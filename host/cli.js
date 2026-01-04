@@ -64,7 +64,16 @@ function parseArgs(args) {
   while (i < args.length) {
     if (args[i].startsWith('--')) {
       const key = args[i].slice(2);
-      const value = args[i + 1];
+      let value = args[i + 1];
+
+      // Parse numeric values
+      if (value && /^\d+$/.test(value)) {
+        value = parseInt(value, 10);
+      }
+      // Parse boolean values
+      if (value === 'true') value = true;
+      if (value === 'false') value = false;
+
       result[key] = value;
       i += 2;
     } else {

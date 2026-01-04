@@ -1,0 +1,15 @@
+{
+  "name": "claudezilla-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for Claudezilla Firefox browser automation",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^0.5.0"
+  },
+  "author": "Chris Lyons <support@boot.industries>",
+  "license": "MIT"
+}

@@ -50,9 +50,52 @@ Click the Claudezilla icon in the toolbar. You should see "Connected" status.
 
 ## Usage
 
-Once installed, Claudezilla provides browser automation capabilities that can be accessed through the native messaging protocol.
+### MCP Server (Recommended)
 
-### Testing Commands
+Claudezilla includes an MCP server so Claude Code sessions can discover and use Firefox automation.
+
+**Setup:**
+```bash
+# Install MCP server dependencies
+cd mcp && npm install
+
+# Add to your Claude Code MCP config (~/.claude/.mcp.json):
+{
+  "mcpServers": {
+    "claudezilla": {
+      "command": "node",
+      "args": ["/path/to/claudezilla/mcp/server.js"]
+    }
+  }
+}
+```
+
+**Available MCP Tools:**
+- `firefox_create_window` — Create a private browser window
+- `firefox_navigate` — Navigate to URL
+- `firefox_get_content` — Read page content
+- `firefox_click` — Click element by selector
+- `firefox_type` — Type into input field
+- `firefox_screenshot` — Capture screenshot
+- `firefox_get_tabs` — List open tabs
+- `firefox_close_window` — Close browser window
+
+### CLI Usage
+
+Control Firefox directly from the command line:
+
+```bash
+./host/cli.js ping
+./host/cli.js createWindow --url https://example.com
+./host/cli.js navigate --url https://example.com
+./host/cli.js getContent
+./host/cli.js click --selector "button.submit"
+./host/cli.js type --selector "input[name=q]" --text "hello"
+./host/cli.js screenshot
+./host/cli.js closeWindow --windowId 123
+```
+
+### Browser Console
 
 Open the browser console (Ctrl+Shift+J) and use:
 
@@ -67,17 +110,26 @@ browser.runtime.sendMessage({ action: 'getActiveTab' }).then(console.log);
 browser.runtime.sendMessage({ action: 'navigate', params: { url: 'https://example.com' } });
 ```
 
+## Security
+
+- **Private windows only** — Claude can only operate in private browser windows
+- **Command whitelist** — Only predefined commands are allowed (no arbitrary code execution)
+- **Structured data** — Page content is returned as data, never interpreted as instructions
+- **Local socket** — CLI communication is local-only via Unix socket
+
+See [SECURITY.md](./SECURITY.md) for details.
+
 ## Architecture
 
 ```
-┌─────────────────────┐     ┌──────────────────────┐
-│  Firefox Extension  │────▶│  Native Messaging    │
-│  (WebExtension)     │◀────│  Host (Node.js)      │
-└─────────────────────┘     └──────────────────────┘
-        │
-        ▼
-   Browser APIs
-   (tabs, DOM)
+┌─────────────────────┐     ┌──────────────────────┐     ┌─────────────────┐
+│  Firefox Extension  │────▶│  Native Messaging    │────▶│  MCP Server     │
+│  (WebExtension)     │◀────│  Host (Node.js)      │◀────│  (Claude Code)  │
+└─────────────────────┘     └──────────────────────┘     └─────────────────┘
+        │                            │
+        ▼                            ▼
+   Browser APIs              Unix Socket IPC
+   (tabs, DOM)               /tmp/claudezilla.sock
 ```
 
 ## Development
