@@ -23,6 +23,8 @@ const SOCKET_PATH = '/tmp/claudezilla.sock';
 function sendCommand(command, params = {}) {
   return new Promise((resolve, reject) => {
     const socket = connect(SOCKET_PATH);
+    let buffer = '';
+    let resolved = false;
 
     socket.on('connect', () => {
       const message = JSON.stringify({ command, params }) + '\n';
@@ -30,16 +32,25 @@ function sendCommand(command, params = {}) {
     });
 
     socket.on('data', (data) => {
-      try {
-        const response = JSON.parse(data.toString().trim());
-        socket.end();
-        resolve(response);
-      } catch (e) {
-        reject(new Error('Invalid response from Claudezilla host'));
+      buffer += data.toString();
+
+      // Check if we have a complete JSON response (newline-delimited)
+      const newlineIndex = buffer.indexOf('\n');
+      if (newlineIndex !== -1 && !resolved) {
+        const jsonStr = buffer.slice(0, newlineIndex);
+        try {
+          const response = JSON.parse(jsonStr);
+          resolved = true;
+          socket.end();
+          resolve(response);
+        } catch (e) {
+          reject(new Error('Invalid response from Claudezilla host: ' + e.message));
+        }
       }
     });
 
     socket.on('error', (err) => {
+      if (resolved) return;
       if (err.code === 'ENOENT') {
         reject(new Error('Claudezilla not running. Open Firefox with the Claudezilla extension loaded.'));
       } else if (err.code === 'ECONNREFUSED') {
@@ -49,9 +60,24 @@ function sendCommand(command, params = {}) {
       }
     });
 
+    socket.on('close', () => {
+      // If socket closes before we got a response, try parsing buffer
+      if (!resolved && buffer) {
+        try {
+          const response = JSON.parse(buffer.trim());
+          resolved = true;
+          resolve(response);
+        } catch (e) {
+          // Ignore - may have already resolved
+        }
+      }
+    });
+
     socket.on('timeout', () => {
       socket.end();
-      reject(new Error('Connection timed out'));
+      if (!resolved) {
+        reject(new Error('Connection timed out'));
+      }
     });
 
     socket.setTimeout(30000);

@@ -22,6 +22,7 @@ const SOCKET_PATH = '/tmp/claudezilla.sock';
 function sendCommand(command, params = {}) {
   return new Promise((resolve, reject) => {
     const socket = connect(SOCKET_PATH);
+    let buffer = '';
 
     socket.on('connect', () => {
       const message = JSON.stringify({ command, params }) + '\n';
@@ -29,12 +30,19 @@ function sendCommand(command, params = {}) {
     });
 
     socket.on('data', (data) => {
-      try {
-        const response = JSON.parse(data.toString().trim());
-        socket.end();
-        resolve(response);
-      } catch (e) {
-        reject(new Error('Invalid response from host'));
+      buffer += data.toString();
+
+      // Check if we have a complete JSON response (newline-delimited)
+      const newlineIndex = buffer.indexOf('\n');
+      if (newlineIndex !== -1) {
+        const jsonStr = buffer.slice(0, newlineIndex);
+        try {
+          const response = JSON.parse(jsonStr);
+          socket.end();
+          resolve(response);
+        } catch (e) {
+          reject(new Error('Invalid response from host: ' + e.message));
+        }
       }
     });
 
@@ -45,6 +53,18 @@ function sendCommand(command, params = {}) {
         reject(new Error('Connection refused. Make sure the extension is connected.'));
       } else {
         reject(err);
+      }
+    });
+
+    socket.on('close', () => {
+      // If socket closes before we got a response, try parsing buffer
+      if (buffer && !buffer.includes('\n')) {
+        try {
+          const response = JSON.parse(buffer.trim());
+          resolve(response);
+        } catch (e) {
+          // Only reject if we haven't already resolved
+        }
       }
     });
 
