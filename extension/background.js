@@ -126,8 +126,28 @@ async function executeInTab(tabId, action, params) {
 }
 
 /**
+ * SECURITY: Verify we're operating in a private window
+ * Returns the active tab if in private window, throws if not
+ */
+async function requirePrivateWindow() {
+  const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+  if (!tab) {
+    throw new Error('No active tab');
+  }
+
+  const win = await browser.windows.get(tab.windowId);
+  if (!win.incognito) {
+    throw new Error('SECURITY: Claudezilla only operates in private windows. Use createWindow first.');
+  }
+
+  return tab;
+}
+
+/**
  * Handle command from CLI (via native host)
  * Executes the command and sends result back to host
+ *
+ * SECURITY: Most commands require a private window
  */
 async function handleCliCommand(message) {
   const { id, command, params = {} } = message;
@@ -152,8 +172,10 @@ async function handleCliCommand(message) {
       case 'navigate': {
         const { url } = params;
         if (!url) throw new Error('url is required');
-        const tab = await browser.tabs.create({ url });
-        result = { tabId: tab.id, url };
+        // SECURITY: Require private window, then navigate in current tab
+        const currentTab = await requirePrivateWindow();
+        await browser.tabs.update(currentTab.id, { url });
+        result = { tabId: currentTab.id, url };
         break;
       }
 
@@ -177,31 +199,68 @@ async function handleCliCommand(message) {
         break;
       }
 
+      case 'createWindow': {
+        // Create a new window, optionally private (incognito)
+        const { private: isPrivate = true, url } = params;
+        const windowOpts = { incognito: isPrivate };
+        if (url) {
+          windowOpts.url = url;
+        }
+        const win = await browser.windows.create(windowOpts);
+        result = {
+          windowId: win.id,
+          private: win.incognito,
+          tabId: win.tabs?.[0]?.id,
+        };
+        break;
+      }
+
+      case 'closeWindow': {
+        const { windowId } = params;
+        if (!windowId) throw new Error('windowId is required');
+        await browser.windows.remove(windowId);
+        result = { closed: true, windowId };
+        break;
+      }
+
+      case 'getWindows': {
+        const windows = await browser.windows.getAll({ populate: true });
+        result = windows.map(w => ({
+          windowId: w.id,
+          private: w.incognito,
+          focused: w.focused,
+          tabCount: w.tabs?.length || 0,
+        }));
+        break;
+      }
+
       case 'getContent': {
-        const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
-        if (!tab) throw new Error('No active tab');
+        // SECURITY: Require private window
+        const tab = await requirePrivateWindow();
         const response = await executeInTab(tab.id, 'getContent', params);
         result = response.result;
         break;
       }
 
       case 'click': {
-        const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
-        if (!tab) throw new Error('No active tab');
+        // SECURITY: Require private window
+        const tab = await requirePrivateWindow();
         const response = await executeInTab(tab.id, 'click', params);
         result = response.result;
         break;
       }
 
       case 'type': {
-        const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
-        if (!tab) throw new Error('No active tab');
+        // SECURITY: Require private window
+        const tab = await requirePrivateWindow();
         const response = await executeInTab(tab.id, 'type', params);
         result = response.result;
         break;
       }
 
       case 'screenshot': {
+        // SECURITY: Require private window
+        await requirePrivateWindow();
         const dataUrl = await browser.tabs.captureVisibleTab(null, { format: 'png' });
         result = { dataUrl };
         break;

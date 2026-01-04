@@ -31,6 +31,9 @@ const ALLOWED_COMMANDS = new Set([
   'screenshot',
   'getTabs',
   'closeTab',
+  'createWindow',
+  'closeWindow',
+  'getWindows',
 ]);
 
 // Log to stderr and debug file

@@ -85,22 +85,33 @@ Claudezilla CLI - Control Firefox from the command line
 Usage:
   claudezilla-cli <command> [options]
 
-Commands:
-  ping                          Test connection
-  version                       Get version info
-  navigate --url <url>          Navigate to URL
+Window Commands:
+  createWindow [--private true] [--url <url>]  Create new window (private by default)
+  closeWindow --windowId <id>   Close a window
+  getWindows                    List all windows
+
+Tab Commands:
+  navigate --url <url>          Navigate to URL in current tab
   getActiveTab                  Get active tab info
   getTabs                       List all tabs
   closeTab --tabId <id>         Close a tab
+
+Page Commands:
   getContent [--selector <sel>] Get page content
   click --selector <selector>   Click an element
   type --selector <sel> --text <text>  Type into input
   screenshot                    Capture screenshot (base64)
 
+Utility:
+  ping                          Test connection
+  version                       Get version info
+
 Examples:
-  claudezilla-cli ping
+  claudezilla-cli createWindow                    # Start fresh private window
+  claudezilla-cli createWindow --url https://example.com
   claudezilla-cli navigate --url https://example.com
   claudezilla-cli click --selector "button[type=submit]"
+  claudezilla-cli closeWindow --windowId 123
 `);
     process.exit(0);
   }
