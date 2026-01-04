@@ -1,0 +1,44 @@
+{
+  "manifest_version": 2,
+  "name": "Claudezilla",
+  "version": "0.1.0",
+  "description": "Firefox browser automation for Claude Code",
+  "author": "Chris Lyons <support@boot.industries>",
+
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "claudezilla@boot.industries",
+      "strict_min_version": "91.0"
+    }
+  },
+
+  "permissions": [
+    "nativeMessaging",
+    "tabs",
+    "activeTab",
+    "<all_urls>"
+  ],
+
+  "background": {
+    "scripts": ["background.js"],
+    "persistent": true
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+
+  "browser_action": {
+    "default_icon": "icons/claudezilla-48.svg",
+    "default_title": "Claudezilla",
+    "default_popup": "popup/popup.html"
+  },
+
+  "icons": {
+    "48": "icons/claudezilla-48.svg"
+  }
+}

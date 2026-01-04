@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- Background circle -->
+  <circle cx="24" cy="24" r="22" fill="#D97706"/>
+
+  <!-- Godzilla-like silhouette (simplified) -->
+  <path d="M16 34 L16 26 L14 24 L14 20 L16 18 L18 18 L20 16 L22 16 L24 14 L26 14 L28 16 L30 16 L32 18 L34 20 L34 24 L32 26 L32 34 L28 34 L28 28 L26 30 L22 30 L20 28 L20 34 Z" fill="#1F2937"/>
+
+  <!-- Eye -->
+  <circle cx="26" cy="20" r="2" fill="#FCD34D"/>
+
+  <!-- Spines -->
+  <path d="M24 14 L25 10 L26 14 M28 16 L30 12 L31 16 M22 16 L20 12 L19 16" stroke="#1F2937" stroke-width="1.5" fill="none"/>
+</svg>

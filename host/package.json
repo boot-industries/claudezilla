@@ -1,0 +1,15 @@
+{
+  "name": "claudezilla-host",
+  "version": "0.1.0",
+  "description": "Native messaging host for Claudezilla Firefox extension",
+  "type": "module",
+  "main": "index.js",
+  "bin": {
+    "claudezilla-host": "./index.js"
+  },
+  "scripts": {
+    "start": "node index.js"
+  },
+  "author": "Chris Lyons <support@boot.industries>",
+  "license": "MIT"
+}

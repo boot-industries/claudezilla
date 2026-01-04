@@ -1,0 +1,23 @@
+{
+  "name": "claudezilla",
+  "version": "0.1.0",
+  "description": "Firefox extension for Claude Code browser automation",
+  "private": true,
+  "scripts": {
+    "install:host": "cd host && npm install",
+    "install:macos": "./install/install-macos.sh",
+    "test": "echo 'Run: npm run install:macos && load extension in about:debugging'"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/boot-industries/claudezilla"
+  },
+  "author": "Chris Lyons <support@boot.industries>",
+  "license": "MIT",
+  "keywords": [
+    "claude",
+    "firefox",
+    "browser-automation",
+    "webextension"
+  ]
+}
