@@ -8,6 +8,7 @@ Firefox browser automation for Claude Code.
 
 ## Recent Documents
 
+- [[CLZ004 Welcome Page UX Session]]
 - [[CLZ003 Security Audit v0.4.5]]
 - [[CLZ002 Changelog]]
 - [[CLZ001 Architecture Overview]]
@@ -17,6 +18,7 @@ Firefox browser automation for Claude Code.
 - [[CLZ001 Architecture Overview]]
 - [[CLZ002 Changelog]]
 - [[CLZ003 Security Audit v0.4.5]]
+- [[CLZ004 Welcome Page UX Session]]
 
 ## Navigation
 

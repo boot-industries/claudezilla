@@ -35,6 +35,15 @@ See [[CLZ003 Security Audit v0.4.5]] for full details.
 ### Enhancements
 
 - **Click feedback** - Returns element `text`, `id`, and `className` for better debugging
+- **Watermark improvements** - Moved to bottom-left corner, clickable to open popup, hover scale effect
+- **Checkbox branding** - Popup checkboxes use favicon terracotta color (#D14D32)
+
+### New Features
+
+- **Welcome page** - Retro-futuristic onboarding with animated Godzilla logo, visual step-by-step permission guide
+- **First-run UX** - Automatically shows welcome page when private window permission not enabled
+- **Screenshot compression toggle** - User-configurable JPEG vs PNG format (default: compressed)
+- **Permission status indicator** - Shows private window permission state in popup
 
 ---
 
