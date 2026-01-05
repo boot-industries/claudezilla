@@ -38,6 +38,13 @@ Firefox browser automation for [Claude Code](https://claude.com/claude-code). A 
 - **Screenshot Mutex** — Screenshot requests are serialized to prevent tab-switching collisions
 - **Agent IDs** — Each MCP server instance gets a unique ID for ownership tracking
 
+### Security Hardening (v0.4.5)
+- **Socket Security** — 0600 permissions, 10MB buffer limit, secure temp path
+- **URL Validation** — Blocks javascript:, data:, file:// schemes
+- **Content Ownership** — All content commands verify tab ownership
+- **Opt-in Console** — Console capture disabled by default
+- **Selector Validation** — CSS selectors validated before execution
+
 ## Requirements
 
 - Firefox 91+
@@ -184,25 +191,28 @@ See [SECURITY.md](./SECURITY.md) for more details.
 
 ## Extension Permissions
 
-Claudezilla's behavior changes based on the "Run in Private Windows" permission in Firefox:
+Claudezilla works in both regular and private Firefox windows. The "Run in Private Windows" permission controls behavior:
 
-- **Permission disabled (default)** — All commands work only in private windows. `firefox_navigate` is enabled.
-- **Permission enabled** — All commands still work in private windows. `firefox_navigate` is disabled to prevent agents from creating non-private windows.
+- **Permission disabled (default)** — Extension only works in regular windows. Enable this permission to use Claudezilla in private browsing.
+- **Permission enabled** — Extension works in private windows. `firefox_navigate` is disabled to prevent agents from accidentally creating non-private windows (preserving privacy intent).
 
-To enable the permission:
-1. Open Firefox and navigate to about:addons
+To enable private window support:
+1. Open Firefox and navigate to `about:addons`
 2. Click on **Claudezilla**
 3. Go to **Details** tab
 4. Find **"Run in Private Windows"** and click **Allow**
 
-## Security
+## Security (v0.4.5)
 
-- **Private windows only** — Claude can only operate in private browser windows
-- **Command whitelist** — Only predefined commands are allowed (no arbitrary code execution)
-- **Structured data** — Page content is returned as data, never interpreted as instructions
-- **Local socket** — CLI communication is local-only via Unix socket
+- **Command whitelist** — Only predefined commands allowed (no arbitrary code execution)
+- **Structured data** — Page content returned as data, never interpreted as instructions
+- **Local socket** — Unix socket with 0600 permissions (user-only access)
+- **URL validation** — Blocks `javascript:`, `data:`, `file://` schemes
+- **Tab ownership** — Agents can only interact with tabs they created (128-bit agent IDs)
+- **Opt-in console capture** — Console logs only captured when explicitly requested
+- **Selector validation** — CSS selectors validated before execution
 
-See [SECURITY.md](./SECURITY.md) for details.
+See [SECURITY.md](./SECURITY.md) for full security model (11 principles).
 
 ## Architecture
 

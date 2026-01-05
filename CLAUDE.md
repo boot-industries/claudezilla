@@ -1,6 +1,6 @@
 # Claudezilla - Claude Code Firefox Extension
 
-**Version:** 0.4.4
+**Version:** 0.4.5
 
 ## Overview
 
@@ -8,7 +8,8 @@ Firefox extension providing browser automation for Claude Code CLI. A Google-fre
 
 **Key Features (v0.4.x):**
 - Single window with max 10 tabs shared across Claude agents
-- Multi-agent safety (tab ownership, screenshot mutex)
+- Multi-agent safety (tab ownership, screenshot mutex, 128-bit agent IDs)
+- Security hardening (socket permissions, URL validation, selector validation)
 - Image compression (JPEG 60%, 50% scale by default)
 - Payload optimization (text truncation, node limits)
 - Visual effects (focus glow, watermark with animated electrons)
@@ -122,12 +123,13 @@ claudezilla@boot.industries
 | getAccessibilitySnapshot | 200 nodes | `maxNodes` |
 | getPageState | 50 links, 30 buttons | `maxLinks`, `maxButtons`, etc. |
 
-## Multi-Agent Safety (v0.4.4)
+## Multi-Agent Safety (v0.4.4+)
 
 **Tab Ownership:**
 - Each tab tracks its creator (agentId from MCP server)
 - Only the creator can close their own tab via `closeTab`
-- Other agents get: `OWNERSHIP: Tab X was created by agent_Y. You cannot close another agent's tab.`
+- All content commands (getContent, click, type, etc.) verify ownership
+- Other agents get: `OWNERSHIP: Cannot <operation> tab X (owned by agent_Y)`
 - Use `getTabs` to see ownership info for all tabs
 
 **Screenshot Mutex:**
@@ -135,7 +137,27 @@ claudezilla@boot.industries
 - Prevents tab-switching collisions when multiple agents screenshot simultaneously
 - Each request waits for previous to complete before switching tabs
 
-**Agent IDs:**
-- Generated at MCP server startup: `agent_<random>_<pid>`
-- Passed automatically with `createWindow` and `closeTab` commands
+**Agent IDs (v0.4.5):**
+- Generated at MCP server startup: `agent_<128-bit-hex>_<pid>`
+- 128-bit entropy (16 random bytes) for security
+- Passed automatically with all ownership-requiring commands
 - Visible in `getTabs` response as `ownerId` field
+
+## Security (v0.4.5)
+
+**Socket Security:**
+- Permissions set to 0600 (user-only access)
+- Buffer limit 10MB prevents memory exhaustion
+- Uses XDG_RUNTIME_DIR when available (secure temp path)
+
+**Input Validation:**
+- URL schemes whitelisted: `http:`, `https:`, `about:` only
+- CSS selectors validated with length limit (1000 chars)
+- Sensitive URL parameters redacted in network monitoring
+
+**Privacy:**
+- Console capture opt-in (disabled by default)
+- Request bodies never captured (prevents credential leak)
+- Debug logs created with 0600 permissions
+
+See [SECURITY.md](./SECURITY.md) for full security model.
