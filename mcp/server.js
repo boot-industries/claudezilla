@@ -14,8 +14,10 @@ import {
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import { connect } from 'net';
+import { tmpdir } from 'os';
+import { join } from 'path';
 
-const SOCKET_PATH = '/tmp/claudezilla.sock';
+const SOCKET_PATH = join(tmpdir(), 'claudezilla.sock');
 
 /**
  * Send command to Claudezilla via Unix socket
