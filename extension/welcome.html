@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Welcome to Claudezilla</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --terracotta: #D14D32;
+      --terracotta-dark: #b83e28;
+      --terracotta-glow: rgba(209, 77, 50, 0.4);
+      --yellow: #FCD34D;
+      --bg-dark: #0a0a0a;
+      --bg-card: #1a1a1a;
+      --text-primary: #ffffff;
+      --text-secondary: #aaaaaa;
+      --grid-color: rgba(209, 77, 50, 0.08);
+    }
+
+    body {
+      font-family: 'Space Mono', monospace;
+      background: var(--bg-dark);
+      color: var(--text-primary);
+      min-height: 100vh;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    /* Animated grid background */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-image:
+        linear-gradient(var(--grid-color) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+      background-size: 40px 40px;
+      z-index: 0;
+      animation: gridPulse 20s ease-in-out infinite;
+    }
+
+    @keyframes gridPulse {
+      0%, 100% { opacity: 0.3; }
+      50% { opacity: 0.6; }
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 60px 32px;
+    }
+
+    /* Hero Section */
+    .hero {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 80px;
+      align-items: center;
+      margin-bottom: 120px;
+      position: relative;
+    }
+
+    .hero-content h1 {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 64px;
+      font-weight: 900;
+      line-height: 1;
+      margin-bottom: 16px;
+      background: linear-gradient(135deg, var(--terracotta) 0%, var(--yellow) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-transform: uppercase;
+      letter-spacing: -2px;
+      animation: slideInLeft 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes slideInLeft {
+      from {
+        opacity: 0;
+        transform: translateX(-40px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    .hero-content .tagline {
+      font-size: 20px;
+      color: var(--text-secondary);
+      margin-bottom: 32px;
+      font-weight: 400;
+      animation: slideInLeft 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.1s backwards;
+    }
+
+    .hero-content .description {
+      font-size: 16px;
+      line-height: 1.6;
+      color: var(--text-secondary);
+      margin-bottom: 40px;
+      animation: slideInLeft 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.2s backwards;
+    }
+
+    .hero-visual {
+      position: relative;
+      height: 400px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: slideInRight 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.3s backwards;
+    }
+
+    @keyframes slideInRight {
+      from {
+        opacity: 0;
+        transform: translateX(40px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    .monster-logo {
+      width: 280px;
+      height: 280px;
+      position: relative;
+      filter: drop-shadow(0 0 40px var(--terracotta-glow))
+              drop-shadow(0 0 80px var(--terracotta-glow));
+      animation: float 6s ease-in-out infinite, glow 3s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0px) rotate(-2deg); }
+      50% { transform: translateY(-20px) rotate(2deg); }
+    }
+
+    @keyframes glow {
+      0%, 100% {
+        filter: drop-shadow(0 0 40px var(--terracotta-glow))
+                drop-shadow(0 0 80px var(--terracotta-glow));
+      }
+      50% {
+        filter: drop-shadow(0 0 60px var(--terracotta-glow))
+                drop-shadow(0 0 120px var(--terracotta-glow));
+      }
+    }
+
+    /* Status Badge */
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      animation: slideInLeft 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.4s backwards;
+    }
+
+    .status-badge.disabled {
+      background: rgba(239, 68, 68, 0.15);
+      color: #EF4444;
+      border: 2px solid #EF4444;
+    }
+
+    .status-badge.enabled {
+      background: rgba(34, 197, 94, 0.15);
+      color: #22C55E;
+      border: 2px solid #22C55E;
+    }
+
+    .status-badge .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(1.2); }
+    }
+
+    /* Setup Guide */
+    .setup-guide {
+      margin-bottom: 80px;
+    }
+
+    .section-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 16px;
+      color: var(--terracotta);
+      text-transform: uppercase;
+      letter-spacing: -1px;
+    }
+
+    .section-subtitle {
+      font-size: 18px;
+      color: var(--text-secondary);
+      margin-bottom: 48px;
+      line-height: 1.6;
+    }
+
+    /* Steps */
+    .steps {
+      display: grid;
+      gap: 48px;
+    }
+
+    .step {
+      display: grid;
+      grid-template-columns: 80px 1fr;
+      gap: 32px;
+      padding: 32px;
+      background: var(--bg-card);
+      border: 2px solid transparent;
+      border-radius: 12px;
+      position: relative;
+      overflow: hidden;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .step::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, var(--terracotta) 0%, transparent 100%);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .step:hover {
+      border-color: var(--terracotta);
+      transform: translateX(8px);
+    }
+
+    .step:hover::before {
+      opacity: 0.05;
+    }
+
+    .step-number {
+      width: 80px;
+      height: 80px;
+      background: var(--terracotta);
+      color: var(--bg-dark);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 36px;
+      font-weight: 900;
+      position: relative;
+      z-index: 1;
+      box-shadow: 0 0 30px var(--terracotta-glow);
+    }
+
+    .step-content {
+      position: relative;
+      z-index: 1;
+    }
+
+    .step-content h3 {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      color: var(--text-primary);
+    }
+
+    .step-content p {
+      font-size: 16px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+
+    /* Visual Diagrams */
+    .diagram {
+      background: #000;
+      border: 2px solid var(--terracotta);
+      border-radius: 8px;
+      padding: 24px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .diagram::before {
+      content: 'FIREFOX UI';
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      font-size: 10px;
+      color: var(--terracotta);
+      opacity: 0.5;
+      letter-spacing: 1px;
+    }
+
+    .browser-chrome {
+      background: #2a2a2a;
+      border-radius: 6px;
+      padding: 8px;
+      margin-bottom: 12px;
+    }
+
+    .browser-tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 8px;
+    }
+
+    .browser-tab {
+      background: #1a1a1a;
+      padding: 6px 12px;
+      border-radius: 4px 4px 0 0;
+      font-size: 11px;
+      color: #888;
+    }
+
+    .browser-tab.active {
+      background: var(--terracotta);
+      color: #fff;
+    }
+
+    .browser-address {
+      background: #1a1a1a;
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-size: 12px;
+      color: #666;
+    }
+
+    .extension-list {
+      background: #1a1a1a;
+      border-radius: 6px;
+      padding: 16px;
+    }
+
+    .extension-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px;
+      background: #2a2a2a;
+      border-radius: 6px;
+      margin-bottom: 8px;
+      border: 2px solid transparent;
+      transition: all 0.3s;
+    }
+
+    .extension-item.highlighted {
+      border-color: var(--terracotta);
+      background: rgba(209, 77, 50, 0.1);
+      animation: highlight 2s ease-in-out infinite;
+    }
+
+    @keyframes highlight {
+      0%, 100% { box-shadow: 0 0 0 0 var(--terracotta-glow); }
+      50% { box-shadow: 0 0 20px 5px var(--terracotta-glow); }
+    }
+
+    .extension-item .icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      background: var(--terracotta);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+    }
+
+    .extension-item .info {
+      flex: 1;
+      margin-left: 12px;
+    }
+
+    .extension-item .name {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .extension-item .description {
+      font-size: 11px;
+      color: #666;
+    }
+
+    .toggle-switch {
+      width: 48px;
+      height: 24px;
+      background: #333;
+      border-radius: 12px;
+      position: relative;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+
+    .toggle-switch.on {
+      background: var(--terracotta);
+    }
+
+    .toggle-switch::after {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 20px;
+      height: 20px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform 0.3s;
+    }
+
+    .toggle-switch.on::after {
+      transform: translateX(24px);
+    }
+
+    .arrow-indicator {
+      position: absolute;
+      width: 40px;
+      height: 40px;
+      animation: bounce 2s ease-in-out infinite;
+    }
+
+    @keyframes bounce {
+      0%, 100% { transform: translate(0, 0); }
+      50% { transform: translate(10px, 10px); }
+    }
+
+    .arrow-indicator svg {
+      width: 100%;
+      height: 100%;
+      filter: drop-shadow(0 0 10px var(--terracotta));
+    }
+
+    /* CTA Buttons */
+    .cta-buttons {
+      display: flex;
+      gap: 16px;
+      margin-top: 64px;
+      animation: slideUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.5s backwards;
+    }
+
+    @keyframes slideUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    button {
+      flex: 1;
+      padding: 20px 32px;
+      border: none;
+      border-radius: 8px;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 16px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    button::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 0;
+      height: 0;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      transition: width 0.6s, height 0.6s;
+    }
+
+    button:hover::before {
+      width: 300px;
+      height: 300px;
+    }
+
+    .btn-primary {
+      background: var(--terracotta);
+      color: var(--text-primary);
+      box-shadow: 0 0 30px var(--terracotta-glow);
+    }
+
+    .btn-primary:hover {
+      background: var(--terracotta-dark);
+      transform: translateY(-2px);
+      box-shadow: 0 0 50px var(--terracotta-glow);
+    }
+
+    .btn-primary:active {
+      transform: translateY(0);
+    }
+
+    .btn-secondary {
+      background: transparent;
+      color: var(--text-secondary);
+      border: 2px solid #333;
+    }
+
+    .btn-secondary:hover {
+      background: #1a1a1a;
+      border-color: #555;
+      color: var(--text-primary);
+    }
+
+    /* Note */
+    .note {
+      background: rgba(209, 77, 50, 0.1);
+      border-left: 4px solid var(--terracotta);
+      padding: 20px 24px;
+      border-radius: 0 8px 8px 0;
+      margin-top: 32px;
+    }
+
+    .note strong {
+      font-family: 'Orbitron', sans-serif;
+      color: var(--terracotta);
+      display: block;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+
+    .note p {
+      font-size: 14px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+      margin: 0;
+    }
+
+    code {
+      background: #000;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-family: 'Space Mono', monospace;
+      font-size: 13px;
+      color: var(--yellow);
+      border: 1px solid #333;
+    }
+
+    @media (max-width: 900px) {
+      .hero {
+        grid-template-columns: 1fr;
+        gap: 40px;
+        text-align: center;
+      }
+
+      .hero-content h1 {
+        font-size: 48px;
+      }
+
+      .hero-visual {
+        height: 300px;
+      }
+
+      .monster-logo {
+        width: 200px;
+        height: 200px;
+      }
+
+      .step {
+        grid-template-columns: 1fr;
+        gap: 20px;
+      }
+
+      .cta-buttons {
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Hero Section -->
+    <div class="hero">
+      <div class="hero-content">
+        <h1>Claudezilla</h1>
+        <p class="tagline">Browser automation awakens</p>
+        <p class="description">
+          Give Claude Code full control of Firefox with powerful browser automation.
+          Navigate pages, fill forms, extract data, and automate workflows—all through
+          Claude's natural language interface.
+        </p>
+        <div id="permissionStatus" class="status-badge disabled">
+          <span class="dot"></span>
+          Private Windows: Not Enabled
+        </div>
+      </div>
+      <div class="hero-visual">
+        <svg class="monster-logo" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="32" cy="32" r="30" fill="#D14D32"/>
+          <path d="M20 46 L20 34 L17 31 L17 26 L20 23 L23 23 L26 20 L29 20 L32 17 L35 17 L38 20 L41 20 L44 23 L47 26 L47 31 L44 34 L44 46 L38 46 L38 36 L34 39 L30 39 L26 36 L26 46 Z" fill="#1a1a1a"/>
+          <circle cx="35" cy="26" r="3" fill="#FCD34D">
+            <animate attributeName="opacity" values="1;0.6;1" dur="3s" repeatCount="indefinite"/>
+          </circle>
+          <path d="M32 17 L33 12 L34 17 M38 20 L41 14 L42 20 M30 20 L27 14 L26 20" stroke="#1a1a1a" stroke-width="2" fill="none"/>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Setup Guide -->
+    <div class="setup-guide">
+      <h2 class="section-title">🔓 Enable Private Window Access</h2>
+      <p class="section-subtitle">
+        Claudezilla works best with private window permission. This gives Claude full browser
+        control while keeping your automation isolated and secure.
+      </p>
+
+      <div class="steps">
+        <!-- Step 1 -->
+        <div class="step">
+          <div class="step-number">1</div>
+          <div class="step-content">
+            <h3>Open Extension Settings</h3>
+            <p>Navigate to Firefox Add-ons manager or click the button below.</p>
+            <div class="diagram">
+              <div class="browser-chrome">
+                <div class="browser-tabs">
+                  <div class="browser-tab">New Tab</div>
+                  <div class="browser-tab active">Add-ons and Themes</div>
+                  <div class="browser-tab">Settings</div>
+                </div>
+                <div class="browser-address">about:addons</div>
+              </div>
+              <div style="position: relative; margin-top: 16px;">
+                <div class="arrow-indicator" style="top: -10px; right: 20px;">
+                  <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M20 5 L20 30 M20 30 L10 20 M20 30 L30 20" stroke="#D14D32" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="step">
+          <div class="step-number">2</div>
+          <div class="step-content">
+            <h3>Find Claudezilla Extension</h3>
+            <p>Locate "Claudezilla" in your installed extensions list.</p>
+            <div class="diagram">
+              <div class="extension-list">
+                <div class="extension-item">
+                  <div class="icon">🔒</div>
+                  <div class="info">
+                    <div class="name">Privacy Badger</div>
+                    <div class="description">Blocks invisible trackers</div>
+                  </div>
+                </div>
+                <div class="extension-item highlighted">
+                  <div class="icon">🦖</div>
+                  <div class="info">
+                    <div class="name">Claudezilla</div>
+                    <div class="description">Browser automation for Claude Code</div>
+                  </div>
+                </div>
+                <div class="extension-item">
+                  <div class="icon">🎨</div>
+                  <div class="info">
+                    <div class="name">Dark Reader</div>
+                    <div class="description">Dark mode for every website</div>
+                  </div>
+                </div>
+              </div>
+              <div style="position: relative; margin-top: 16px;">
+                <div class="arrow-indicator" style="top: -60px; left: 50%; transform: translateX(-50%);">
+                  <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="20" cy="20" r="18" stroke="#D14D32" stroke-width="3" fill="none"/>
+                    <path d="M20 10 L20 30 M15 25 L20 30 L25 25" stroke="#D14D32" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="step">
+          <div class="step-number">3</div>
+          <div class="step-content">
+            <h3>Enable Private Window Permission</h3>
+            <p>Click on Claudezilla details, then toggle "Run in Private Windows" to ON.</p>
+            <div class="diagram">
+              <div style="background: #1a1a1a; padding: 20px; border-radius: 6px;">
+                <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 20px;">
+                  <div class="icon" style="width: 48px; height: 48px; background: var(--terracotta); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 28px;">🦖</div>
+                  <div>
+                    <div style="font-size: 18px; font-weight: 700; color: #fff; margin-bottom: 4px;">Claudezilla</div>
+                    <div style="font-size: 12px; color: #666;">by boot.industries</div>
+                  </div>
+                </div>
+                <div style="background: #2a2a2a; padding: 16px; border-radius: 6px; border: 2px solid var(--terracotta);">
+                  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                    <span style="font-size: 14px; color: #fff;">Run in Private Windows</span>
+                    <div class="toggle-switch on"></div>
+                  </div>
+                  <div style="font-size: 11px; color: #888; line-height: 1.4;">
+                    This extension will be able to read and change data in private windows.
+                  </div>
+                </div>
+              </div>
+              <div style="position: relative; margin-top: 16px;">
+                <div class="arrow-indicator" style="top: -100px; right: 80px;">
+                  <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M5 20 L30 20 M30 20 L20 10 M30 20 L20 30" stroke="#D14D32" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="note">
+        <strong>⚡ Why Private Windows?</strong>
+        <p>
+          Private window permission allows Claude to create and control browser tabs without
+          interference. You can still use Claudezilla without this permission, but some features
+          will be restricted. You can enable this anytime from <code>about:addons</code>.
+        </p>
+      </div>
+    </div>
+
+    <!-- CTA Buttons -->
+    <div class="cta-buttons">
+      <button class="btn-primary" id="openSettings">
+        <span style="position: relative; z-index: 1;">Open Extension Settings</span>
+      </button>
+      <button class="btn-secondary" id="closeTab">
+        <span style="position: relative; z-index: 1;">I'll Do This Later</span>
+      </button>
+    </div>
+  </div>
+
+  <script src="welcome.js"></script>
+</body>
+</html>

@@ -11,11 +11,13 @@ const errorDiv = document.getElementById('error');
 const pingBtn = document.getElementById('pingBtn');
 const showWatermarkCheckbox = document.getElementById('showWatermark');
 const showFocusglowCheckbox = document.getElementById('showFocusglow');
+const compressImagesCheckbox = document.getElementById('compressImages');
 
 // Default settings
 const DEFAULT_SETTINGS = {
   showWatermark: true,
   showFocusglow: true,
+  compressImages: true,
 };
 
 /**
@@ -27,6 +29,7 @@ async function loadSettings() {
     const settings = { ...DEFAULT_SETTINGS, ...stored.claudezilla };
     showWatermarkCheckbox.checked = settings.showWatermark;
     showFocusglowCheckbox.checked = settings.showFocusglow;
+    compressImagesCheckbox.checked = settings.compressImages;
   } catch (e) {
     console.log('[claudezilla] Could not load settings:', e.message);
   }
@@ -40,6 +43,7 @@ async function saveSettings() {
     const settings = {
       showWatermark: showWatermarkCheckbox.checked,
       showFocusglow: showFocusglowCheckbox.checked,
+      compressImages: compressImagesCheckbox.checked,
     };
     await browser.storage.local.set({ claudezilla: settings });
   } catch (e) {
@@ -118,14 +122,33 @@ async function testConnection() {
   }
 }
 
+// Check if this is first run and show welcome page
+async function checkFirstRun() {
+  try {
+    const stored = await browser.storage.local.get('welcomePageSeen');
+    const hasPermission = await browser.extension.isAllowedIncognitoAccess();
+
+    // Show welcome page if not seen AND permission not enabled
+    if (!stored.welcomePageSeen && !hasPermission) {
+      browser.tabs.create({ url: browser.runtime.getURL('welcome.html') });
+    }
+  } catch (e) {
+    console.log('[claudezilla] Could not check first run:', e);
+  }
+}
+
 // Initialize
 async function init() {
+  // Check for first run
+  await checkFirstRun();
+
   // Load settings
   await loadSettings();
 
   // Add setting change listeners
   showWatermarkCheckbox.addEventListener('change', saveSettings);
   showFocusglowCheckbox.addEventListener('change', saveSettings);
+  compressImagesCheckbox.addEventListener('change', saveSettings);
 
   // Test connection on popup open
   testConnection();

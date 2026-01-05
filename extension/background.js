@@ -781,7 +781,12 @@ async function handleCliCommand(message) {
       case 'screenshot': {
         // MUTEX: Serialize all screenshot requests to prevent tab-switching collisions
         // (captureVisibleTab only works on visible tab)
-        const { windowId, tabId: requestedTabId, agentId, quality = 60, scale = 0.5, format = 'jpeg' } = params;
+        // Get user's compression preference
+        const stored = await browser.storage.local.get('claudezilla');
+        const settings = { compressImages: true, ...(stored.claudezilla || {}) };
+        const defaultFormat = settings.compressImages ? 'jpeg' : 'png';
+
+        const { windowId, tabId: requestedTabId, agentId, quality = 60, scale = 0.5, format = defaultFormat } = params;
 
         // SECURITY: Verify agent owns the target tab before queuing screenshot
         if (requestedTabId && agentId) {
