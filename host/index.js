@@ -119,7 +119,7 @@ function handleExtensionMessage(message) {
       id,
       success: true,
       result: {
-        host: '0.2.0',
+        host: '0.4.0',
         node: process.version,
         platform: process.platform,
         features: ['devtools', 'network', 'console', 'evaluate'],

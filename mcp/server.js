@@ -134,6 +134,10 @@ const TOOLS = [
     inputSchema: {
       type: 'object',
       properties: {
+        windowId: {
+          type: 'number',
+          description: 'Target window ID (from firefox_create_window). Optional if only one window.',
+        },
         selector: {
           type: 'string',
           description: 'Optional CSS selector to get content from a specific element',
@@ -147,6 +151,10 @@ const TOOLS = [
     inputSchema: {
       type: 'object',
       properties: {
+        windowId: {
+          type: 'number',
+          description: 'Target window ID (from firefox_create_window). Optional if only one window.',
+        },
         selector: {
           type: 'string',
           description: 'CSS selector for the element to click (e.g., "button.submit", "#login-btn", "a[href*=login]")',
@@ -161,6 +169,10 @@ const TOOLS = [
     inputSchema: {
       type: 'object',
       properties: {
+        windowId: {
+          type: 'number',
+          description: 'Target window ID (from firefox_create_window). Optional if only one window.',
+        },
         selector: {
           type: 'string',
           description: 'CSS selector for the input element',
@@ -182,7 +194,12 @@ const TOOLS = [
     description: 'Capture a screenshot of the visible browser viewport. Returns base64-encoded PNG.',
     inputSchema: {
       type: 'object',
-      properties: {},
+      properties: {
+        windowId: {
+          type: 'number',
+          description: 'Target window ID (from firefox_create_window). Optional if only one window.',
+        },
+      },
     },
   },
   {
@@ -242,6 +259,10 @@ const TOOLS = [
     inputSchema: {
       type: 'object',
       properties: {
+        windowId: {
+          type: 'number',
+          description: 'Target window ID (from firefox_create_window). Optional if only one window.',
+        },
         device: {
           type: 'string',
           description: 'Device preset name (e.g., "iphone-14", "ipad-pro-11", "pixel-7")',
@@ -266,6 +287,10 @@ const TOOLS = [
     inputSchema: {
       type: 'object',
       properties: {
+        windowId: {
+          type: 'number',
+          description: 'Target window ID (from firefox_create_window). Optional if only one window.',
+        },
         level: {
           type: 'string',
           description: 'Filter by log level: log, warn, error, info, debug',
@@ -288,6 +313,10 @@ const TOOLS = [
     inputSchema: {
       type: 'object',
       properties: {
+        windowId: {
+          type: 'number',
+          description: 'Target window ID (from firefox_create_window). Optional if only one window.',
+        },
         type: {
           type: 'string',
           description: 'Filter by request type: xmlhttprequest, script, stylesheet, image, font, etc.',
@@ -314,6 +343,10 @@ const TOOLS = [
     inputSchema: {
       type: 'object',
       properties: {
+        windowId: {
+          type: 'number',
+          description: 'Target window ID (from firefox_create_window). Optional if only one window.',
+        },
         expression: {
           type: 'string',
           description: 'JavaScript expression to evaluate (e.g., "document.title", "window.localStorage.getItem(\'key\')")',
@@ -328,6 +361,10 @@ const TOOLS = [
     inputSchema: {
       type: 'object',
       properties: {
+        windowId: {
+          type: 'number',
+          description: 'Target window ID (from firefox_create_window). Optional if only one window.',
+        },
         selector: {
           type: 'string',
           description: 'CSS selector to wait for',
@@ -346,6 +383,10 @@ const TOOLS = [
     inputSchema: {
       type: 'object',
       properties: {
+        windowId: {
+          type: 'number',
+          description: 'Target window ID (from firefox_create_window). Optional if only one window.',
+        },
         selector: {
           type: 'string',
           description: 'CSS selector to scroll to',
@@ -372,6 +413,10 @@ const TOOLS = [
     inputSchema: {
       type: 'object',
       properties: {
+        windowId: {
+          type: 'number',
+          description: 'Target window ID (from firefox_create_window). Optional if only one window.',
+        },
         selector: {
           type: 'string',
           description: 'CSS selector for the element',
@@ -408,7 +453,7 @@ const TOOL_TO_COMMAND = {
 const server = new Server(
   {
     name: 'claudezilla',
-    version: '0.2.0',
+    version: '0.4.0',
   },
   {
     capabilities: {

@@ -22,6 +22,10 @@ let port = null;
 let messageId = 0;
 const pendingRequests = new Map();
 
+// Session tracking for multi-window support
+const sessions = new Map(); // windowId -> { windowId, tabId, createdAt }
+let lastActiveWindowId = null; // Track most recent for fallback
+
 // Network request monitoring
 const networkRequests = [];
 const MAX_NETWORK_ENTRIES = 200;
@@ -231,21 +235,63 @@ async function canRunInPrivateWindows() {
 }
 
 /**
+ * Get session by windowId, or fall back to last active / only session.
+ * Replaces requirePrivateWindow() for multi-window support.
+ * @param {number} windowId - Optional explicit window ID
+ * @returns {Promise<{windowId, tabId, tab}>} Session info with tab object
+ */
+async function getSession(windowId) {
+  let targetWindowId = windowId;
+
+  // If no windowId specified, try fallback strategies
+  if (!targetWindowId) {
+    if (sessions.size === 0) {
+      throw new Error('No active sessions. Call firefox_create_window first.');
+    }
+    if (sessions.size === 1) {
+      // Only one session - use it
+      targetWindowId = sessions.keys().next().value;
+    } else if (lastActiveWindowId && sessions.has(lastActiveWindowId)) {
+      // Use most recently created/used window
+      targetWindowId = lastActiveWindowId;
+    } else {
+      // Multiple sessions, none specified - list them
+      const sessionList = [...sessions.values()]
+        .map(s => `windowId: ${s.windowId}`)
+        .join(', ');
+      throw new Error(`Multiple sessions active (${sessionList}). Specify windowId parameter.`);
+    }
+  }
+
+  const session = sessions.get(targetWindowId);
+  if (!session) {
+    throw new Error(`No session for windowId ${targetWindowId}. Call firefox_create_window first.`);
+  }
+
+  // Verify window still exists and is private
+  try {
+    const win = await browser.windows.get(session.windowId);
+    if (!win.incognito) {
+      sessions.delete(targetWindowId);
+      throw new Error('Session window is not private.');
+    }
+    const tab = await browser.tabs.get(session.tabId);
+    lastActiveWindowId = targetWindowId; // Update last active
+    return { ...session, tab };
+  } catch (e) {
+    sessions.delete(targetWindowId);
+    throw new Error(`Session ${targetWindowId} expired. Call firefox_create_window.`);
+  }
+}
+
+/**
  * SECURITY: Verify we're operating in a private window
- * Returns the active tab if in private window, throws if not
+ * @deprecated Use getSession() instead for multi-window support
  */
 async function requirePrivateWindow() {
-  const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
-  if (!tab) {
-    throw new Error('No active tab');
-  }
-
-  const win = await browser.windows.get(tab.windowId);
-  if (!win.incognito) {
-    throw new Error('SECURITY: Claudezilla only operates in private windows. Use createWindow first.');
-  }
-
-  return tab;
+  // Delegate to getSession for backward compatibility
+  const session = await getSession();
+  return session.tab;
 }
 
 /**
@@ -269,7 +315,7 @@ async function handleCliCommand(message) {
 
       case 'version':
         result = {
-          extension: '0.3.0',
+          extension: '0.4.0',
           browser: navigator.userAgent,
           features: ['devtools', 'network', 'console', 'evaluate'],
         };
@@ -327,10 +373,16 @@ async function handleCliCommand(message) {
           windowOpts.url = url;
         }
         const win = await browser.windows.create(windowOpts);
+        const tabId = win.tabs?.[0]?.id;
+
+        // Store session for multi-window support
+        sessions.set(win.id, { windowId: win.id, tabId, createdAt: Date.now() });
+        lastActiveWindowId = win.id;
+
         result = {
           windowId: win.id,
           private: win.incognito,
-          tabId: win.tabs?.[0]?.id,
+          tabId,
         };
         break;
       }
@@ -338,6 +390,15 @@ async function handleCliCommand(message) {
       case 'closeWindow': {
         const { windowId } = params;
         if (!windowId) throw new Error('windowId is required');
+
+        // Clean up session before removing window
+        sessions.delete(windowId);
+        if (lastActiveWindowId === windowId) {
+          lastActiveWindowId = sessions.size > 0
+            ? sessions.keys().next().value
+            : null;
+        }
+
         await browser.windows.remove(windowId);
         result = { closed: true, windowId };
         break;
@@ -396,8 +457,8 @@ async function handleCliCommand(message) {
           'desktop': { width: 1920, height: 1080, ua: 'desktop' },
         };
 
-        const { device, width, height } = params;
-        const tab = await requirePrivateWindow();
+        const { windowId, device, width, height } = params;
+        const session = await getSession(windowId);
 
         let viewportWidth, viewportHeight, deviceType;
 
@@ -415,7 +476,7 @@ async function handleCliCommand(message) {
 
         // Add ~80px for browser chrome (toolbar, etc)
         const chromeHeight = 80;
-        const win = await browser.windows.update(tab.windowId, {
+        const win = await browser.windows.update(session.windowId, {
           width: viewportWidth,
           height: viewportHeight + chromeHeight,
         });
@@ -431,33 +492,35 @@ async function handleCliCommand(message) {
       }
 
       case 'getContent': {
-        // SECURITY: Require private window
-        const tab = await requirePrivateWindow();
-        const response = await executeInTab(tab.id, 'getContent', params);
+        const { windowId, ...contentParams } = params;
+        const session = await getSession(windowId);
+        const response = await executeInTab(session.tabId, 'getContent', contentParams);
         result = response.result;
         break;
       }
 
       case 'click': {
-        // SECURITY: Require private window
-        const tab = await requirePrivateWindow();
-        const response = await executeInTab(tab.id, 'click', params);
+        const { windowId, ...clickParams } = params;
+        const session = await getSession(windowId);
+        const response = await executeInTab(session.tabId, 'click', clickParams);
         result = response.result;
         break;
       }
 
       case 'type': {
-        // SECURITY: Require private window
-        const tab = await requirePrivateWindow();
-        const response = await executeInTab(tab.id, 'type', params);
+        const { windowId, ...typeParams } = params;
+        const session = await getSession(windowId);
+        const response = await executeInTab(session.tabId, 'type', typeParams);
         result = response.result;
         break;
       }
 
       case 'screenshot': {
-        // SECURITY: Require private window
-        await requirePrivateWindow();
-        const dataUrl = await browser.tabs.captureVisibleTab(null, { format: 'png' });
+        const { windowId } = params;
+        const session = await getSession(windowId);
+        // Focus the window before capturing to ensure correct viewport
+        await browser.windows.update(session.windowId, { focused: true });
+        const dataUrl = await browser.tabs.captureVisibleTab(session.windowId, { format: 'png' });
         result = { dataUrl };
         break;
       }
@@ -465,48 +528,48 @@ async function handleCliCommand(message) {
       // ===== DEVTOOLS COMMANDS =====
 
       case 'getConsoleLogs': {
-        // SECURITY: Require private window
-        const tab = await requirePrivateWindow();
-        const response = await executeInTab(tab.id, 'getConsoleLogs', params);
+        const { windowId, ...consoleParams } = params;
+        const session = await getSession(windowId);
+        const response = await executeInTab(session.tabId, 'getConsoleLogs', consoleParams);
         result = response.result;
         break;
       }
 
       case 'getNetworkRequests': {
-        // Network requests are captured in background, filter by current tab
-        const tab = await requirePrivateWindow();
-        result = getNetworkRequests({ ...params, tabId: tab.id });
+        const { windowId, ...networkParams } = params;
+        const session = await getSession(windowId);
+        result = getNetworkRequests({ ...networkParams, tabId: session.tabId });
         break;
       }
 
       case 'scroll': {
-        // SECURITY: Require private window
-        const tab = await requirePrivateWindow();
-        const response = await executeInTab(tab.id, 'scroll', params);
+        const { windowId, ...scrollParams } = params;
+        const session = await getSession(windowId);
+        const response = await executeInTab(session.tabId, 'scroll', scrollParams);
         result = response.result;
         break;
       }
 
       case 'waitFor': {
-        // SECURITY: Require private window
-        const tab = await requirePrivateWindow();
-        const response = await executeInTab(tab.id, 'waitFor', params);
+        const { windowId, ...waitParams } = params;
+        const session = await getSession(windowId);
+        const response = await executeInTab(session.tabId, 'waitFor', waitParams);
         result = response.result;
         break;
       }
 
       case 'evaluate': {
-        // SECURITY: Require private window
-        const tab = await requirePrivateWindow();
-        const response = await executeInTab(tab.id, 'evaluate', params);
+        const { windowId, ...evalParams } = params;
+        const session = await getSession(windowId);
+        const response = await executeInTab(session.tabId, 'evaluate', evalParams);
         result = response.result;
         break;
       }
 
       case 'getElementInfo': {
-        // SECURITY: Require private window
-        const tab = await requirePrivateWindow();
-        const response = await executeInTab(tab.id, 'getElementInfo', params);
+        const { windowId, ...elementParams } = params;
+        const session = await getSession(windowId);
+        const response = await executeInTab(session.tabId, 'getElementInfo', elementParams);
         result = response.result;
         break;
       }
@@ -596,6 +659,19 @@ browser.runtime.onMessage.addListener((message, sender) => {
       return { success: false, error: error.message };
     }
   })();
+});
+
+// Clean up session when window is closed
+browser.windows.onRemoved.addListener((windowId) => {
+  if (sessions.has(windowId)) {
+    console.log(`[claudezilla] Session ${windowId} closed`);
+    sessions.delete(windowId);
+    if (lastActiveWindowId === windowId) {
+      lastActiveWindowId = sessions.size > 0
+        ? sessions.keys().next().value
+        : null;
+    }
+  }
 });
 
 // Connect on startup
