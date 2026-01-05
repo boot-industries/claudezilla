@@ -39,95 +39,108 @@ const CLAUDE_LOGO_SVG = `
       <stop offset="0%" stop-color="#D14D32" stop-opacity="0.8"/>
       <stop offset="100%" stop-color="#FCD34D" stop-opacity="0.4"/>
     </linearGradient>
+    <!-- Soft dissolve glow gradients (stronger) -->
+    <radialGradient id="wmGlowOuter" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#D14D32" stop-opacity="0.75"/>
+      <stop offset="40%" stop-color="#D14D32" stop-opacity="0.55"/>
+      <stop offset="70%" stop-color="#D14D32" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#D14D32" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="wmGlowInner" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#E05A38" stop-opacity="0.65"/>
+      <stop offset="50%" stop-color="#E05A38" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#E05A38" stop-opacity="0"/>
+    </radialGradient>
   </defs>
 
-  <!-- LAYER 1: Tesseract frame -->
-  <path d="M32 8 L54 18 L54 46 L32 56 L10 46 L10 18 Z"
-        stroke="#D14D32" stroke-width="2.5" fill="none" stroke-linejoin="round" opacity="0.9"/>
-  <path d="M32 8 L32 56 M10 18 L54 46 M54 18 L10 46"
-        stroke="#D14D32" stroke-width="2" stroke-linecap="round" opacity="0.85"/>
+  <!-- Master group with breathing animation (scales to fill container) -->
+  <g id="claudezilla-breathe" style="transform-origin: center; transform-box: fill-box;">
+    <animateTransform attributeName="transform" type="scale" values="1.08;1.12;1.08" dur="4s" repeatCount="indefinite"/>
 
-  <!-- LAYER 2: Electrons group (hidden by default, shown when thinking) -->
-  <g id="claudezilla-electrons" style="opacity: 0; transition: opacity 1.5s ease-out;">
-    <!-- Claudezilla's tiny waving stick arms (only visible when working) -->
-    <g transform="translate(32, 32) scale(1.2)">
-      <!-- Left arm glow -->
-      <path d="M-4.5 0 L-7 -2" stroke="#D14D32" stroke-width="3" stroke-linecap="round" fill="none" opacity="0.6">
-        <animateTransform attributeName="transform" type="rotate" values="0 -4.5 0; -25 -4.5 0; 0 -4.5 0" dur="0.5s" repeatCount="indefinite"/>
-      </path>
-      <!-- Left arm -->
-      <path d="M-4.5 0 L-7 -2" stroke="#1a1a1a" stroke-width="1" stroke-linecap="round" fill="none">
-        <animateTransform attributeName="transform" type="rotate" values="0 -4.5 0; -25 -4.5 0; 0 -4.5 0" dur="0.5s" repeatCount="indefinite"/>
-      </path>
-      <!-- Right arm glow -->
-      <path d="M4.5 0 L7 -2" stroke="#D14D32" stroke-width="3" stroke-linecap="round" fill="none" opacity="0.6">
-        <animateTransform attributeName="transform" type="rotate" values="0 4.5 0; 25 4.5 0; 0 4.5 0" dur="0.5s" repeatCount="indefinite" begin="0.25s"/>
-      </path>
-      <!-- Right arm -->
-      <path d="M4.5 0 L7 -2" stroke="#1a1a1a" stroke-width="1" stroke-linecap="round" fill="none">
-        <animateTransform attributeName="transform" type="rotate" values="0 4.5 0; 25 4.5 0; 0 4.5 0" dur="0.5s" repeatCount="indefinite" begin="0.25s"/>
-      </path>
+    <!-- LAYER 1: Tesseract frame -->
+    <path d="M32 8 L54 18 L54 46 L32 56 L10 46 L10 18 Z"
+          stroke="#D14D32" stroke-width="2.5" fill="none" stroke-linejoin="round" opacity="0.9"/>
+    <path d="M32 8 L32 56 M10 18 L54 46 M54 18 L10 46"
+          stroke="#D14D32" stroke-width="2" stroke-linecap="round" opacity="0.85"/>
+
+    <!-- LAYER 2: Electrons group (hidden by default, shown when thinking) -->
+    <g id="claudezilla-electrons" style="opacity: 0; transition: opacity 1.5s ease-out;">
+      <!-- Electron 1: Around outer hexagon -->
+      <circle r="3.5" fill="url(#electronGlow)">
+        <animateMotion dur="4s" repeatCount="indefinite" path="M32 8 L54 18 L54 46 L32 56 L10 46 L10 18 Z"/>
+      </circle>
+
+      <!-- Electron 2: Around outer hexagon (opposite phase) -->
+      <circle r="3" fill="url(#electronGlow)">
+        <animateMotion dur="4s" repeatCount="indefinite" begin="-2s" path="M32 8 L54 18 L54 46 L32 56 L10 46 L10 18 Z"/>
+      </circle>
+
+      <!-- Electron 3: Vertical line -->
+      <circle r="2.5" fill="url(#electronGlow)">
+        <animateMotion dur="2.5s" repeatCount="indefinite" path="M32 8 L32 56 L32 8"/>
+      </circle>
+
+      <!-- Electron 4: Diagonal 1 -->
+      <circle r="2.5" fill="url(#electronGlow)">
+        <animateMotion dur="3s" repeatCount="indefinite" begin="-0.5s" path="M10 18 L54 46 L10 18"/>
+      </circle>
+
+      <!-- Electron 5: Diagonal 2 -->
+      <circle r="2.5" fill="url(#electronGlow)">
+        <animateMotion dur="3s" repeatCount="indefinite" begin="-1.5s" path="M54 18 L10 46 L54 18"/>
+      </circle>
     </g>
 
-    <!-- Electron 1: Around outer hexagon -->
-    <circle r="3.5" fill="url(#electronGlow)">
-      <animateMotion dur="4s" repeatCount="indefinite" path="M32 8 L54 18 L54 46 L32 56 L10 46 L10 18 Z"/>
-    </circle>
+    <!-- LAYER 3: Glow (behind character) - soft dissolve edges, expanded -->
+    <g transform="translate(32, 32) scale(1.2)">
+      <ellipse cx="0" cy="0" rx="14" ry="16" fill="url(#wmGlowOuter)"/>
+      <ellipse cx="0" cy="0" rx="9" ry="11" fill="url(#wmGlowInner)"/>
+    </g>
 
-    <!-- Electron 2: Around outer hexagon (opposite phase) -->
-    <circle r="3" fill="url(#electronGlow)">
-      <animateMotion dur="4s" repeatCount="indefinite" begin="-2s" path="M32 8 L54 18 L54 46 L32 56 L10 46 L10 18 Z"/>
-    </circle>
+    <!-- LAYER 4: Arms (only visible when working - AFTER glow so in front) -->
+    <g id="claudezilla-arms" style="opacity: 0; transition: opacity 1.5s ease-out;">
+      <g transform="translate(32, 32) scale(1.2)">
+        <!-- Left arm glow -->
+        <path d="M-4.5 0 L-7 -2" stroke="#D14D32" stroke-width="3" stroke-linecap="round" fill="none" opacity="0.6">
+          <animateTransform attributeName="transform" type="rotate" values="0 -4.5 0; -25 -4.5 0; 0 -4.5 0" dur="0.5s" repeatCount="indefinite"/>
+        </path>
+        <!-- Left arm -->
+        <path d="M-4.5 0 L-7 -2" stroke="#1a1a1a" stroke-width="1" stroke-linecap="round" fill="none">
+          <animateTransform attributeName="transform" type="rotate" values="0 -4.5 0; -25 -4.5 0; 0 -4.5 0" dur="0.5s" repeatCount="indefinite"/>
+        </path>
+        <!-- Right arm glow -->
+        <path d="M4.5 0 L7 -2" stroke="#D14D32" stroke-width="3" stroke-linecap="round" fill="none" opacity="0.6">
+          <animateTransform attributeName="transform" type="rotate" values="0 4.5 0; 25 4.5 0; 0 4.5 0" dur="0.5s" repeatCount="indefinite" begin="0.25s"/>
+        </path>
+        <!-- Right arm -->
+        <path d="M4.5 0 L7 -2" stroke="#1a1a1a" stroke-width="1" stroke-linecap="round" fill="none">
+          <animateTransform attributeName="transform" type="rotate" values="0 4.5 0; 25 4.5 0; 0 4.5 0" dur="0.5s" repeatCount="indefinite" begin="0.25s"/>
+        </path>
+      </g>
+    </g>
 
-    <!-- Electron 3: Vertical line -->
-    <circle r="2.5" fill="url(#electronGlow)">
-      <animateMotion dur="2.5s" repeatCount="indefinite" path="M32 8 L32 56 L32 8"/>
-    </circle>
+    <!-- LAYER 5: Character (spines + body + eye - ALL in one group) -->
+    <g transform="translate(32, 32) scale(1.2)">
+      <!-- Spine glows (behind dark cones) -->
+      <path d="M-0.8 -6 L0 -10 L0.8 -6" fill="url(#wmSpineGlow)" opacity="0.7">
+        <animate attributeName="opacity" values="0.5;0.8;0.5" dur="2s" repeatCount="indefinite"/>
+      </path>
+      <path d="M1.5 -4 L3.5 -8 L3.5 -3.5" fill="url(#wmSpineGlow)" opacity="0.7">
+        <animate attributeName="opacity" values="0.5;0.8;0.5" dur="2s" repeatCount="indefinite" begin="0.3s"/>
+      </path>
+      <path d="M-1.5 -4 L-3.5 -8 L-3.5 -3.5" fill="url(#wmSpineGlow)" opacity="0.7">
+        <animate attributeName="opacity" values="0.5;0.8;0.5" dur="2s" repeatCount="indefinite" begin="0.6s"/>
+      </path>
+      <!-- Spine dark cones -->
+      <path d="M-0.7 -6 L0 -10 L0.7 -6 Z" fill="#1a1a1a"/>
+      <path d="M1.8 -4 L3.5 -8 L3.2 -3.5 Z" fill="#1a1a1a"/>
+      <path d="M-1.8 -4 L-3.5 -8 L-3.2 -3.5 Z" fill="#1a1a1a"/>
+      <!-- Body -->
+      <path d="M-4 6 L-4 0 L-5 -2 L-5 -4 L-4 -5 L-2 -5 L0 -7 L2 -5 L4 -5 L5 -4 L5 -2 L4 0 L4 6 L2 6 L2 2 L1 3 L-1 3 L-2 2 L-2 6 Z" fill="#1a1a1a"/>
+      <!-- Eye (offset right for profile look) -->
+      <circle cx="1" cy="-3" r="1.5" fill="#FCD34D"/>
+    </g>
 
-    <!-- Electron 4: Diagonal 1 -->
-    <circle r="2.5" fill="url(#electronGlow)">
-      <animateMotion dur="3s" repeatCount="indefinite" begin="-0.5s" path="M10 18 L54 46 L10 18"/>
-    </circle>
-
-    <!-- Electron 5: Diagonal 2 -->
-    <circle r="2.5" fill="url(#electronGlow)">
-      <animateMotion dur="3s" repeatCount="indefinite" begin="-1.5s" path="M54 18 L10 46 L54 18"/>
-    </circle>
-  </g>
-
-  <!-- LAYER 3: Glow (behind character) -->
-  <g transform="translate(32, 32) scale(1.2)">
-    <ellipse cx="0" cy="0" rx="8" ry="10" fill="#D14D32" opacity="0.5"/>
-    <ellipse cx="0" cy="0" rx="6" ry="8" fill="#E05A38" opacity="0.4"/>
-  </g>
-
-  <!-- LAYER 4: Conical spines (bases extend into head) -->
-  <g transform="translate(32, 32) scale(1.2)">
-    <!-- Spine glows (behind) -->
-    <path d="M-0.8 -6 L0 -10 L0.8 -6" fill="url(#wmSpineGlow)" opacity="0.7">
-      <animate attributeName="opacity" values="0.5;0.8;0.5" dur="2s" repeatCount="indefinite"/>
-    </path>
-    <path d="M1.5 -4 L3.5 -8 L3.5 -3.5" fill="url(#wmSpineGlow)" opacity="0.7">
-      <animate attributeName="opacity" values="0.5;0.8;0.5" dur="2s" repeatCount="indefinite" begin="0.3s"/>
-    </path>
-    <path d="M-1.5 -4 L-3.5 -8 L-3.5 -3.5" fill="url(#wmSpineGlow)" opacity="0.7">
-      <animate attributeName="opacity" values="0.5;0.8;0.5" dur="2s" repeatCount="indefinite" begin="0.6s"/>
-    </path>
-    <!-- Spine dark cones (bases extend into head, body covers them) -->
-    <path d="M-0.7 -6 L0 -10 L0.7 -6 Z" fill="#1a1a1a"/>
-    <path d="M1.8 -4 L3.5 -8 L3.2 -3.5 Z" fill="#1a1a1a"/>
-    <path d="M-1.8 -4 L-3.5 -8 L-3.2 -3.5 Z" fill="#1a1a1a"/>
-  </g>
-
-  <!-- LAYER 5: Body and eye (front) -->
-  <g transform="translate(32, 32) scale(1.2)">
-    <!-- Body -->
-    <path d="M-4 6 L-4 0 L-5 -2 L-5 -4 L-4 -5 L-2 -5 L0 -7 L2 -5 L4 -5 L5 -4 L5 -2 L4 0 L4 6 L2 6 L2 2 L1 3 L-1 3 L-2 2 L-2 6 Z" fill="#1a1a1a"/>
-    <!-- Eye socket glow -->
-    <ellipse cx="0" cy="-3" rx="2.5" ry="2" fill="#D14D32" opacity="0.4"/>
-    <!-- Eye (centered cyclops) -->
-    <circle cx="0" cy="-3" r="1.8" fill="#FCD34D"/>
-    <circle cx="0.4" cy="-3.4" r="0.6" fill="#FFF7E0" opacity="0.9"/>
   </g>
 </svg>
 `;
@@ -137,6 +150,33 @@ const CLAUDE_LOGO_SVG = `
  */
 function initWatermark() {
   if (watermarkElement) return;
+
+  // Inject watermark glow throb animation
+  if (!document.getElementById('claudezilla-watermark-styles')) {
+    const style = document.createElement('style');
+    style.id = 'claudezilla-watermark-styles';
+    style.textContent = `
+      @keyframes claudezilla-glow-throb {
+        0%, 100% {
+          box-shadow:
+            0 0 20px 4px rgba(209, 77, 50, 0.5),
+            0 0 40px 8px rgba(209, 77, 50, 0.25),
+            0 0 60px 12px rgba(209, 77, 50, 0.1),
+            0 4px 16px rgba(0, 0, 0, 0.5),
+            inset 0 0 0 1px rgba(209, 77, 50, 0.3);
+        }
+        50% {
+          box-shadow:
+            0 0 28px 6px rgba(209, 77, 50, 0.6),
+            0 0 52px 12px rgba(209, 77, 50, 0.35),
+            0 0 80px 18px rgba(209, 77, 50, 0.15),
+            0 4px 16px rgba(0, 0, 0, 0.5),
+            inset 0 0 0 1px rgba(209, 77, 50, 0.4);
+        }
+      }
+    `;
+    document.head.appendChild(style);
+  }
 
   watermarkElement = document.createElement('div');
   watermarkElement.id = 'claudezilla-watermark';
@@ -155,12 +195,7 @@ function initWatermark() {
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow:
-      0 0 20px 4px rgba(209, 77, 50, 0.5),
-      0 0 40px 8px rgba(209, 77, 50, 0.25),
-      0 0 60px 12px rgba(209, 77, 50, 0.1),
-      0 4px 16px rgba(0, 0, 0, 0.5),
-      inset 0 0 0 1px rgba(209, 77, 50, 0.3);
+    animation: claudezilla-glow-throb 4s ease-in-out infinite;
     pointer-events: auto;
     cursor: pointer;
     transition: opacity 0.3s ease, transform 0.15s ease;
@@ -341,15 +376,18 @@ function triggerElectrons() {
   if (!settings.showWatermark || !watermarkElement) return;
 
   const electrons = watermarkElement.querySelector('#claudezilla-electrons');
+  const arms = watermarkElement.querySelector('#claudezilla-arms');
   if (!electrons) return;
 
-  // Show electrons
+  // Show electrons and arms
   electrons.style.opacity = '1';
+  if (arms) arms.style.opacity = '1';
 
   // Hide after 5s idle (with gradual 1.5s fade)
   clearTimeout(electronTimeout);
   electronTimeout = setTimeout(() => {
     electrons.style.opacity = '0';
+    if (arms) arms.style.opacity = '0';
   }, 5000);
 }
 
