@@ -49,6 +49,10 @@ See [[CLZ003 Security Audit v0.4.5]] for full details.
 
 - **Hero logo redesign** - "Atomic Kaiju" aesthetic with tesseract frame, orbiting electrons, conical spines, cyclops eye, asymmetric bendy arms, rounded feet
 - **Watermark updates** - Conical spines with glow, z-index layering fix, cyclops eye, 20% larger (84→100px)
+- **Watermark animations** - Breathing scale animation (1.20→1.24) only when active, glow throb effect, soft dissolve edges on elliptical glow
+- **Speech bubble feature** - Tiny 8x8px white bubble with music note (♪) appears when Claude is working, positioned at `top: 37px, right: 34px` relative to watermark container, diagonal tail pointing to monster's mouth, bobbing note animation
+- **Arms rendering fix** - Moved to render after glow layer so they appear in front (z-index correction)
+- **Tesseract scaling** - Fixed clipping at container's rounded corners by using 1.20 scale factor
 - **Focusglow enhancements** - 1s fade in, 2s fade out, pixie dust particle animation
 - **Favicon** - Conical filled spines (matching hero/watermark)
 - **Tagline typography** - Orbitron font, white color
