@@ -193,6 +193,57 @@ const TOOLS = [
       required: ['windowId'],
     },
   },
+  {
+    name: 'firefox_resize_window',
+    description: 'Resize and/or reposition a browser window.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        windowId: {
+          type: 'number',
+          description: 'Window ID to resize (uses current window if not specified)',
+        },
+        width: {
+          type: 'number',
+          description: 'New window width in pixels',
+        },
+        height: {
+          type: 'number',
+          description: 'New window height in pixels',
+        },
+        left: {
+          type: 'number',
+          description: 'Window X position from left edge of screen',
+        },
+        top: {
+          type: 'number',
+          description: 'Window Y position from top edge of screen',
+        },
+      },
+    },
+  },
+  {
+    name: 'firefox_set_viewport',
+    description: 'Set browser viewport to a device preset for responsive testing. Presets: iphone-se, iphone-14, iphone-14-pro-max, pixel-7, galaxy-s23, ipad-mini, ipad-pro-11, ipad-pro-12, laptop, desktop',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        device: {
+          type: 'string',
+          description: 'Device preset name (e.g., "iphone-14", "ipad-pro-11", "pixel-7")',
+          enum: ['iphone-se', 'iphone-14', 'iphone-14-pro-max', 'pixel-7', 'galaxy-s23', 'ipad-mini', 'ipad-pro-11', 'ipad-pro-12', 'laptop', 'desktop'],
+        },
+        width: {
+          type: 'number',
+          description: 'Custom viewport width (use instead of device preset)',
+        },
+        height: {
+          type: 'number',
+          description: 'Custom viewport height (use instead of device preset)',
+        },
+      },
+    },
+  },
 
   // ===== DEVTOOLS FEATURES =====
   {
@@ -328,6 +379,8 @@ const TOOL_TO_COMMAND = {
   firefox_screenshot: 'screenshot',
   firefox_get_tabs: 'getTabs',
   firefox_close_window: 'closeWindow',
+  firefox_resize_window: 'resizeWindow',
+  firefox_set_viewport: 'setViewport',
   // Devtools features
   firefox_get_console: 'getConsoleLogs',
   firefox_get_network: 'getNetworkRequests',
@@ -385,17 +438,22 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
       }
 
+      // Handle undefined/null results - ensure text is always a string
+      const resultText = response.result !== undefined
+        ? JSON.stringify(response.result, null, 2)
+        : '{ "success": true }';
+
       return {
         content: [
           {
             type: 'text',
-            text: JSON.stringify(response.result, null, 2),
+            text: resultText,
           },
         ],
       };
     } else {
       return {
-        content: [{ type: 'text', text: `Error: ${response.error}` }],
+        content: [{ type: 'text', text: `Error: ${response.error || 'Unknown error'}` }],
         isError: true,
       };
     }

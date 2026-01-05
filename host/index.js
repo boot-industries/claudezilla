@@ -35,6 +35,8 @@ const ALLOWED_COMMANDS = new Set([
   'createWindow',
   'closeWindow',
   'getWindows',
+  'resizeWindow',
+  'setViewport',
   // Devtools features
   'getConsoleLogs',
   'getNetworkRequests',

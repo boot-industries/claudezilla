@@ -118,6 +118,7 @@ Window Commands:
   createWindow [--private true] [--url <url>]  Create new window (private by default)
   closeWindow --windowId <id>   Close a window
   getWindows                    List all windows
+  resizeWindow [--width 375] [--height 667]    Resize for mobile testing
 
 Tab Commands:
   navigate --url <url>          Navigate to URL in current tab

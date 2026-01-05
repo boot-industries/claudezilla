@@ -332,6 +332,82 @@ async function handleCliCommand(message) {
         break;
       }
 
+      case 'resizeWindow': {
+        const { windowId, width, height, left, top } = params;
+        // Get current window if no windowId specified
+        let targetWindowId = windowId;
+        if (!targetWindowId) {
+          const tab = await requirePrivateWindow();
+          targetWindowId = tab.windowId;
+        }
+        const updateInfo = {};
+        if (width !== undefined) updateInfo.width = width;
+        if (height !== undefined) updateInfo.height = height;
+        if (left !== undefined) updateInfo.left = left;
+        if (top !== undefined) updateInfo.top = top;
+        const win = await browser.windows.update(targetWindowId, updateInfo);
+        result = {
+          windowId: win.id,
+          width: win.width,
+          height: win.height,
+          left: win.left,
+          top: win.top,
+        };
+        break;
+      }
+
+      case 'setViewport': {
+        // Device viewport presets (content area, not window chrome)
+        const DEVICES = {
+          // Phones
+          'iphone-se': { width: 375, height: 667, ua: 'mobile' },
+          'iphone-14': { width: 390, height: 844, ua: 'mobile' },
+          'iphone-14-pro-max': { width: 430, height: 932, ua: 'mobile' },
+          'pixel-7': { width: 412, height: 915, ua: 'mobile' },
+          'galaxy-s23': { width: 360, height: 780, ua: 'mobile' },
+          // Tablets
+          'ipad-mini': { width: 768, height: 1024, ua: 'tablet' },
+          'ipad-pro-11': { width: 834, height: 1194, ua: 'tablet' },
+          'ipad-pro-12': { width: 1024, height: 1366, ua: 'tablet' },
+          // Desktop
+          'laptop': { width: 1366, height: 768, ua: 'desktop' },
+          'desktop': { width: 1920, height: 1080, ua: 'desktop' },
+        };
+
+        const { device, width, height } = params;
+        const tab = await requirePrivateWindow();
+
+        let viewportWidth, viewportHeight, deviceType;
+
+        if (device && DEVICES[device]) {
+          viewportWidth = DEVICES[device].width;
+          viewportHeight = DEVICES[device].height;
+          deviceType = DEVICES[device].ua;
+        } else if (width && height) {
+          viewportWidth = width;
+          viewportHeight = height;
+          deviceType = width < 768 ? 'mobile' : width < 1024 ? 'tablet' : 'desktop';
+        } else {
+          throw new Error(`Specify device preset or width/height. Available: ${Object.keys(DEVICES).join(', ')}`);
+        }
+
+        // Add ~80px for browser chrome (toolbar, etc)
+        const chromeHeight = 80;
+        const win = await browser.windows.update(tab.windowId, {
+          width: viewportWidth,
+          height: viewportHeight + chromeHeight,
+        });
+
+        result = {
+          device: device || 'custom',
+          viewport: { width: viewportWidth, height: viewportHeight },
+          window: { width: win.width, height: win.height },
+          type: deviceType,
+          availableDevices: Object.keys(DEVICES),
+        };
+        break;
+      }
+
       case 'getContent': {
         // SECURITY: Require private window
         const tab = await requirePrivateWindow();
