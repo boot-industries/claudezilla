@@ -122,6 +122,24 @@ async function testConnection() {
   }
 }
 
+// Check permission status
+async function checkPermissionStatus() {
+  const permissionStateEl = document.getElementById('permissionState');
+  try {
+    const hasPermission = await browser.extension.isAllowedIncognitoAccess();
+    if (hasPermission) {
+      permissionStateEl.textContent = 'Enabled';
+      permissionStateEl.style.color = '#22C55E';
+    } else {
+      permissionStateEl.textContent = 'Not Enabled';
+      permissionStateEl.style.color = '#EF4444';
+    }
+  } catch (e) {
+    permissionStateEl.textContent = 'Unknown';
+    permissionStateEl.style.color = '#888';
+  }
+}
+
 // Check if this is first run and show welcome page
 async function checkFirstRun() {
   try {
@@ -149,6 +167,9 @@ async function init() {
   showWatermarkCheckbox.addEventListener('change', saveSettings);
   showFocusglowCheckbox.addEventListener('change', saveSettings);
   compressImagesCheckbox.addEventListener('change', saveSettings);
+
+  // Check permission status
+  await checkPermissionStatus();
 
   // Test connection on popup open
   testConnection();

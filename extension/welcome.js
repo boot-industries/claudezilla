@@ -22,10 +22,8 @@ async function checkPermissionStatus() {
 
 // Open extension settings
 document.getElementById('openSettings').addEventListener('click', () => {
-  browser.runtime.sendMessage({ action: 'openAddonSettings' }).catch(() => {
-    // Fallback: open about:addons
-    browser.tabs.create({ url: 'about:addons' });
-  });
+  // Open about:addons page
+  browser.tabs.create({ url: 'about:addons' });
 });
 
 // Close tab
