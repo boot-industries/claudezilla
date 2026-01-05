@@ -3,7 +3,306 @@
  *
  * Runs in web pages and handles DOM interaction commands.
  * Includes devtools features: console capture, scroll, wait, evaluate.
+ * Visual features: Claude sparkle watermark, focusglow.
  */
+
+// ===== VISUAL EFFECTS =====
+
+// Settings (loaded from storage)
+let settings = {
+  showWatermark: true,
+  showFocusglow: true,
+};
+
+// Visual elements
+let watermarkElement = null;
+let focusglowElement = null;
+let focusglowTimeout = null;
+let electronTimeout = null;
+
+/**
+ * Claude logo SVG (interconnected knot pattern - animated)
+ * Based on Anthropic's Claude brand mark
+ */
+const CLAUDE_LOGO_SVG = `
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Brighter gradient for electron glow -->
+    <radialGradient id="electronGlow">
+      <stop offset="0%" stop-color="#fff" stop-opacity="1"/>
+      <stop offset="30%" stop-color="#FFE4D6" stop-opacity="0.95"/>
+      <stop offset="60%" stop-color="#E05A38" stop-opacity="0.7"/>
+      <stop offset="100%" stop-color="#D14D32" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Tesseract frame (Claude terracotta) -->
+  <path d="M32 8 L54 18 L54 46 L32 56 L10 46 L10 18 Z"
+        stroke="#D14D32" stroke-width="2.5" fill="none" stroke-linejoin="round" opacity="0.9"/>
+  <path d="M32 8 L32 56 M10 18 L54 46 M54 18 L10 46"
+        stroke="#D14D32" stroke-width="2" stroke-linecap="round" opacity="0.85"/>
+
+  <!-- Claudezilla character (center, matches favicon) -->
+  <g transform="translate(32, 32) scale(1.2)">
+    <!-- Orange glow behind character -->
+    <ellipse cx="0" cy="0" rx="8" ry="10" fill="#D14D32" opacity="0.5"/>
+    <ellipse cx="0" cy="0" rx="6" ry="8" fill="#E05A38" opacity="0.4"/>
+    <!-- Body -->
+    <path d="M-4 6 L-4 0 L-5 -2 L-5 -4 L-4 -5 L-2 -5 L0 -7 L2 -5 L4 -5 L5 -4 L5 -2 L4 0 L4 6 L2 6 L2 2 L1 3 L-1 3 L-2 2 L-2 6 Z" fill="#1a1a1a"/>
+    <!-- Eye (glowing amber like favicon) -->
+    <circle cx="1" cy="-3" r="1.5" fill="#FCD34D"/>
+    <!-- Spines -->
+    <path d="M0 -7 L0.5 -10 L1 -7 M2 -5 L3.5 -8 L4 -5 M-2 -5 L-3.5 -8 L-3 -5" stroke="#1a1a1a" stroke-width="1" fill="none"/>
+  </g>
+
+  <!-- Electrons group (hidden by default, shown when thinking) -->
+  <g id="claudezilla-electrons" style="opacity: 0; transition: opacity 1.5s ease-out;">
+    <!-- Claudezilla's tiny waving stick arms (only visible when working) -->
+    <g transform="translate(32, 32) scale(1.2)">
+      <!-- Left arm glow -->
+      <path d="M-4.5 0 L-7 -2" stroke="#D14D32" stroke-width="3" stroke-linecap="round" fill="none" opacity="0.6">
+        <animateTransform attributeName="transform" type="rotate" values="0 -4.5 0; -25 -4.5 0; 0 -4.5 0" dur="0.5s" repeatCount="indefinite"/>
+      </path>
+      <!-- Left arm -->
+      <path d="M-4.5 0 L-7 -2" stroke="#1a1a1a" stroke-width="1" stroke-linecap="round" fill="none">
+        <animateTransform attributeName="transform" type="rotate" values="0 -4.5 0; -25 -4.5 0; 0 -4.5 0" dur="0.5s" repeatCount="indefinite"/>
+      </path>
+      <!-- Right arm glow -->
+      <path d="M4.5 0 L7 -2" stroke="#D14D32" stroke-width="3" stroke-linecap="round" fill="none" opacity="0.6">
+        <animateTransform attributeName="transform" type="rotate" values="0 4.5 0; 25 4.5 0; 0 4.5 0" dur="0.5s" repeatCount="indefinite" begin="0.25s"/>
+      </path>
+      <!-- Right arm -->
+      <path d="M4.5 0 L7 -2" stroke="#1a1a1a" stroke-width="1" stroke-linecap="round" fill="none">
+        <animateTransform attributeName="transform" type="rotate" values="0 4.5 0; 25 4.5 0; 0 4.5 0" dur="0.5s" repeatCount="indefinite" begin="0.25s"/>
+      </path>
+    </g>
+
+    <!-- Electron 1: Around outer hexagon -->
+    <circle r="3.5" fill="url(#electronGlow)">
+      <animateMotion dur="4s" repeatCount="indefinite" path="M32 8 L54 18 L54 46 L32 56 L10 46 L10 18 Z"/>
+    </circle>
+
+    <!-- Electron 2: Around outer hexagon (opposite phase) -->
+    <circle r="3" fill="url(#electronGlow)">
+      <animateMotion dur="4s" repeatCount="indefinite" begin="-2s" path="M32 8 L54 18 L54 46 L32 56 L10 46 L10 18 Z"/>
+    </circle>
+
+    <!-- Electron 3: Vertical line -->
+    <circle r="2.5" fill="url(#electronGlow)">
+      <animateMotion dur="2.5s" repeatCount="indefinite" path="M32 8 L32 56 L32 8"/>
+    </circle>
+
+    <!-- Electron 4: Diagonal 1 -->
+    <circle r="2.5" fill="url(#electronGlow)">
+      <animateMotion dur="3s" repeatCount="indefinite" begin="-0.5s" path="M10 18 L54 46 L10 18"/>
+    </circle>
+
+    <!-- Electron 5: Diagonal 2 -->
+    <circle r="2.5" fill="url(#electronGlow)">
+      <animateMotion dur="3s" repeatCount="indefinite" begin="-1.5s" path="M54 18 L10 46 L54 18"/>
+    </circle>
+  </g>
+</svg>
+`;
+
+/**
+ * Initialize watermark (Claude logo badge)
+ */
+function initWatermark() {
+  if (watermarkElement) return;
+
+  watermarkElement = document.createElement('div');
+  watermarkElement.id = 'claudezilla-watermark';
+  watermarkElement.innerHTML = CLAUDE_LOGO_SVG;
+  watermarkElement.style.cssText = `
+    position: fixed;
+    bottom: 16px;
+    right: 16px;
+    width: 84px;
+    height: 84px;
+    background: rgba(20, 18, 18, 0.94);
+    border-radius: 12px;
+    padding: 10px;
+    z-index: 2147483647;
+    opacity: 0.95;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow:
+      0 0 20px 4px rgba(209, 77, 50, 0.5),
+      0 0 40px 8px rgba(209, 77, 50, 0.25),
+      0 0 60px 12px rgba(209, 77, 50, 0.1),
+      0 4px 16px rgba(0, 0, 0, 0.5),
+      inset 0 0 0 1px rgba(209, 77, 50, 0.3);
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+  `;
+  document.body.appendChild(watermarkElement);
+}
+
+/**
+ * Initialize focusglow element
+ */
+function initFocusglow() {
+  if (focusglowElement) return;
+
+  // Inject CSS animation
+  const style = document.createElement('style');
+  style.id = 'claudezilla-focusglow-styles';
+  style.textContent = `
+    @keyframes claudezilla-sparkle {
+      0%, 100% {
+        opacity: 0.85;
+        transform: scale(1);
+        box-shadow:
+          0 0 12px 4px rgba(255, 215, 0, 0.7),
+          0 0 24px 8px rgba(255, 165, 0, 0.5),
+          0 0 40px 16px rgba(255, 215, 0, 0.25),
+          inset 0 0 8px rgba(255, 215, 0, 0.3);
+      }
+      50% {
+        opacity: 1;
+        transform: scale(1.01);
+        box-shadow:
+          0 0 16px 6px rgba(255, 215, 0, 0.8),
+          0 0 32px 12px rgba(255, 165, 0, 0.6),
+          0 0 48px 20px rgba(255, 215, 0, 0.3),
+          inset 0 0 12px rgba(255, 215, 0, 0.4);
+      }
+    }
+    #claudezilla-focusglow {
+      position: absolute;
+      pointer-events: none;
+      z-index: 2147483646;
+      border-radius: 6px;
+      border: 3px solid rgba(255, 215, 0, 0.9);
+      background: rgba(255, 215, 0, 0.15);
+      box-shadow:
+        0 0 15px 6px rgba(255, 215, 0, 0.8),
+        0 0 30px 12px rgba(255, 165, 0, 0.6),
+        0 0 50px 20px rgba(255, 215, 0, 0.35);
+      animation: claudezilla-sparkle 1.5s ease-in-out infinite;
+      transition: top 0.3s ease-out, left 0.3s ease-out, width 0.3s ease-out, height 0.3s ease-out, opacity 0.3s ease-out;
+      display: none;
+    }
+  `;
+  document.head.appendChild(style);
+
+  focusglowElement = document.createElement('div');
+  focusglowElement.id = 'claudezilla-focusglow';
+  document.body.appendChild(focusglowElement);
+}
+
+/**
+ * Move focusglow to an element
+ * @param {string} selector - CSS selector of target element
+ */
+function moveFocusTo(selector) {
+  console.log('[claudezilla] moveFocusTo called:', selector, 'showFocusglow:', settings.showFocusglow, 'element exists:', !!focusglowElement);
+
+  if (!settings.showFocusglow || !focusglowElement) {
+    console.log('[claudezilla] moveFocusTo early return - settings:', settings.showFocusglow, 'element:', !!focusglowElement);
+    return;
+  }
+
+  const el = document.querySelector(selector);
+  if (!el) {
+    console.log('[claudezilla] moveFocusTo - element not found:', selector);
+    return;
+  }
+
+  const rect = el.getBoundingClientRect();
+  console.log('[claudezilla] moveFocusTo - positioning glow at:', rect.top, rect.left, rect.width, rect.height);
+  focusglowElement.style.display = 'block';
+  focusglowElement.style.top = `${rect.top + window.scrollY - 4}px`;
+  focusglowElement.style.left = `${rect.left + window.scrollX - 4}px`;
+  focusglowElement.style.width = `${rect.width + 8}px`;
+  focusglowElement.style.height = `${rect.height + 8}px`;
+
+  // Fade out after idle
+  clearTimeout(focusglowTimeout);
+  focusglowTimeout = setTimeout(() => {
+    if (focusglowElement) {
+      focusglowElement.style.display = 'none';
+    }
+  }, 2000);
+}
+
+/**
+ * Trigger electron animation (shows Claude is thinking/working)
+ */
+function triggerElectrons() {
+  if (!settings.showWatermark || !watermarkElement) return;
+
+  const electrons = watermarkElement.querySelector('#claudezilla-electrons');
+  if (!electrons) return;
+
+  // Show electrons
+  electrons.style.opacity = '1';
+
+  // Hide after 5s idle (with gradual 1.5s fade)
+  clearTimeout(electronTimeout);
+  electronTimeout = setTimeout(() => {
+    electrons.style.opacity = '0';
+  }, 5000);
+}
+
+/**
+ * Update visual elements based on settings
+ */
+function updateVisuals() {
+  if (watermarkElement) {
+    watermarkElement.style.display = settings.showWatermark ? 'flex' : 'none';
+  }
+  if (focusglowElement && !settings.showFocusglow) {
+    focusglowElement.style.display = 'none';
+  }
+}
+
+/**
+ * Load settings from storage
+ */
+async function loadSettings() {
+  try {
+    const stored = await browser.storage.local.get('claudezilla');
+    if (stored.claudezilla) {
+      settings = { ...settings, ...stored.claudezilla };
+    }
+    updateVisuals();
+  } catch (e) {
+    console.log('[claudezilla] Could not load settings:', e.message);
+  }
+}
+
+/**
+ * Initialize visual effects
+ */
+function initVisuals() {
+  // Only initialize in top frame
+  if (window !== window.top) return;
+
+  loadSettings();
+  initWatermark();
+  initFocusglow();
+  updateVisuals();
+
+  // Listen for settings changes
+  try {
+    browser.storage.onChanged.addListener((changes, area) => {
+      if (area === 'local' && changes.claudezilla) {
+        settings = { ...settings, ...changes.claudezilla.newValue };
+        updateVisuals();
+      }
+    });
+  } catch (e) {
+    console.log('[claudezilla] Storage listener not available:', e.message);
+  }
+}
+
+// DON'T auto-initialize visuals - wait for background.js to tell us this is a Claudezilla tab
+// initVisuals() will be called via 'enableClaudezillaVisuals' message from background.js
+
+// ===== CONSOLE LOG CAPTURE =====
 
 // Console log capture
 const capturedLogs = [];
@@ -101,6 +400,8 @@ function scroll(params = {}) {
     if (!element) {
       throw new Error(`Element not found: ${selector}`);
     }
+    // Show focusglow on scroll target
+    moveFocusTo(selector);
     element.scrollIntoView({ behavior, block: 'center' });
     const rect = element.getBoundingClientRect();
     return {
@@ -222,6 +523,9 @@ function getElementInfo(params) {
     throw new Error(`Element not found: ${selector}`);
   }
 
+  // Show focusglow on inspected element
+  moveFocusTo(selector);
+
   const rect = element.getBoundingClientRect();
   const styles = window.getComputedStyle(element);
 
@@ -253,30 +557,60 @@ function getElementInfo(params) {
  * Get page content
  * @param {object} params - Parameters
  * @param {string} params.selector - Optional CSS selector to get specific element
+ * @param {boolean} params.includeHtml - Include HTML in response (default: false)
+ * @param {number} params.maxLength - Max text length before truncation (default: 50000)
  * @returns {object} Page content
  */
 function getContent(params = {}) {
-  const { selector } = params;
+  const { selector, includeHtml = false, maxLength = 50000 } = params;
+
+  // Helper to truncate text
+  function truncateText(text, limit) {
+    if (!text || text.length <= limit) return { text, truncated: false };
+    return {
+      text: text.slice(0, limit) + '\n\n[... truncated, use selector for specific content]',
+      truncated: true
+    };
+  }
 
   if (selector) {
     const element = document.querySelector(selector);
     if (!element) {
       throw new Error(`Element not found: ${selector}`);
     }
-    return {
+    // Show focusglow on read element
+    moveFocusTo(selector);
+
+    const rawText = element.textContent?.trim() || '';
+    const { text, truncated } = truncateText(rawText, maxLength);
+
+    const result = {
       selector,
-      text: element.textContent?.trim(),
-      html: element.innerHTML,
+      text,
       tagName: element.tagName.toLowerCase(),
+      textLength: rawText.length,
+      truncated,
     };
+    if (includeHtml) {
+      result.html = element.innerHTML;
+    }
+    return result;
   }
 
-  return {
+  const rawText = document.body?.textContent?.trim() || '';
+  const { text, truncated } = truncateText(rawText, maxLength);
+
+  const result = {
     url: window.location.href,
     title: document.title,
-    text: document.body?.textContent?.trim(),
-    html: document.documentElement.outerHTML,
+    text,
+    textLength: rawText.length,
+    truncated,
   };
+  if (includeHtml) {
+    result.html = document.documentElement.outerHTML;
+  }
+  return result;
 }
 
 /**
@@ -296,6 +630,9 @@ function click(params) {
   if (!element) {
     throw new Error(`Element not found: ${selector}`);
   }
+
+  // Show focusglow on clicked element
+  moveFocusTo(selector);
 
   // Scroll element into view
   element.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -342,6 +679,9 @@ function type(params) {
     throw new Error(`Element is not editable: ${selector}`);
   }
 
+  // Show focusglow on input element
+  moveFocusTo(selector);
+
   // Focus the element
   element.focus();
 
@@ -373,10 +713,101 @@ function type(params) {
 
 /**
  * Get structured page state (fast alternative to screenshots)
+ * @param {object} params - Parameters
+ * @param {number} params.maxHeadings - Max headings to return (default: 30)
+ * @param {number} params.maxLinks - Max links to return (default: 50)
+ * @param {number} params.maxButtons - Max buttons to return (default: 30)
+ * @param {number} params.maxInputs - Max inputs to return (default: 30)
+ * @param {number} params.maxImages - Max images to return (default: 20)
  * @returns {object} Page state
  */
-function getPageState() {
-  const state = {
+function getPageState(params = {}) {
+  const {
+    maxHeadings = 30,
+    maxLinks = 50,
+    maxButtons = 30,
+    maxInputs = 30,
+    maxImages = 20,
+  } = params;
+
+  // Collect all items first, then slice
+  const allHeadings = [];
+  const allLinks = [];
+  const allButtons = [];
+  const allInputs = [];
+  const allImages = [];
+  const allLandmarks = [];
+
+  // Headings
+  document.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach(el => {
+    const text = el.textContent?.trim();
+    if (text) {
+      allHeadings.push({ level: el.tagName.toLowerCase(), text: text.slice(0, 100) });
+    }
+  });
+
+  // Links (visible, with text)
+  document.querySelectorAll('a[href]').forEach(el => {
+    const rect = el.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) {
+      const text = el.textContent?.trim() || el.getAttribute('aria-label') || '';
+      if (text) {
+        allLinks.push({
+          text: text.slice(0, 50),
+          href: el.getAttribute('href')?.slice(0, 100),
+        });
+      }
+    }
+  });
+
+  // Buttons
+  document.querySelectorAll('button, [role="button"], input[type="submit"], input[type="button"]').forEach(el => {
+    const rect = el.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) {
+      allButtons.push({
+        text: (el.textContent?.trim() || el.value || el.getAttribute('aria-label') || '').slice(0, 50),
+        disabled: el.disabled || el.getAttribute('aria-disabled') === 'true',
+        type: el.type || 'button',
+      });
+    }
+  });
+
+  // Form inputs
+  document.querySelectorAll('input, textarea, select').forEach(el => {
+    if (el.type === 'hidden') return;
+    const rect = el.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) {
+      allInputs.push({
+        type: el.type || el.tagName.toLowerCase(),
+        name: el.name || el.id || '',
+        label: el.getAttribute('aria-label') || el.placeholder || document.querySelector(`label[for="${el.id}"]`)?.textContent?.trim() || '',
+        value: el.type === 'password' ? '***' : (el.value?.slice(0, 50) || ''),
+        required: el.required,
+        disabled: el.disabled,
+      });
+    }
+  });
+
+  // Images with alt text
+  document.querySelectorAll('img[alt]').forEach(el => {
+    const rect = el.getBoundingClientRect();
+    if (rect.width > 20 && rect.height > 20) {
+      allImages.push({
+        alt: el.alt.slice(0, 100),
+        src: el.src?.slice(0, 100),
+      });
+    }
+  });
+
+  // ARIA landmarks
+  document.querySelectorAll('[role="main"], [role="navigation"], [role="banner"], [role="contentinfo"], [role="search"], [role="form"], main, nav, header, footer, aside').forEach(el => {
+    allLandmarks.push({
+      role: el.getAttribute('role') || el.tagName.toLowerCase(),
+      label: el.getAttribute('aria-label') || '',
+    });
+  });
+
+  return {
     url: window.location.href,
     title: document.title,
     viewport: {
@@ -387,101 +818,38 @@ function getPageState() {
       scrollHeight: document.documentElement.scrollHeight,
     },
     errors: capturedLogs.filter(l => l.level === 'error').slice(-10).map(l => l.message),
-    headings: [],
-    links: [],
-    buttons: [],
-    inputs: [],
-    images: [],
-    landmarks: [],
+    headings: allHeadings.slice(0, maxHeadings),
+    links: allLinks.slice(0, maxLinks),
+    buttons: allButtons.slice(0, maxButtons),
+    inputs: allInputs.slice(0, maxInputs),
+    images: allImages.slice(0, maxImages),
+    landmarks: allLandmarks,
+    counts: {
+      headings: { shown: Math.min(allHeadings.length, maxHeadings), total: allHeadings.length },
+      links: { shown: Math.min(allLinks.length, maxLinks), total: allLinks.length },
+      buttons: { shown: Math.min(allButtons.length, maxButtons), total: allButtons.length },
+      inputs: { shown: Math.min(allInputs.length, maxInputs), total: allInputs.length },
+      images: { shown: Math.min(allImages.length, maxImages), total: allImages.length },
+      landmarks: { shown: allLandmarks.length, total: allLandmarks.length },
+    },
   };
-
-  // Headings
-  document.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach(el => {
-    const text = el.textContent?.trim();
-    if (text) {
-      state.headings.push({ level: el.tagName.toLowerCase(), text: text.slice(0, 100) });
-    }
-  });
-
-  // Links (visible, with text)
-  document.querySelectorAll('a[href]').forEach(el => {
-    const rect = el.getBoundingClientRect();
-    if (rect.width > 0 && rect.height > 0) {
-      const text = el.textContent?.trim() || el.getAttribute('aria-label') || '';
-      if (text) {
-        state.links.push({
-          text: text.slice(0, 50),
-          href: el.getAttribute('href')?.slice(0, 100),
-        });
-      }
-    }
-  });
-  state.links = state.links.slice(0, 30);
-
-  // Buttons
-  document.querySelectorAll('button, [role="button"], input[type="submit"], input[type="button"]').forEach(el => {
-    const rect = el.getBoundingClientRect();
-    if (rect.width > 0 && rect.height > 0) {
-      state.buttons.push({
-        text: (el.textContent?.trim() || el.value || el.getAttribute('aria-label') || '').slice(0, 50),
-        disabled: el.disabled || el.getAttribute('aria-disabled') === 'true',
-        type: el.type || 'button',
-      });
-    }
-  });
-  state.buttons = state.buttons.slice(0, 20);
-
-  // Form inputs
-  document.querySelectorAll('input, textarea, select').forEach(el => {
-    if (el.type === 'hidden') return;
-    const rect = el.getBoundingClientRect();
-    if (rect.width > 0 && rect.height > 0) {
-      state.inputs.push({
-        type: el.type || el.tagName.toLowerCase(),
-        name: el.name || el.id || '',
-        label: el.getAttribute('aria-label') || el.placeholder || document.querySelector(`label[for="${el.id}"]`)?.textContent?.trim() || '',
-        value: el.type === 'password' ? '***' : (el.value?.slice(0, 50) || ''),
-        required: el.required,
-        disabled: el.disabled,
-      });
-    }
-  });
-  state.inputs = state.inputs.slice(0, 20);
-
-  // Images with alt text
-  document.querySelectorAll('img[alt]').forEach(el => {
-    const rect = el.getBoundingClientRect();
-    if (rect.width > 20 && rect.height > 20) {
-      state.images.push({
-        alt: el.alt.slice(0, 100),
-        src: el.src?.slice(0, 100),
-      });
-    }
-  });
-  state.images = state.images.slice(0, 15);
-
-  // ARIA landmarks
-  document.querySelectorAll('[role="main"], [role="navigation"], [role="banner"], [role="contentinfo"], [role="search"], [role="form"], main, nav, header, footer, aside').forEach(el => {
-    state.landmarks.push({
-      role: el.getAttribute('role') || el.tagName.toLowerCase(),
-      label: el.getAttribute('aria-label') || '',
-    });
-  });
-
-  return state;
 }
 
 /**
  * Get accessibility tree snapshot
  * @param {object} params - Parameters
  * @param {number} params.maxDepth - Max tree depth (default: 5)
+ * @param {number} params.maxNodes - Max nodes to include (default: 200)
  * @param {string} params.selector - Root element selector (default: body)
  * @returns {object} Accessibility tree
  */
 function getAccessibilitySnapshot(params = {}) {
-  const { maxDepth = 5, selector = 'body' } = params;
+  const { maxDepth = 5, maxNodes = 200, selector = 'body' } = params;
   const root = document.querySelector(selector);
   if (!root) throw new Error(`Element not found: ${selector}`);
+
+  let nodeCount = 0;
+  let truncated = false;
 
   function getAccessibleName(el) {
     return el.getAttribute('aria-label') ||
@@ -529,6 +897,10 @@ function getAccessibilitySnapshot(params = {}) {
 
   function walkTree(el, depth = 0) {
     if (depth > maxDepth) return null;
+    if (nodeCount >= maxNodes) {
+      truncated = true;
+      return null;
+    }
 
     const rect = el.getBoundingClientRect();
     const isVisible = rect.width > 0 && rect.height > 0 &&
@@ -548,11 +920,14 @@ function getAccessibilitySnapshot(params = {}) {
       // But still process children
       const children = [];
       for (const child of el.children) {
-        const node = walkTree(child, depth);
-        if (node) children.push(node);
+        const childNode = walkTree(child, depth);
+        if (childNode) children.push(childNode);
       }
       return children.length === 1 ? children[0] : (children.length > 1 ? { children } : null);
     }
+
+    // Count this as a meaningful node
+    nodeCount++;
 
     const node = {};
     if (role) node.role = role;
@@ -585,11 +960,179 @@ function getAccessibilitySnapshot(params = {}) {
     return Object.keys(node).length > 0 ? node : null;
   }
 
+  const tree = walkTree(root);
+
   return {
     url: window.location.href,
     title: document.title,
-    tree: walkTree(root),
+    tree,
+    nodeCount,
+    maxNodes,
+    truncated,
   };
+}
+
+/**
+ * Send keyboard event to element or document
+ * @param {object} params - Parameters
+ * @param {string} params.key - Key to press (e.g., 'Enter', 'Tab', 'Escape', 'a', 'ArrowDown')
+ * @param {string} params.selector - Optional CSS selector for target element (default: active element)
+ * @param {boolean} params.ctrlKey - Hold Ctrl/Cmd
+ * @param {boolean} params.shiftKey - Hold Shift
+ * @param {boolean} params.altKey - Hold Alt
+ * @param {boolean} params.metaKey - Hold Meta (Cmd on Mac)
+ * @returns {object} Result
+ */
+function pressKey(params) {
+  const {
+    key,
+    selector,
+    ctrlKey = false,
+    shiftKey = false,
+    altKey = false,
+    metaKey = false,
+  } = params;
+
+  if (!key) {
+    throw new Error('key is required');
+  }
+
+  // Get target element
+  let target;
+  if (selector) {
+    target = document.querySelector(selector);
+    if (!target) {
+      throw new Error(`Element not found: ${selector}`);
+    }
+    target.focus();
+    moveFocusTo(selector);
+  } else {
+    target = document.activeElement || document.body;
+  }
+
+  // Create and dispatch keyboard events
+  const eventInit = {
+    key,
+    code: getKeyCode(key),
+    keyCode: getKeyCodeNum(key),
+    which: getKeyCodeNum(key),
+    ctrlKey,
+    shiftKey,
+    altKey,
+    metaKey,
+    bubbles: true,
+    cancelable: true,
+  };
+
+  const keydownEvent = new KeyboardEvent('keydown', eventInit);
+  const keypressEvent = new KeyboardEvent('keypress', eventInit);
+  const keyupEvent = new KeyboardEvent('keyup', eventInit);
+
+  target.dispatchEvent(keydownEvent);
+  // keypress is deprecated but some sites still use it
+  if (key.length === 1) {
+    target.dispatchEvent(keypressEvent);
+  }
+  target.dispatchEvent(keyupEvent);
+
+  return {
+    key,
+    selector: selector || '(active element)',
+    targetTag: target.tagName.toLowerCase(),
+    modifiers: { ctrlKey, shiftKey, altKey, metaKey },
+  };
+}
+
+/**
+ * Get key code string for common keys
+ */
+function getKeyCode(key) {
+  const codeMap = {
+    'Enter': 'Enter',
+    'Tab': 'Tab',
+    'Escape': 'Escape',
+    'Backspace': 'Backspace',
+    'Delete': 'Delete',
+    'ArrowUp': 'ArrowUp',
+    'ArrowDown': 'ArrowDown',
+    'ArrowLeft': 'ArrowLeft',
+    'ArrowRight': 'ArrowRight',
+    'Home': 'Home',
+    'End': 'End',
+    'PageUp': 'PageUp',
+    'PageDown': 'PageDown',
+    ' ': 'Space',
+  };
+  return codeMap[key] || (key.length === 1 ? `Key${key.toUpperCase()}` : key);
+}
+
+/**
+ * Get numeric key code for common keys
+ */
+function getKeyCodeNum(key) {
+  const numMap = {
+    'Enter': 13,
+    'Tab': 9,
+    'Escape': 27,
+    'Backspace': 8,
+    'Delete': 46,
+    'ArrowUp': 38,
+    'ArrowDown': 40,
+    'ArrowLeft': 37,
+    'ArrowRight': 39,
+    'Home': 36,
+    'End': 35,
+    'PageUp': 33,
+    'PageDown': 34,
+    ' ': 32,
+  };
+  if (numMap[key]) return numMap[key];
+  if (key.length === 1) return key.toUpperCase().charCodeAt(0);
+  return 0;
+}
+
+/**
+ * Resize image using canvas (for screenshot compression)
+ * @param {object} params - Parameters
+ * @param {string} params.dataUrl - Source image data URL
+ * @param {number} params.scale - Scale factor (0.25, 0.5, etc)
+ * @param {number} params.quality - JPEG quality (1-100)
+ * @param {string} params.format - Output format (jpeg/png)
+ * @returns {Promise<object>} Resized image data
+ */
+async function resizeImage(params) {
+  const { dataUrl, scale = 0.5, quality = 60, format = 'jpeg' } = params;
+
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const originalWidth = img.width;
+      const originalHeight = img.height;
+      const newWidth = Math.round(originalWidth * scale);
+      const newHeight = Math.round(originalHeight * scale);
+
+      const canvas = document.createElement('canvas');
+      canvas.width = newWidth;
+      canvas.height = newHeight;
+
+      const ctx = canvas.getContext('2d');
+      // Use better quality scaling
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, 0, 0, newWidth, newHeight);
+
+      const mimeType = format === 'png' ? 'image/png' : 'image/jpeg';
+      const outputDataUrl = canvas.toDataURL(mimeType, quality / 100);
+
+      resolve({
+        dataUrl: outputDataUrl,
+        originalSize: { width: originalWidth, height: originalHeight },
+        scaledSize: { width: newWidth, height: newHeight },
+      });
+    };
+    img.onerror = () => reject(new Error('Failed to load image for resizing'));
+    img.src = dataUrl;
+  });
 }
 
 /**
@@ -598,12 +1141,26 @@ function getAccessibilitySnapshot(params = {}) {
 browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
   const { action, params } = message;
 
+  // Ensure visuals are initialized on any Claudezilla command (lazy init)
+  if (!watermarkElement && action !== 'enableClaudezillaVisuals') {
+    initVisuals();
+  }
+
+  // Trigger electron animation on any command (Claude is working)
+  triggerElectrons();
+
   // Handle async actions
   (async () => {
     try {
       let result;
 
       switch (action) {
+        case 'enableClaudezillaVisuals':
+          // This tab is now a Claudezilla-controlled tab - show visuals
+          initVisuals();
+          result = { enabled: true };
+          break;
+
         case 'getContent':
           result = getContent(params);
           break;
@@ -637,11 +1194,19 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
           break;
 
         case 'getPageState':
-          result = getPageState();
+          result = getPageState(params);
           break;
 
         case 'getAccessibilitySnapshot':
           result = getAccessibilitySnapshot(params);
+          break;
+
+        case 'resizeImage':
+          result = await resizeImage(params);
+          break;
+
+        case 'pressKey':
+          result = pressKey(params);
           break;
 
         default:

@@ -1,13 +1,21 @@
 # Claudezilla - Claude Code Firefox Extension
 
+**Version:** 0.4.3
+
 ## Overview
 
 Firefox extension providing browser automation for Claude Code CLI. A Google-free alternative to the official Chrome extension.
 
+**Key Features (v0.4.x):**
+- Single window with max 10 tabs shared across Claude agents
+- Payload optimization (text truncation, node limits)
+- Visual effects (focus glow, watermark with animated electrons)
+- Fast page analysis (structured JSON, accessibility tree)
+
 ## Architecture
 
 ```
-Firefox Extension ←→ Native Messaging Host (Node.js) ←→ Claude Code CLI
+Firefox Extension ←→ Native Messaging Host (Node.js) ←→ MCP Server ←→ Claude Code
 ```
 
 ## Directory Structure
@@ -68,12 +76,46 @@ claudezilla@boot.industries
 
 ## Commands
 
+### Browser Control
 | Command | Description |
 |---------|-------------|
 | ping | Test connection |
 | version | Get host version info |
-| navigate | Open URL in new tab |
-| getContent | Get page content/element text |
+| createWindow | Open URL in shared 10-tab pool |
+| closeTab | Close specific tab by ID |
+| closeWindow | Close entire window |
+| getTabs | List tabs in pool |
+
+### Page Interaction
+| Command | Description |
+|---------|-------------|
+| getContent | Get page text (HTML opt-in, 50K limit) |
 | click | Click element by selector |
 | type | Type text in input |
-| screenshot | Capture visible viewport |
+| pressKey | Send keyboard events |
+| scroll | Scroll to element/position |
+| waitFor | Wait for element to appear |
+| screenshot | Capture viewport (JPEG, configurable) |
+
+### Page Analysis
+| Command | Description |
+|---------|-------------|
+| getPageState | Structured JSON (headings, links, buttons) |
+| getAccessibilitySnapshot | Semantic tree (200 node limit) |
+| getElementInfo | Element attributes, styles |
+| evaluate | Run JS in page context |
+
+### DevTools
+| Command | Description |
+|---------|-------------|
+| getConsoleLogs | Console output by level |
+| getNetworkRequests | XHR/fetch with timing |
+
+## Payload Optimization (v0.4.3)
+
+| Function | Default Limit | Parameter |
+|----------|---------------|-----------|
+| getContent | 50K chars | `maxLength` |
+| getContent | No HTML | `includeHtml` |
+| getAccessibilitySnapshot | 200 nodes | `maxNodes` |
+| getPageState | 50 links, 30 buttons | `maxLinks`, `maxButtons`, etc. |

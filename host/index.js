@@ -50,6 +50,8 @@ const ALLOWED_COMMANDS = new Set([
   // Page analysis (fast alternatives to screenshots)
   'getPageState',
   'getAccessibilitySnapshot',
+  // Keyboard input
+  'pressKey',
 ]);
 
 // Log to stderr and debug file
@@ -122,7 +124,7 @@ function handleExtensionMessage(message) {
       id,
       success: true,
       result: {
-        host: '0.4.0',
+        host: '0.4.2',
         node: process.version,
         platform: process.platform,
         features: ['devtools', 'network', 'console', 'evaluate'],

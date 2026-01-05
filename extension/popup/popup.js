@@ -1,12 +1,51 @@
 /**
  * Claudezilla Popup Script
+ * v0.4.2 - Visual effects settings
  */
 
+// Elements
 const statusIndicator = document.getElementById('statusIndicator');
 const statusText = document.getElementById('statusText');
 const infoDiv = document.getElementById('info');
 const errorDiv = document.getElementById('error');
 const pingBtn = document.getElementById('pingBtn');
+const showWatermarkCheckbox = document.getElementById('showWatermark');
+const showFocusglowCheckbox = document.getElementById('showFocusglow');
+
+// Default settings
+const DEFAULT_SETTINGS = {
+  showWatermark: true,
+  showFocusglow: true,
+};
+
+/**
+ * Load settings from storage
+ */
+async function loadSettings() {
+  try {
+    const stored = await browser.storage.local.get('claudezilla');
+    const settings = { ...DEFAULT_SETTINGS, ...stored.claudezilla };
+    showWatermarkCheckbox.checked = settings.showWatermark;
+    showFocusglowCheckbox.checked = settings.showFocusglow;
+  } catch (e) {
+    console.log('[claudezilla] Could not load settings:', e.message);
+  }
+}
+
+/**
+ * Save settings to storage
+ */
+async function saveSettings() {
+  try {
+    const settings = {
+      showWatermark: showWatermarkCheckbox.checked,
+      showFocusglow: showFocusglowCheckbox.checked,
+    };
+    await browser.storage.local.set({ claudezilla: settings });
+  } catch (e) {
+    console.log('[claudezilla] Could not save settings:', e.message);
+  }
+}
 
 function setStatus(connected, text) {
   if (connected) {
@@ -19,6 +58,7 @@ function setStatus(connected, text) {
 
 function setInfo(info) {
   infoDiv.innerHTML = '';
+  infoDiv.style.display = 'block';
   Object.entries(info).forEach(([key, value]) => {
     const div = document.createElement('div');
     const strong = document.createElement('strong');
@@ -78,8 +118,20 @@ async function testConnection() {
   }
 }
 
-// Test connection on popup open
-testConnection();
+// Initialize
+async function init() {
+  // Load settings
+  await loadSettings();
 
-// Manual test button
-pingBtn.addEventListener('click', testConnection);
+  // Add setting change listeners
+  showWatermarkCheckbox.addEventListener('change', saveSettings);
+  showFocusglowCheckbox.addEventListener('change', saveSettings);
+
+  // Test connection on popup open
+  testConnection();
+
+  // Manual test button
+  pingBtn.addEventListener('click', testConnection);
+}
+
+init();

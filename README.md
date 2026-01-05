@@ -5,19 +5,33 @@ Firefox browser automation for [Claude Code](https://claude.com/claude-code). A 
 ## Features
 
 ### Browser Automation
-- **Tab Navigation** — Open URLs, switch tabs
-- **DOM Reading** — Get page content, element text
-- **Click** — Click elements by CSS selector
-- **Type** — Enter text in input fields
-- **Screenshot** — Capture visible viewport
+- **Tab Pool** — Single window with max 10 tabs, shared across Claude agents
+- **DOM Reading** — Get page content with smart truncation
+- **Click/Type** — Interact with elements by CSS selector
+- **Screenshot** — Compressed JPEG at configurable quality/scale
+- **Keyboard** — Press keys, use shortcuts (Ctrl+A, Enter, etc.)
 
-### DevTools Access (v0.2.0)
+### DevTools Access
 - **Console Capture** — See console.log/warn/error and uncaught exceptions
 - **Network Monitoring** — Track XHR, fetch, scripts with status codes and timing
 - **JavaScript Evaluation** — Run JS in page context, extract data
 - **Element Inspection** — Get attributes, styles, visibility
 - **Wait for Element** — Handle SPAs and dynamic content
 - **Scroll Control** — Scroll to elements or coordinates
+
+### Fast Page Analysis (v0.4.0+)
+- **Page State** — Structured JSON with headings, links, buttons, inputs, images
+- **Accessibility Tree** — Semantic structure as screen readers see it (capped at 200 nodes)
+
+### Visual Effects (v0.4.2+)
+- **Focus Glow** — Golden sparkle effect follows Claude's focus
+- **Watermark** — Corner badge with Claudezilla mascot and animated electrons
+- **Tab Groups** — Color-coded tab groups (Firefox 138+)
+
+### Payload Optimization (v0.4.3)
+- **Content** — HTML excluded by default, text capped at 50K chars
+- **Accessibility** — Tree capped at 200 nodes to prevent overflow
+- **Page State** — Configurable limits per category (links, buttons, etc.)
 
 ## Requirements
 
@@ -82,22 +96,27 @@ cd mcp && npm install
 **Available MCP Tools:**
 
 *Browser Control:*
-- `firefox_create_window` — Create a private browser window
-- `firefox_navigate` — Navigate to URL
-- `firefox_get_content` — Read page content
+- `firefox_create_window` — Open URL in shared 10-tab pool
+- `firefox_get_content` — Read page text (HTML opt-in, 50K char limit)
 - `firefox_click` — Click element by selector
 - `firefox_type` — Type into input field
-- `firefox_screenshot` — Capture screenshot
-- `firefox_get_tabs` — List open tabs
-- `firefox_close_window` — Close browser window
+- `firefox_press_key` — Send keyboard events (Enter, Tab, shortcuts)
+- `firefox_screenshot` — Capture screenshot (JPEG, configurable quality)
+- `firefox_get_tabs` — List tabs in pool
+- `firefox_close_tab` — Close specific tab (free pool slot)
+- `firefox_close_window` — Close entire window (affects all agents)
+
+*Page Analysis:*
+- `firefox_get_page_state` — Structured JSON (headings, links, buttons, inputs)
+- `firefox_get_accessibility_snapshot` — Semantic tree (200 node limit)
+- `firefox_get_element` — Element attributes, styles, visibility
 
 *DevTools:*
-- `firefox_get_console` — Get console logs (filter by level)
-- `firefox_get_network` — Get network requests (filter by type/status)
+- `firefox_get_console` — Console logs (filter by level)
+- `firefox_get_network` — Network requests (filter by type/status)
 - `firefox_evaluate` — Run JavaScript in page context
 - `firefox_wait_for` — Wait for element to appear
 - `firefox_scroll` — Scroll to element or position
-- `firefox_get_element` — Get element attributes, styles, visibility
 
 ### CLI Usage
 

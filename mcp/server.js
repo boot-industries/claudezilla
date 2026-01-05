@@ -105,13 +105,13 @@ const TOOLS = [
   // ===== CORE BROWSER CONTROL =====
   {
     name: 'firefox_create_window',
-    description: 'Create a new private Firefox browser window. Always call this first before other browser commands. Returns windowId for reference.',
+    description: 'Open a URL in the shared Claudezilla browser. SHARED POOL: One private window with MAX 10 TABS shared across all Claude agents. Each call creates a new tab. When limit reached, oldest tab auto-closed. Returns: windowId, tabId, tabCount, maxTabs. Use firefox_close_tab to free slots when done with a tab.',
     inputSchema: {
       type: 'object',
       properties: {
         url: {
           type: 'string',
-          description: 'Optional URL to open in the new window',
+          description: 'URL to open in new tab (default: about:blank)',
         },
       },
     },
@@ -132,34 +132,42 @@ const TOOLS = [
   },
   {
     name: 'firefox_get_content',
-    description: 'Get the text content of the current page or a specific element. Returns structured data with url, title, and text content.',
+    description: 'Get the text content of a page or element. Works on background tabs. Returns url, title, text. HTML excluded by default (use includeHtml=true if needed). Text truncated at 50K chars by default.',
     inputSchema: {
       type: 'object',
       properties: {
-        windowId: {
+        tabId: {
           type: 'number',
-          description: 'Target window ID (from firefox_create_window). Optional if only one window.',
+          description: 'Target tab ID. Default: active tab. Works on background tabs.',
         },
         selector: {
           type: 'string',
           description: 'Optional CSS selector to get content from a specific element',
+        },
+        includeHtml: {
+          type: 'boolean',
+          description: 'Include raw HTML in response (default: false). Warning: can be very large.',
+        },
+        maxLength: {
+          type: 'number',
+          description: 'Max text length before truncation (default: 50000). Use selector for focused extraction.',
         },
       },
     },
   },
   {
     name: 'firefox_click',
-    description: 'Click an element on the page by CSS selector.',
+    description: 'Click an element by CSS selector. Works on background tabs.',
     inputSchema: {
       type: 'object',
       properties: {
-        windowId: {
+        tabId: {
           type: 'number',
-          description: 'Target window ID (from firefox_create_window). Optional if only one window.',
+          description: 'Target tab ID. Default: active tab. Works on background tabs.',
         },
         selector: {
           type: 'string',
-          description: 'CSS selector for the element to click (e.g., "button.submit", "#login-btn", "a[href*=login]")',
+          description: 'CSS selector for the element to click (e.g., "button.submit", "#login-btn")',
         },
       },
       required: ['selector'],
@@ -167,13 +175,13 @@ const TOOLS = [
   },
   {
     name: 'firefox_type',
-    description: 'Type text into an input field.',
+    description: 'Type text into an input field. Works on background tabs.',
     inputSchema: {
       type: 'object',
       properties: {
-        windowId: {
+        tabId: {
           type: 'number',
-          description: 'Target window ID (from firefox_create_window). Optional if only one window.',
+          description: 'Target tab ID. Default: active tab. Works on background tabs.',
         },
         selector: {
           type: 'string',
@@ -192,38 +200,97 @@ const TOOLS = [
     },
   },
   {
-    name: 'firefox_screenshot',
-    description: 'Capture a screenshot of the visible browser viewport. Returns base64-encoded PNG.',
+    name: 'firefox_press_key',
+    description: 'Send a keyboard event. Use for Enter, Tab, Escape, arrow keys, or shortcuts (Ctrl+A, etc.). More reliable than clicking for form submission and navigation. Works on background tabs.',
     inputSchema: {
       type: 'object',
       properties: {
-        windowId: {
+        tabId: {
           type: 'number',
-          description: 'Target window ID (from firefox_create_window). Optional if only one window.',
+          description: 'Target tab ID. Default: active tab. Works on background tabs.',
+        },
+        key: {
+          type: 'string',
+          description: 'Key to press: Enter, Tab, Escape, Backspace, Delete, ArrowUp/Down/Left/Right, Home, End, PageUp/Down, or single characters (a-z, 0-9)',
+        },
+        selector: {
+          type: 'string',
+          description: 'Optional CSS selector for target element (default: currently focused element)',
+        },
+        ctrlKey: {
+          type: 'boolean',
+          description: 'Hold Ctrl key (for shortcuts like Ctrl+A)',
+        },
+        shiftKey: {
+          type: 'boolean',
+          description: 'Hold Shift key',
+        },
+        altKey: {
+          type: 'boolean',
+          description: 'Hold Alt key',
+        },
+        metaKey: {
+          type: 'boolean',
+          description: 'Hold Meta/Cmd key (Mac)',
+        },
+      },
+      required: ['key'],
+    },
+  },
+  {
+    name: 'firefox_screenshot',
+    description: 'Capture a screenshot of a tab. If tabId specified, switches to that tab first (only screenshot requires visible tab - other commands work on background tabs). Returns base64-encoded image. Default: JPEG at 60% quality, 50% scale.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        tabId: {
+          type: 'number',
+          description: 'Specific tab to capture (will switch to it). Default: current active tab.',
+        },
+        quality: {
+          type: 'number',
+          description: 'JPEG quality 1-100 (default: 60). Lower = smaller file.',
+        },
+        scale: {
+          type: 'number',
+          description: 'Resolution scale 0.25-1.0 (default: 0.5). 0.5 = half resolution.',
+        },
+        format: {
+          type: 'string',
+          enum: ['jpeg', 'png'],
+          description: 'Image format (default: jpeg). JPEG is much smaller.',
         },
       },
     },
   },
   {
     name: 'firefox_get_tabs',
-    description: 'List all open browser tabs with their URLs and titles.',
+    description: 'List all Claudezilla tabs with their URLs, titles, and tabIds. Use this to see which tabs are open in the shared 10-tab pool.',
     inputSchema: {
       type: 'object',
       properties: {},
     },
   },
   {
-    name: 'firefox_close_window',
-    description: 'Close a browser window by ID.',
+    name: 'firefox_close_tab',
+    description: 'Close a specific tab by ID. Use this to free up slots in the shared 10-tab pool. Get tabIds from firefox_get_tabs or firefox_create_window response.',
     inputSchema: {
       type: 'object',
       properties: {
-        windowId: {
+        tabId: {
           type: 'number',
-          description: 'The window ID to close',
+          description: 'Tab ID to close (required)',
         },
       },
-      required: ['windowId'],
+      required: ['tabId'],
+    },
+  },
+  {
+    name: 'firefox_close_window',
+    description: 'Close the entire Claudezilla window and all tabs. WARNING: This affects all Claude agents sharing the window. Use firefox_close_tab to close individual tabs instead.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
     },
   },
   {
@@ -285,13 +352,13 @@ const TOOLS = [
   // ===== DEVTOOLS FEATURES =====
   {
     name: 'firefox_get_console',
-    description: 'Get captured console logs from the page. Captures console.log, console.warn, console.error, and uncaught exceptions.',
+    description: 'Get captured console logs from the page. Captures console.log, console.warn, console.error, and uncaught exceptions. Works on background tabs.',
     inputSchema: {
       type: 'object',
       properties: {
-        windowId: {
+        tabId: {
           type: 'number',
-          description: 'Target window ID (from firefox_create_window). Optional if only one window.',
+          description: 'Target tab ID. Default: active tab. Works on background tabs.',
         },
         level: {
           type: 'string',
@@ -311,13 +378,13 @@ const TOOLS = [
   },
   {
     name: 'firefox_get_network',
-    description: 'Get captured network requests. Shows XHR, fetch, script, image, and other resource requests with status codes and timing.',
+    description: 'Get captured network requests. Shows XHR, fetch, script, image, and other resource requests with status codes and timing. Works on background tabs.',
     inputSchema: {
       type: 'object',
       properties: {
-        windowId: {
+        tabId: {
           type: 'number',
-          description: 'Target window ID (from firefox_create_window). Optional if only one window.',
+          description: 'Target tab ID. Default: active tab. Works on background tabs.',
         },
         type: {
           type: 'string',
@@ -341,13 +408,13 @@ const TOOLS = [
   },
   {
     name: 'firefox_evaluate',
-    description: 'Execute JavaScript in the page context and return the result. Useful for extracting data, checking state, or debugging.',
+    description: 'Execute JavaScript in the page context and return the result. Useful for extracting data, checking state, or debugging. Works on background tabs.',
     inputSchema: {
       type: 'object',
       properties: {
-        windowId: {
+        tabId: {
           type: 'number',
-          description: 'Target window ID (from firefox_create_window). Optional if only one window.',
+          description: 'Target tab ID. Default: active tab. Works on background tabs.',
         },
         expression: {
           type: 'string',
@@ -359,13 +426,13 @@ const TOOLS = [
   },
   {
     name: 'firefox_wait_for',
-    description: 'Wait for an element to appear on the page. Useful for SPAs and dynamic content.',
+    description: 'Wait for an element to appear on the page. Useful for SPAs and dynamic content. Works on background tabs.',
     inputSchema: {
       type: 'object',
       properties: {
-        windowId: {
+        tabId: {
           type: 'number',
-          description: 'Target window ID (from firefox_create_window). Optional if only one window.',
+          description: 'Target tab ID. Default: active tab. Works on background tabs.',
         },
         selector: {
           type: 'string',
@@ -381,13 +448,13 @@ const TOOLS = [
   },
   {
     name: 'firefox_scroll',
-    description: 'Scroll to an element or position on the page.',
+    description: 'Scroll to an element or position on the page. Works on background tabs.',
     inputSchema: {
       type: 'object',
       properties: {
-        windowId: {
+        tabId: {
           type: 'number',
-          description: 'Target window ID (from firefox_create_window). Optional if only one window.',
+          description: 'Target tab ID. Default: active tab. Works on background tabs.',
         },
         selector: {
           type: 'string',
@@ -411,13 +478,13 @@ const TOOLS = [
   },
   {
     name: 'firefox_get_element',
-    description: 'Get detailed information about an element including attributes, styles, visibility, and position.',
+    description: 'Get detailed information about an element including attributes, styles, visibility, and position. Works on background tabs.',
     inputSchema: {
       type: 'object',
       properties: {
-        windowId: {
+        tabId: {
           type: 'number',
-          description: 'Target window ID (from firefox_create_window). Optional if only one window.',
+          description: 'Target tab ID. Default: active tab. Works on background tabs.',
         },
         selector: {
           type: 'string',
@@ -430,30 +497,54 @@ const TOOLS = [
   // ===== PAGE ANALYSIS (FAST ALTERNATIVES TO SCREENSHOTS) =====
   {
     name: 'firefox_get_page_state',
-    description: 'Get structured page state as JSON. Much faster than screenshots for understanding page content. Returns: URL, title, viewport, errors, headings, links, buttons, inputs, images, landmarks. Use this instead of screenshots when you need to understand what is on the page.',
+    description: 'Get structured page state as JSON. Much faster than screenshots for understanding page content. Returns: URL, title, viewport, errors, headings, links, buttons, inputs, images, landmarks with counts. Works on background tabs.',
     inputSchema: {
       type: 'object',
       properties: {
-        windowId: {
+        tabId: {
           type: 'number',
-          description: 'Target window ID (from firefox_create_window). Optional if only one window.',
+          description: 'Target tab ID. Default: active tab. Works on background tabs.',
+        },
+        maxHeadings: {
+          type: 'number',
+          description: 'Max headings to return (default: 30)',
+        },
+        maxLinks: {
+          type: 'number',
+          description: 'Max links to return (default: 50)',
+        },
+        maxButtons: {
+          type: 'number',
+          description: 'Max buttons to return (default: 30)',
+        },
+        maxInputs: {
+          type: 'number',
+          description: 'Max inputs to return (default: 30)',
+        },
+        maxImages: {
+          type: 'number',
+          description: 'Max images to return (default: 20)',
         },
       },
     },
   },
   {
     name: 'firefox_get_accessibility_snapshot',
-    description: 'Get accessibility tree snapshot. Returns semantic structure of the page as screen readers see it. Includes roles, names, states (disabled, checked, expanded), and values. Faster and more accurate than screenshots for form state and interactive elements.',
+    description: 'Get accessibility tree snapshot. Returns semantic structure with roles, names, states. Capped at 200 nodes by default to prevent overflow. Works on background tabs.',
     inputSchema: {
       type: 'object',
       properties: {
-        windowId: {
+        tabId: {
           type: 'number',
-          description: 'Target window ID (from firefox_create_window). Optional if only one window.',
+          description: 'Target tab ID. Default: active tab. Works on background tabs.',
         },
         maxDepth: {
           type: 'number',
           description: 'Maximum tree depth to traverse (default: 5)',
+        },
+        maxNodes: {
+          type: 'number',
+          description: 'Maximum nodes to include (default: 200). Lower = faster, less detail.',
         },
         selector: {
           type: 'string',
@@ -474,6 +565,7 @@ const TOOL_TO_COMMAND = {
   firefox_type: 'type',
   firefox_screenshot: 'screenshot',
   firefox_get_tabs: 'getTabs',
+  firefox_close_tab: 'closeTab',
   firefox_close_window: 'closeWindow',
   firefox_resize_window: 'resizeWindow',
   firefox_set_viewport: 'setViewport',
@@ -487,13 +579,15 @@ const TOOL_TO_COMMAND = {
   // Page analysis
   firefox_get_page_state: 'getPageState',
   firefox_get_accessibility_snapshot: 'getAccessibilitySnapshot',
+  // Keyboard input
+  firefox_press_key: 'pressKey',
 };
 
 // Create MCP server
 const server = new Server(
   {
     name: 'claudezilla',
-    version: '0.4.0',
+    version: '0.4.3',
   },
   {
     capabilities: {
@@ -534,13 +628,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     if (response.success) {
       // Special handling for screenshots - return as image
       if (name === 'firefox_screenshot' && response.result?.dataUrl) {
-        const base64Data = response.result.dataUrl.replace(/^data:image\/png;base64,/, '');
+        // Detect format from data URL
+        const isJpeg = response.result.dataUrl.startsWith('data:image/jpeg');
+        const mimeType = isJpeg ? 'image/jpeg' : 'image/png';
+        const base64Data = response.result.dataUrl.replace(/^data:image\/(jpeg|png);base64,/, '');
         return {
           content: [
             {
               type: 'image',
               data: base64Data,
-              mimeType: 'image/png',
+              mimeType,
             },
           ],
         };
