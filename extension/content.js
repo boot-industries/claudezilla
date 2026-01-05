@@ -194,7 +194,7 @@ function initWatermark() {
       #claudezilla-speech-bubble {
         position: absolute !important;
         top: 36px !important;
-        right: 33px !important;
+        right: 35px !important;
         width: 8px;
         height: 8px;
         background: #f5f5f4;
