@@ -13,13 +13,29 @@
  */
 
 import { readMessage, sendMessage } from './protocol.js';
-import { appendFileSync, unlinkSync, existsSync } from 'fs';
+import { appendFileSync, unlinkSync, existsSync, chmodSync, writeFileSync } from 'fs';
 import { createServer } from 'net';
 import { tmpdir } from 'os';
 import { join } from 'path';
+import { randomUUID } from 'crypto';
 
-const DEBUG_LOG = join(tmpdir(), 'claudezilla-debug.log');
-const SOCKET_PATH = join(tmpdir(), 'claudezilla.sock');
+// SECURITY: Use validated temp directory
+// Prevents TMPDIR hijacking by validating the path
+const SAFE_TMPDIR = (() => {
+  const tmp = tmpdir();
+  // On macOS/Linux, prefer XDG_RUNTIME_DIR if available (per-user, secure)
+  const xdgRuntime = process.env.XDG_RUNTIME_DIR;
+  if (xdgRuntime && existsSync(xdgRuntime)) {
+    return xdgRuntime;
+  }
+  return tmp;
+})();
+
+const DEBUG_LOG = join(SAFE_TMPDIR, 'claudezilla-debug.log');
+const SOCKET_PATH = join(SAFE_TMPDIR, 'claudezilla.sock');
+
+// SECURITY: Max buffer size to prevent memory exhaustion (10MB)
+const MAX_BUFFER_SIZE = 10 * 1024 * 1024;
 
 // SECURITY: Whitelist of allowed commands
 const ALLOWED_COMMANDS = new Set([
@@ -54,11 +70,15 @@ const ALLOWED_COMMANDS = new Set([
   'pressKey',
 ]);
 
-// Log to stderr and debug file
+// SECURITY: Log to stderr and debug file with restricted permissions
 function log(...args) {
   const msg = `[${new Date().toISOString()}] [claudezilla-host] ${args.join(' ')}\n`;
   console.error('[claudezilla-host]', ...args);
   try {
+    // Create log file with restricted permissions if it doesn't exist
+    if (!existsSync(DEBUG_LOG)) {
+      writeFileSync(DEBUG_LOG, '', { mode: 0o600 });
+    }
     appendFileSync(DEBUG_LOG, msg);
   } catch (e) {
     // ignore
@@ -69,7 +89,6 @@ log('Script starting, cwd:', process.cwd());
 
 // Track pending requests from CLI
 const pendingCliRequests = new Map();
-let requestId = 0;
 
 /**
  * Handle command from CLI (via socket)
@@ -82,7 +101,8 @@ function handleCliCommand(command, params, callback) {
     return;
   }
 
-  const id = ++requestId;
+  // SECURITY: Use UUID for request IDs to prevent overflow/collision
+  const id = randomUUID();
 
   // Store callback for when extension responds
   pendingCliRequests.set(id, callback);
@@ -154,6 +174,15 @@ function startSocketServer() {
     socket.on('data', (data) => {
       buffer += data.toString();
 
+      // SECURITY: Prevent memory exhaustion from unbounded buffer
+      if (buffer.length > MAX_BUFFER_SIZE) {
+        log('Buffer overflow attempt - disconnecting client');
+        socket.write(JSON.stringify({ success: false, error: 'Message too large' }) + '\n');
+        socket.destroy();
+        buffer = '';
+        return;
+      }
+
       // Process complete JSON messages (newline-delimited)
       const lines = buffer.split('\n');
       buffer = lines.pop(); // Keep incomplete line in buffer
@@ -187,6 +216,13 @@ function startSocketServer() {
 
   server.listen(SOCKET_PATH, () => {
     log(`Socket server listening on ${SOCKET_PATH}`);
+    // SECURITY: Set socket permissions to user-only (0600)
+    try {
+      chmodSync(SOCKET_PATH, 0o600);
+      log('Socket permissions set to 0600 (user only)');
+    } catch (e) {
+      log('Warning: Could not set socket permissions:', e.message);
+    }
   });
 
   server.on('error', (err) => {

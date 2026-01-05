@@ -41,14 +41,81 @@ const sessions = new Map();
 const networkRequests = [];
 const MAX_NETWORK_ENTRIES = 200;
 
+// SECURITY: Allowed URL schemes for navigation
+const ALLOWED_URL_SCHEMES = ['http:', 'https:', 'about:'];
+
+// SECURITY: Sensitive query parameter patterns to redact
+const SENSITIVE_PARAMS = ['password', 'passwd', 'pwd', 'token', 'api_key', 'apikey', 'secret', 'auth', 'key', 'credential'];
+
+/**
+ * SECURITY: Redact sensitive query parameters from URLs
+ * Prevents leaking passwords, tokens, API keys in logs/captures
+ */
+function redactSensitiveUrl(url) {
+  try {
+    const parsed = new URL(url);
+    let redacted = false;
+    for (const [key] of parsed.searchParams) {
+      if (SENSITIVE_PARAMS.some(p => key.toLowerCase().includes(p))) {
+        parsed.searchParams.set(key, '[REDACTED]');
+        redacted = true;
+      }
+    }
+    return redacted ? parsed.toString() : url;
+  } catch (e) {
+    return url; // Return as-is if not parseable
+  }
+}
+
+/**
+ * SECURITY: Validate URL scheme before navigation
+ * Prevents javascript:, data:, file:// injection attacks
+ */
+function validateUrlScheme(url) {
+  if (!url || url === 'about:blank') return true;
+  try {
+    const parsed = new URL(url);
+    if (!ALLOWED_URL_SCHEMES.includes(parsed.protocol)) {
+      throw new Error(`URL scheme not allowed: ${parsed.protocol}. Allowed: ${ALLOWED_URL_SCHEMES.join(', ')}`);
+    }
+    return true;
+  } catch (e) {
+    if (e.message.includes('URL scheme not allowed')) throw e;
+    throw new Error(`Invalid URL: ${e.message}`);
+  }
+}
+
+/**
+ * SECURITY: Verify agent owns the target tab before operations
+ * Prevents cross-agent tab interference
+ */
+function verifyTabOwnership(tabId, agentId, operation) {
+  if (!claudezillaWindow) {
+    throw new Error('No Claudezilla window active');
+  }
+  const tabEntry = claudezillaWindow.tabs.find(t => t.tabId === tabId);
+  if (!tabEntry) {
+    throw new Error(`Tab ${tabId} not found in Claudezilla window`);
+  }
+  // Allow operations on tabs with 'unknown' owner (legacy compatibility)
+  // But if both have IDs and they don't match, deny
+  if (tabEntry.ownerId !== 'unknown' && agentId && tabEntry.ownerId !== agentId) {
+    throw new Error(`OWNERSHIP: Cannot ${operation} tab ${tabId} (owned by ${tabEntry.ownerId}, you are ${agentId})`);
+  }
+  return tabEntry;
+}
+
 /**
  * Monitor network requests using webRequest API
  */
+// SECURITY: Do NOT capture requestBody - it may contain passwords, tokens, credit cards
+// Only capture metadata (URL, method, type) for debugging purposes
 browser.webRequest.onBeforeRequest.addListener(
   (details) => {
     const entry = {
       requestId: details.requestId,
-      url: details.url,
+      // SECURITY: Redact query params that may contain sensitive data
+      url: redactSensitiveUrl(details.url),
       method: details.method,
       type: details.type,
       tabId: details.tabId,
@@ -60,8 +127,8 @@ browser.webRequest.onBeforeRequest.addListener(
       networkRequests.shift();
     }
   },
-  { urls: ['<all_urls>'] },
-  ['requestBody']
+  { urls: ['<all_urls>'] }
+  // SECURITY: Removed 'requestBody' - prevents capturing sensitive POST data
 );
 
 browser.webRequest.onCompleted.addListener(
@@ -311,9 +378,9 @@ async function handleCliCommand(message) {
 
       case 'version':
         result = {
-          extension: '0.4.4',
+          extension: '0.4.5',
           browser: navigator.userAgent,
-          features: ['devtools', 'network', 'console', 'evaluate', 'focusglow', 'tabgroups'],
+          features: ['devtools', 'network', 'console', 'evaluate', 'focusglow', 'tabgroups', 'security-hardened'],
         };
         break;
 
@@ -327,6 +394,9 @@ async function handleCliCommand(message) {
       case 'navigate': {
         const { url } = params;
         if (!url) throw new Error('url is required');
+
+        // SECURITY: Validate URL scheme (blocks javascript:, data:, file://)
+        validateUrlScheme(url);
 
         // SECURITY: Disable navigate when extension is allowed in private windows
         // to prevent agents from creating non-private windows
@@ -384,6 +454,11 @@ async function handleCliCommand(message) {
         // Tab ownership: each tab tracks its creator agent for close permission
         const { url, agentId } = params;
         const ownerId = agentId || 'unknown';
+
+        // SECURITY: Validate URL scheme (blocks javascript:, data:, file://)
+        if (url) {
+          validateUrlScheme(url);
+        }
         let tabId;
         let isNewWindow = false;
         let closedTabId = null;
@@ -493,6 +568,11 @@ async function handleCliCommand(message) {
           throw new Error('tabId is required');
         }
 
+        // SECURITY: Require agentId for ownership verification
+        if (!agentId) {
+          throw new Error('agentId is required for tab close operations');
+        }
+
         if (!claudezillaWindow) {
           throw new Error('No Claudezilla window active');
         }
@@ -503,8 +583,10 @@ async function handleCliCommand(message) {
           throw new Error(`Tab ${closeTabId} not found in Claudezilla window. Available tabs: ${availableTabs}`);
         }
 
-        // OWNERSHIP CHECK: Only the creator can close the tab
-        if (tabEntry.ownerId !== 'unknown' && agentId && tabEntry.ownerId !== agentId) {
+        // SECURITY: Ownership check - agents can only close their own tabs
+        // Note: 'unknown' ownership allows any agent to close (legacy tabs created without agentId)
+        // This is intentional for backward compatibility, but new tabs always have agentId
+        if (tabEntry.ownerId !== 'unknown' && tabEntry.ownerId !== agentId) {
           throw new Error(`OWNERSHIP: Tab ${closeTabId} was created by ${tabEntry.ownerId}. You (${agentId}) cannot close another agent's tab.`);
         }
 
@@ -531,8 +613,20 @@ async function handleCliCommand(message) {
 
       case 'closeWindow': {
         // Close the entire Claudezilla window - WARNING: affects all agents
+        const { agentId } = params;
+
         if (!claudezillaWindow) {
           throw new Error('No Claudezilla window to close');
+        }
+
+        // SECURITY: Check if agent owns all tabs or if there are no other owners
+        const tabOwners = new Set(claudezillaWindow.tabs.map(t => t.ownerId).filter(o => o !== 'unknown'));
+        const hasMultipleOwners = tabOwners.size > 1;
+        const isOnlyOwner = tabOwners.size === 0 || (tabOwners.size === 1 && tabOwners.has(agentId));
+
+        if (hasMultipleOwners && !isOnlyOwner && agentId) {
+          const otherOwners = [...tabOwners].filter(o => o !== agentId);
+          throw new Error(`OWNERSHIP: Cannot close window - other agents have tabs open: ${otherOwners.join(', ')}. Use firefox_close_tab to close your own tabs.`);
         }
 
         const winId = claudezillaWindow.windowId;

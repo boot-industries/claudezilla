@@ -22,9 +22,9 @@ if [ ! -f "$HOST_PATH" ]; then
     exit 1
 fi
 
-# Make host script executable
-chmod +x "$HOST_PATH"
-echo "Made host script executable: $HOST_PATH"
+# SECURITY: Make host script executable with explicit permissions
+chmod 755 "$HOST_PATH"
+echo "Set host script permissions to 755: $HOST_PATH"
 
 # Create native messaging hosts directory if it doesn't exist
 mkdir -p "$NATIVE_HOSTS_DIR"
@@ -43,7 +43,9 @@ cat > "$MANIFEST_PATH" << EOF
 }
 EOF
 
-echo "Created native manifest: $MANIFEST_PATH"
+# SECURITY: Set manifest file permissions explicitly
+chmod 644 "$MANIFEST_PATH"
+echo "Created native manifest with permissions 644: $MANIFEST_PATH"
 echo ""
 echo "Installation complete!"
 echo ""

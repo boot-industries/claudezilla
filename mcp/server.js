@@ -20,9 +20,10 @@ import { randomBytes } from 'crypto';
 
 const SOCKET_PATH = join(tmpdir(), 'claudezilla.sock');
 
-// Unique agent ID for this MCP server instance
+// SECURITY: Unique agent ID with 128-bit entropy (16 bytes = 32 hex chars)
 // Used for tab ownership tracking - only the agent that created a tab can close it
-const AGENT_ID = `agent_${randomBytes(4).toString('hex')}_${process.pid}`;
+// Previous: 4 bytes (32 bits) was too weak and predictable
+const AGENT_ID = `agent_${randomBytes(16).toString('hex')}_${process.pid}`;
 
 /**
  * Send command to Claudezilla via Unix socket
@@ -592,7 +593,7 @@ const TOOL_TO_COMMAND = {
 const server = new Server(
   {
     name: 'claudezilla',
-    version: '0.4.4',
+    version: '0.4.5',
   },
   {
     capabilities: {
@@ -628,9 +629,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   }
 
   try {
-    // Inject agent ID for tab ownership tracking
+    // SECURITY: Inject agent ID for tab ownership tracking
     const commandParams = { ...(args || {}) };
-    if (name === 'firefox_create_window' || name === 'firefox_close_tab') {
+    if (name === 'firefox_create_window' || name === 'firefox_close_tab' || name === 'firefox_close_window') {
       commandParams.agentId = AGENT_ID;
     }
 
