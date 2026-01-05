@@ -85,6 +85,7 @@ claudezilla@boot.industries
 | ping | Test connection |
 | version | Get host version info |
 | createWindow | Open URL in shared 10-tab pool |
+| navigate | Navigate tab to URL (with tabId: owned tabs only) |
 | closeTab | Close specific tab by ID |
 | closeWindow | Close entire window |
 | getTabs | List tabs in pool |
@@ -93,8 +94,8 @@ claudezilla@boot.industries
 | Command | Description |
 |---------|-------------|
 | getContent | Get page text (HTML opt-in, 50K limit) |
-| click | Click element by selector |
-| type | Type text in input |
+| click | Click element by selector (returns text, id, className) |
+| type | Type text in input (React/Angular compatible) |
 | pressKey | Send keyboard events |
 | scroll | Scroll to element/position |
 | waitFor | Wait for element to appear |
@@ -127,8 +128,8 @@ claudezilla@boot.industries
 
 **Tab Ownership:**
 - Each tab tracks its creator (agentId from MCP server)
-- Only the creator can close their own tab via `closeTab`
-- All content commands (getContent, click, type, etc.) verify ownership
+- Only the creator can close or navigate their own tabs
+- All content commands (getContent, click, type, navigate, etc.) verify ownership
 - Other agents get: `OWNERSHIP: Cannot <operation> tab X (owned by agent_Y)`
 - Use `getTabs` to see ownership info for all tabs
 

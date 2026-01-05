@@ -27,6 +27,15 @@
 
 See [[CLZ003 Security Audit v0.4.5]] for full details.
 
+### Bug Fixes
+
+- **React/Angular input compatibility** - Type command now uses native value setter to work with framework-controlled inputs
+- **Tab navigation** - Navigate command accepts `tabId` parameter to navigate owned tabs (ownership enforced)
+
+### Enhancements
+
+- **Click feedback** - Returns element `text`, `id`, and `className` for better debugging
+
 ---
 
 ## v0.4.4 (2026-01-05)
@@ -85,7 +94,7 @@ See [[CLZ003 Security Audit v0.4.5]] for full details.
 ### Features
 
 - Auto-detect "Run in Private Windows" permission
-- Navigate disabled when private permission enabled
+- Navigate without tabId restricted in private mode (use tabId for owned tabs)
 
 ---
 

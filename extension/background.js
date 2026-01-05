@@ -392,16 +392,29 @@ async function handleCliCommand(message) {
       }
 
       case 'navigate': {
-        const { url } = params;
+        const { url, tabId: targetTabId, agentId } = params;
         if (!url) throw new Error('url is required');
 
         // SECURITY: Validate URL scheme (blocks javascript:, data:, file://)
         validateUrlScheme(url);
 
-        // SECURITY: Disable navigate when extension is allowed in private windows
+        // If tabId provided, navigate that specific Claudezilla tab (with ownership check)
+        if (targetTabId) {
+          // Verify the tab is in our pool and agent owns it
+          if (agentId) {
+            verifyTabOwnership(targetTabId, agentId, 'navigate');
+          }
+          await browser.tabs.update(targetTabId, { url });
+          const tab = await browser.tabs.get(targetTabId);
+          result = { tabId: targetTabId, url: tab.url, title: tab.title, navigated: true };
+          break;
+        }
+
+        // No tabId: navigate active tab (original behavior with restrictions)
+        // SECURITY: Disable when extension is allowed in private windows
         // to prevent agents from creating non-private windows
         if (await canRunInPrivateWindows()) {
-          throw new Error('SECURITY: firefox_navigate is disabled when extension runs in Private Windows. This prevents creating non-private windows. Use other commands to interact with the current tab.');
+          throw new Error('SECURITY: firefox_navigate is disabled when extension runs in Private Windows. This prevents creating non-private windows. Use firefox_create_window or provide a tabId to navigate an existing tab.');
         }
 
         // SECURITY: Require private window, then navigate in current tab

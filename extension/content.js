@@ -706,6 +706,9 @@ function click(params) {
     selector,
     clicked: true,
     tagName: element.tagName.toLowerCase(),
+    text: element.textContent?.trim().slice(0, 100) || '',
+    id: element.id || null,
+    className: element.className || null,
   };
 }
 
@@ -745,13 +748,31 @@ function type(params) {
   element.focus();
 
   if (isInput) {
-    if (clear) {
-      element.value = '';
-    }
-    element.value += text;
+    // Use native setter for React/Angular compatibility
+    // React overrides value setter, so direct assignment bypasses change detection
+    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+      window.HTMLInputElement.prototype,
+      'value'
+    ).set;
+    const nativeTextareaValueSetter = Object.getOwnPropertyDescriptor(
+      window.HTMLTextAreaElement.prototype,
+      'value'
+    ).set;
 
-    // Dispatch input event
-    element.dispatchEvent(new Event('input', { bubbles: true }));
+    const setter = element.tagName === 'TEXTAREA'
+      ? nativeTextareaValueSetter
+      : nativeInputValueSetter;
+
+    const newValue = clear ? text : element.value + text;
+    setter.call(element, newValue);
+
+    // Dispatch InputEvent (more specific than generic Event, better framework compat)
+    element.dispatchEvent(new InputEvent('input', {
+      bubbles: true,
+      cancelable: true,
+      inputType: 'insertText',
+      data: text
+    }));
     element.dispatchEvent(new Event('change', { bubbles: true }));
   } else if (isContentEditable) {
     if (clear) {

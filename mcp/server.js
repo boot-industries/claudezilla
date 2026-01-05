@@ -124,13 +124,17 @@ const TOOLS = [
   },
   {
     name: 'firefox_navigate',
-    description: 'Navigate to a URL in the current Firefox tab. Requires a private window (use firefox_create_window first). Disabled if extension is allowed to run in Private Windows to prevent creating non-private windows.',
+    description: 'Navigate to a URL. If tabId provided, navigates that tab (requires ownership). Without tabId, navigates active tab (may be restricted in private window mode).',
     inputSchema: {
       type: 'object',
       properties: {
         url: {
           type: 'string',
           description: 'The URL to navigate to',
+        },
+        tabId: {
+          type: 'number',
+          description: 'Target tab ID. If provided, navigates this tab (ownership enforced). Without tabId, navigates active tab.',
         },
       },
       required: ['url'],
@@ -636,6 +640,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       'firefox_create_window',
       'firefox_close_tab',
       'firefox_close_window',
+      'firefox_navigate',
       'firefox_get_content',
       'firefox_click',
       'firefox_type',

@@ -105,7 +105,7 @@ Claudezilla is designed with security in mind:
 - **Tab isolation** — Each Claude session owns its tabs
 - **URL validation** — Blocks dangerous schemes (`javascript:`, `data:`)
 
-Works in both regular and private Firefox windows. When private window permission is enabled, navigation commands are restricted to preserve privacy intent.
+Works in both regular and private Firefox windows. Tab navigation respects ownership — Claude can only navigate tabs it created.
 
 See [SECURITY.md](./SECURITY.md) for the full security model.
 

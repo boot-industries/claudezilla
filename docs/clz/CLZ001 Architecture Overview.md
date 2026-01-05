@@ -1,4 +1,4 @@
-# CLZ002 Architecture Overview
+# CLZ001 Architecture Overview
 
 **Date:** 2026-01-05
 **Version:** 0.4.5
