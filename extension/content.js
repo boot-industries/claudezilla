@@ -55,7 +55,8 @@ const CLAUDE_LOGO_SVG = `
   </defs>
 
   <!-- Master group with breathing animation (only when active) -->
-  <g id="claudezilla-breathe" style="transform-origin: center; transform-box: fill-box; transform: scale(1.20);">
+  <g id="claudezilla-breathe" transform="scale(1.20)">
+    <animateTransform id="breathe-anim" attributeName="transform" type="scale" values="1.20;1.24;1.20" dur="4s" repeatCount="indefinite" begin="indefinite"/>
 
     <!-- LAYER 1: Tesseract frame -->
     <path d="M32 8 L54 18 L54 46 L32 56 L10 46 L10 18 Z"
@@ -156,13 +157,6 @@ function initWatermark() {
     const style = document.createElement('style');
     style.id = 'claudezilla-watermark-styles';
     style.textContent = `
-      @keyframes claudezilla-breathe {
-        0%, 100% { transform: scale(1.20); }
-        50% { transform: scale(1.24); }
-      }
-      #claudezilla-breathe.active {
-        animation: claudezilla-breathe 4s ease-in-out infinite;
-      }
       @keyframes claudezilla-glow-throb {
         0%, 100% {
           box-shadow:
@@ -443,13 +437,13 @@ function triggerElectrons() {
 
   const electrons = watermarkElement.querySelector('#claudezilla-electrons');
   const arms = watermarkElement.querySelector('#claudezilla-arms');
-  const breathe = watermarkElement.querySelector('#claudezilla-breathe');
+  const breatheAnim = watermarkElement.querySelector('#breathe-anim');
   if (!electrons) return;
 
   // Show electrons, arms, breathing, and speech bubble (Claudezilla sings while working!)
   electrons.style.opacity = '1';
   if (arms) arms.style.opacity = '1';
-  if (breathe) breathe.classList.add('active');
+  if (breatheAnim) breatheAnim.beginElement();
   if (speechBubbleElement) speechBubbleElement.classList.add('singing');
 
   // Hide after 5s idle (with gradual 1.5s fade)
@@ -457,7 +451,7 @@ function triggerElectrons() {
   electronTimeout = setTimeout(() => {
     electrons.style.opacity = '0';
     if (arms) arms.style.opacity = '0';
-    if (breathe) breathe.classList.remove('active');
+    if (breatheAnim) breatheAnim.endElement();
     if (speechBubbleElement) speechBubbleElement.classList.remove('singing');
   }, 5000);
 }
