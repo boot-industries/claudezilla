@@ -92,3 +92,32 @@ document.getElementById('submitBtn').addEventListener('click', async () => {
     loadingEl.style.display = 'none';
   }
 });
+
+// Copy wallet address
+const copyBtn = document.getElementById('copyBtn');
+const copyFeedback = document.getElementById('copyFeedback');
+const walletCode = document.querySelector('#walletAddress code');
+
+if (copyBtn && walletCode) {
+  copyBtn.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(walletCode.textContent);
+      copyFeedback.classList.add('visible');
+      setTimeout(() => {
+        copyFeedback.classList.remove('visible');
+      }, 2000);
+    } catch (err) {
+      // Fallback for older browsers
+      const range = document.createRange();
+      range.selectNode(walletCode);
+      window.getSelection().removeAllRanges();
+      window.getSelection().addRange(range);
+      document.execCommand('copy');
+      window.getSelection().removeAllRanges();
+      copyFeedback.classList.add('visible');
+      setTimeout(() => {
+        copyFeedback.classList.remove('visible');
+      }, 2000);
+    }
+  });
+}

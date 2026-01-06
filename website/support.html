@@ -70,6 +70,29 @@
       <!-- Error Display -->
       <div id="errorMessage" class="error-message" style="display: none;"></div>
 
+      <!-- Divider -->
+      <div class="divider">
+        <span>OR PAY WITH CRYPTO</span>
+      </div>
+
+      <!-- Crypto Section -->
+      <div class="crypto-section">
+        <div class="crypto-info">
+          <span class="crypto-label">Solana / USDC</span>
+          <div class="wallet-address" id="walletAddress">
+            <code>AuHfKsmAEyRtj9Wtdj2XQyB1L84tHTXifUq1QEsuxejC</code>
+            <button class="copy-btn" id="copyBtn" title="Copy address">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+            </button>
+          </div>
+          <span id="copyFeedback" class="copy-feedback">Copied!</span>
+        </div>
+        <p class="crypto-note">Send SOL, USDC, or any SPL token</p>
+      </div>
+
       <!-- Loading Overlay -->
       <div id="loadingOverlay" class="loading-overlay" style="display: none;">
         <div class="spinner"></div>
