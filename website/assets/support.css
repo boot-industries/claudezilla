@@ -306,7 +306,7 @@ label {
   grid-row: 4;
   width: 100%;
   padding: 0;
-  background: var(--terracotta);
+  background: linear-gradient(135deg, #b83e28 0%, #D14D32 50%, #FCD34D 100%);
   border: none;
   border-radius: 8px;
   color: #000;
@@ -324,8 +324,8 @@ label {
 }
 
 .submit-btn:hover {
-  background: var(--terracotta-dark);
   box-shadow: 0 0 20px var(--terracotta-glow);
+  transform: translateY(-1px);
 }
 
 .stripe-note {
