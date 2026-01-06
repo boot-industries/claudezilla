@@ -54,19 +54,37 @@ function checkForPaymentSuccess() {
 
 /**
  * Display thank you modal after successful payment
+ * SECURITY: Uses safe DOM methods instead of innerHTML to prevent XSS
  */
 function showThankYouModal() {
   // Create overlay
   const overlay = document.createElement('div');
   overlay.className = 'thank-you-overlay';
-  overlay.innerHTML = `
-    <div class="thank-you-modal">
-      <div class="checkmark">✓</div>
-      <h2>Thank You!</h2>
-      <p>Your support keeps Claudezilla free and open source.</p>
-      <p class="receipt-note">You'll receive a receipt via email shortly.</p>
-    </div>
-  `;
+
+  // SECURITY: Build modal using safe DOM methods (no innerHTML)
+  const modal = document.createElement('div');
+  modal.className = 'thank-you-modal';
+
+  const checkmark = document.createElement('div');
+  checkmark.className = 'checkmark';
+  checkmark.textContent = '✓';
+
+  const heading = document.createElement('h2');
+  heading.textContent = 'Thank You!';
+
+  const message = document.createElement('p');
+  message.textContent = 'Your support keeps Claudezilla free and open source.';
+
+  const receiptNote = document.createElement('p');
+  receiptNote.className = 'receipt-note';
+  receiptNote.textContent = "You'll receive a receipt via email shortly.";
+
+  modal.appendChild(checkmark);
+  modal.appendChild(heading);
+  modal.appendChild(message);
+  modal.appendChild(receiptNote);
+  overlay.appendChild(modal);
+
   document.body.appendChild(overlay);
 
   // Auto-close after 4 seconds

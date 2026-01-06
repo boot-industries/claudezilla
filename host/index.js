@@ -17,7 +17,7 @@ import { appendFileSync, unlinkSync, existsSync, chmodSync, writeFileSync } from
 import { createServer } from 'net';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { randomUUID } from 'crypto';
+import { randomUUID, randomBytes } from 'crypto';
 
 // SECURITY: Use validated temp directory
 // Prevents TMPDIR hijacking by validating the path
@@ -33,9 +33,18 @@ const SAFE_TMPDIR = (() => {
 
 const DEBUG_LOG = join(SAFE_TMPDIR, 'claudezilla-debug.log');
 const SOCKET_PATH = join(SAFE_TMPDIR, 'claudezilla.sock');
+const AUTH_TOKEN_FILE = join(SAFE_TMPDIR, 'claudezilla-auth.token');
 
 // SECURITY: Max buffer size to prevent memory exhaustion (10MB)
 const MAX_BUFFER_SIZE = 10 * 1024 * 1024;
+
+// SECURITY: Loop configuration limits
+const MAX_ITERATIONS_LIMIT = 10000;  // Maximum allowed maxIterations value
+const MAX_LOOP_DURATION_MS = 60 * 60 * 1000;  // 1 hour wall-clock timeout
+const MAX_COMPLETION_PROMISE_LENGTH = 1000;  // Max length for completionPromise string
+
+// SECURITY: Socket authentication token (generated on startup)
+const SOCKET_AUTH_TOKEN = randomBytes(32).toString('hex');
 
 // SECURITY: Whitelist of allowed commands
 const ALLOWED_COMMANDS = new Set([
@@ -109,25 +118,77 @@ log('Script starting, cwd:', process.cwd());
 const pendingCliRequests = new Map();
 
 /**
+ * Check if loop has exceeded wall-clock timeout
+ * @returns {boolean} true if loop should be auto-stopped
+ */
+function isLoopTimedOut() {
+  if (!loopState.active || !loopState.startedAt) return false;
+  const elapsed = Date.now() - new Date(loopState.startedAt).getTime();
+  return elapsed > MAX_LOOP_DURATION_MS;
+}
+
+/**
  * Handle loop commands directly in host (not forwarded to extension)
+ * SECURITY: Validates all inputs, prevents overlapping loops, enforces timeouts
  */
 function handleLoopCommand(command, params, callback) {
+  // Check for wall-clock timeout on any loop command
+  if (loopState.active && isLoopTimedOut()) {
+    log(`Loop auto-stopped: exceeded ${MAX_LOOP_DURATION_MS / 1000 / 60} minute timeout`);
+    loopState = {
+      active: false,
+      prompt: '',
+      iteration: 0,
+      maxIterations: 0,
+      completionPromise: null,
+      startedAt: null,
+    };
+  }
+
   switch (command) {
     case 'startLoop': {
       const { prompt, maxIterations = 0, completionPromise = null } = params;
-      if (!prompt) {
-        callback({ success: false, error: 'Prompt is required' });
+
+      // SECURITY: Prevent overlapping loops
+      if (loopState.active) {
+        callback({ success: false, error: 'Loop already active. Stop current loop first.' });
         return;
       }
+
+      // Validation: prompt is required
+      if (!prompt || typeof prompt !== 'string') {
+        callback({ success: false, error: 'Prompt is required and must be a string' });
+        return;
+      }
+
+      // SECURITY: Validate maxIterations bounds
+      const maxIter = Number(maxIterations) || 0;
+      if (maxIter < 0 || maxIter > MAX_ITERATIONS_LIMIT) {
+        callback({ success: false, error: `maxIterations must be 0-${MAX_ITERATIONS_LIMIT}` });
+        return;
+      }
+
+      // SECURITY: Validate completionPromise length
+      if (completionPromise !== null) {
+        if (typeof completionPromise !== 'string') {
+          callback({ success: false, error: 'completionPromise must be a string or null' });
+          return;
+        }
+        if (completionPromise.length > MAX_COMPLETION_PROMISE_LENGTH) {
+          callback({ success: false, error: `completionPromise exceeds ${MAX_COMPLETION_PROMISE_LENGTH} character limit` });
+          return;
+        }
+      }
+
       loopState = {
         active: true,
         prompt,
         iteration: 0,
-        maxIterations: Number(maxIterations) || 0,
+        maxIterations: maxIter,
         completionPromise: completionPromise || null,
         startedAt: new Date().toISOString(),
       };
-      log(`Loop started: "${prompt.slice(0, 50)}..." max=${maxIterations}`);
+      log(`Loop started: "${prompt.slice(0, 50)}..." max=${maxIter}`);
       callback({ success: true, result: { ...loopState } });
       break;
     }
@@ -148,7 +209,9 @@ function handleLoopCommand(command, params, callback) {
     }
 
     case 'getLoopState': {
-      callback({ success: true, result: { ...loopState } });
+      // Include timeout status in response
+      const timedOut = isLoopTimedOut();
+      callback({ success: true, result: { ...loopState, timedOut } });
       break;
     }
 
@@ -168,9 +231,15 @@ function handleLoopCommand(command, params, callback) {
 
 /**
  * Handle command from CLI (via socket)
- * SECURITY: Validates command against whitelist
+ * SECURITY: Validates auth token and command against whitelist
  */
-function handleCliCommand(command, params, callback) {
+function handleCliCommand(command, params, authToken, callback) {
+  // SECURITY: Validate auth token
+  if (authToken !== SOCKET_AUTH_TOKEN) {
+    callback({ success: false, error: 'Invalid or missing auth token' });
+    return;
+  }
+
   // SECURITY: Reject non-whitelisted commands
   if (!ALLOWED_COMMANDS.has(command)) {
     callback({ success: false, error: `Command not allowed: ${command}` });
@@ -274,11 +343,11 @@ function startSocketServer() {
         if (!line.trim()) continue;
 
         try {
-          const { command, params = {} } = JSON.parse(line);
+          const { command, params = {}, authToken } = JSON.parse(line);
 
           log(`CLI command: ${command}`);
 
-          handleCliCommand(command, params, (response) => {
+          handleCliCommand(command, params, authToken, (response) => {
             socket.write(JSON.stringify(response) + '\n');
           });
         } catch (e) {
@@ -305,6 +374,14 @@ function startSocketServer() {
       log('Socket permissions set to 0600 (user only)');
     } catch (e) {
       log('Warning: Could not set socket permissions:', e.message);
+    }
+
+    // SECURITY: Write auth token to file for MCP server to read
+    try {
+      writeFileSync(AUTH_TOKEN_FILE, SOCKET_AUTH_TOKEN, { mode: 0o600 });
+      log(`Auth token written to ${AUTH_TOKEN_FILE}`);
+    } catch (e) {
+      log('Warning: Could not write auth token file:', e.message);
     }
   });
 
@@ -354,28 +431,33 @@ async function main() {
   // Cleanup
   log('Host exiting');
   socketServer.close();
+  cleanup();
 
+  process.exit(0);
+}
+
+/**
+ * Cleanup function to remove socket and auth token files
+ */
+function cleanup() {
   if (existsSync(SOCKET_PATH)) {
     unlinkSync(SOCKET_PATH);
   }
-
-  process.exit(0);
+  if (existsSync(AUTH_TOKEN_FILE)) {
+    unlinkSync(AUTH_TOKEN_FILE);
+  }
 }
 
 // Handle signals gracefully
 process.on('SIGTERM', () => {
   log('Received SIGTERM');
-  if (existsSync(SOCKET_PATH)) {
-    unlinkSync(SOCKET_PATH);
-  }
+  cleanup();
   process.exit(0);
 });
 
 process.on('SIGINT', () => {
   log('Received SIGINT');
-  if (existsSync(SOCKET_PATH)) {
-    unlinkSync(SOCKET_PATH);
-  }
+  cleanup();
   process.exit(0);
 });
 

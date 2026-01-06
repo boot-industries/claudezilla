@@ -17,8 +17,35 @@ import { connect } from 'net';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { randomBytes } from 'crypto';
+import { readFileSync, existsSync } from 'fs';
 
-const SOCKET_PATH = join(tmpdir(), 'claudezilla.sock');
+// SECURITY: Use validated temp directory (same logic as host)
+const SAFE_TMPDIR = (() => {
+  const tmp = tmpdir();
+  const xdgRuntime = process.env.XDG_RUNTIME_DIR;
+  if (xdgRuntime && existsSync(xdgRuntime)) {
+    return xdgRuntime;
+  }
+  return tmp;
+})();
+
+const SOCKET_PATH = join(SAFE_TMPDIR, 'claudezilla.sock');
+const AUTH_TOKEN_FILE = join(SAFE_TMPDIR, 'claudezilla-auth.token');
+
+/**
+ * Load auth token from file (written by host on startup)
+ * Returns null if file doesn't exist (host not running)
+ */
+function loadAuthToken() {
+  try {
+    if (existsSync(AUTH_TOKEN_FILE)) {
+      return readFileSync(AUTH_TOKEN_FILE, 'utf8').trim();
+    }
+  } catch (e) {
+    console.error('Warning: Could not read auth token:', e.message);
+  }
+  return null;
+}
 
 // SECURITY: Unique agent ID with 128-bit entropy (16 bytes = 32 hex chars)
 // Used for tab ownership tracking - only the agent that created a tab can close it
@@ -27,15 +54,23 @@ const AGENT_ID = `agent_${randomBytes(16).toString('hex')}_${process.pid}`;
 
 /**
  * Send command to Claudezilla via Unix socket
+ * SECURITY: Includes auth token read from host-created file
  */
 function sendCommand(command, params = {}) {
   return new Promise((resolve, reject) => {
+    // SECURITY: Load auth token on each command (handles host restarts)
+    const authToken = loadAuthToken();
+    if (!authToken) {
+      reject(new Error('Auth token not found. Claudezilla host may not be running.'));
+      return;
+    }
+
     const socket = connect(SOCKET_PATH);
     let buffer = '';
     let resolved = false;
 
     socket.on('connect', () => {
-      const message = JSON.stringify({ command, params }) + '\n';
+      const message = JSON.stringify({ command, params, authToken }) + '\n';
       socket.write(message);
     });
 

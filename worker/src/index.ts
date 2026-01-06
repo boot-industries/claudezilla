@@ -3,6 +3,12 @@
  *
  * Handles payment session creation for Stripe Checkout.
  * Communicates with Stripe API and returns checkout URLs to the extension.
+ *
+ * SECURITY:
+ * - Origin validation against whitelist
+ * - Amount bounds checking (min $3, max $999.99)
+ * - Redirect URL whitelist
+ * - Type validation on all inputs
  */
 
 interface Env {
@@ -11,15 +17,39 @@ interface Env {
   FRONTEND_URL?: string;
 }
 
+// SECURITY: Allowed origins for CORS and request validation
+const ALLOWED_ORIGINS = [
+  'https://boot.industries',
+  'https://claudezilla.com',
+  'https://www.claudezilla.com',
+];
+
+// SECURITY: Allowed redirect URL prefixes
+const ALLOWED_REDIRECT_PREFIXES = [
+  'https://boot.industries',
+  'https://claudezilla.com',
+];
+
+// SECURITY: Amount limits in cents
+const MIN_AMOUNT = 300;      // $3.00
+const MAX_AMOUNT = 99999;    // $999.99
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+    const origin = request.headers.get('Origin');
 
-    // CORS headers for extension requests
+    // SECURITY: Validate origin against whitelist
+    // Allow requests with no origin (direct API calls) but validate if present
+    const isAllowedOrigin = !origin || ALLOWED_ORIGINS.includes(origin);
+    const corsOrigin = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+
+    // CORS headers - use specific origin, not wildcard
     const corsHeaders = {
-      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Origin': corsOrigin,
       'Access-Control-Allow-Methods': 'POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Allow-Credentials': 'false',
     };
 
     // Handle CORS preflight
@@ -29,20 +59,44 @@ export default {
 
     // /create-checkout endpoint
     if (url.pathname === '/create-checkout' && request.method === 'POST') {
+      // SECURITY: Reject requests from non-whitelisted origins
+      if (!isAllowedOrigin) {
+        return Response.json(
+          { error: 'Origin not allowed' },
+          { status: 403, headers: corsHeaders }
+        );
+      }
+
       try {
         const body = await request.json();
         const { amount, frequency } = body;
 
-        // Validation: amount in cents, minimum $3
-        if (!amount || typeof amount !== 'number' || amount < 300) {
+        // Validation: amount must be a number
+        if (typeof amount !== 'number') {
           return Response.json(
-            { error: 'Amount must be at least $3 (300 cents)' },
+            { error: 'Amount must be a number' },
             { status: 400, headers: corsHeaders }
           );
         }
 
-        // Validation: frequency must be one-time or monthly
-        if (!['one-time', 'monthly'].includes(frequency)) {
+        // Validation: amount minimum ($3)
+        if (amount < MIN_AMOUNT) {
+          return Response.json(
+            { error: `Amount must be at least $${MIN_AMOUNT / 100} (${MIN_AMOUNT} cents)` },
+            { status: 400, headers: corsHeaders }
+          );
+        }
+
+        // SECURITY: Amount maximum ($999.99) to prevent abuse
+        if (amount > MAX_AMOUNT) {
+          return Response.json(
+            { error: `Amount cannot exceed $${MAX_AMOUNT / 100}` },
+            { status: 400, headers: corsHeaders }
+          );
+        }
+
+        // Validation: frequency must be string and valid value
+        if (typeof frequency !== 'string' || !['one-time', 'monthly'].includes(frequency)) {
           return Response.json(
             { error: 'Frequency must be "one-time" or "monthly"' },
             { status: 400, headers: corsHeaders }
@@ -59,7 +113,17 @@ export default {
         }
 
         // Get frontend URL for redirects
-        const frontendUrl = env.FRONTEND_URL || 'https://boot.industries/claudezilla';
+        const frontendUrl = env.FRONTEND_URL || 'https://boot.industries';
+
+        // SECURITY: Validate redirect URL against whitelist
+        const isValidRedirect = ALLOWED_REDIRECT_PREFIXES.some(prefix => frontendUrl.startsWith(prefix));
+        if (!isValidRedirect) {
+          console.error('Invalid FRONTEND_URL configuration:', frontendUrl);
+          return Response.json(
+            { error: 'Server misconfiguration' },
+            { status: 500, headers: corsHeaders }
+          );
+        }
 
         // Determine product name and description
         const isMonthly = frequency === 'monthly';
