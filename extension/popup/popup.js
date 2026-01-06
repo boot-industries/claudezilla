@@ -1,6 +1,6 @@
 /**
  * Claudezilla Popup Script
- * v0.4.8 - Concentration loop support
+ * v0.4.5 - Concentration loop support
  */
 
 // Elements

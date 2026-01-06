@@ -158,7 +158,6 @@ body::before {
   height: 60px;
   width: auto;
   display: block;
-  border-radius: 8px;
 }
 
 /* Hero CTA Grid */
@@ -1419,7 +1418,6 @@ pre code {
     height: auto;
     max-height: 60px;
     object-fit: contain;
-    border-radius: 8px;
   }
 
   .cta-grid .btn-secondary {
