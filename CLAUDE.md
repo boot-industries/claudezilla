@@ -239,3 +239,32 @@ ln -s "$(pwd)/plugin" ~/.claude/plugins/claudezilla-loop
 - Debug logs created with 0600 permissions
 
 See [SECURITY.md](./SECURITY.md) for full security model.
+
+## Watermark Visual Effects
+
+The watermark badge in the lower-left corner shows the Claudezilla monster with animated electrons when active.
+
+**Critical SVG Positioning (DO NOT CHANGE):**
+
+The master SVG group uses a translate-scale-translate pattern for center-based scaling:
+```svg
+<g id="claudezilla-breathe" transform="translate(32, 32) scale(1.20) translate(-32, -32)">
+```
+
+**Why this matters:**
+- CSS `transform-origin: center` with `transform-box: fill-box` does NOT work reliably on nested SVG groups in Firefox
+- The SVG viewBox is 64x64, so center is (32, 32)
+- Pattern: translate to center → scale → translate back
+
+**Speech bubble positioning:**
+```css
+#claudezilla-speech-bubble {
+  top: 48px !important;
+  right: 45px !important;
+}
+```
+
+These values are calibrated to place the music note bubble near the monster's mouth. If the SVG transform changes, these values will need recalibration.
+
+**Files:**
+- `extension/content.js` - Contains `CLAUDE_LOGO_SVG` constant and CSS positioning
