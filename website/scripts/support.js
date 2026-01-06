@@ -5,8 +5,8 @@
  * Adapted from extension/support.js for website use.
  */
 
-// TODO: Update this with your deployed Worker URL
-const WORKER_URL = 'https://claudezilla-worker.YOUR_SUBDOMAIN.workers.dev';
+// Cloudflare Worker endpoint for Stripe checkout
+const WORKER_URL = 'https://api.claudezilla.com';
 
 let selectedAmount = 2000; // $20 default (in cents)
 let selectedFrequency = 'one-time';
