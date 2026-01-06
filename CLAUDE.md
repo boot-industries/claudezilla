@@ -1,15 +1,16 @@
 # Claudezilla - Claude Code Firefox Extension
 
-**Version:** 0.4.8
+**Version:** 0.4.9
 
 ## Overview
 
 Firefox extension providing browser automation for Claude Code CLI. A Google-free alternative to the official Chrome extension.
 
-**Key Features (v0.4.8):**
-- **NEW: Concentration loops** - Persistent iterative development like Ralph Wiggum
+**Key Features (v0.4.9):**
+- **NEW: Fair multi-agent coordination** - POOL_FULL and MUTEX_BUSY errors with clear feedback
+- Concentration loops - Persistent iterative development like Ralph Wiggum
 - Single window with max 10 tabs shared across Claude agents
-- Multi-agent safety (tab ownership, screenshot mutex, 128-bit agent IDs)
+- Multi-agent safety (tab ownership, screenshot mutex, 128-bit agent IDs, own-tab-only eviction)
 - Security hardening (socket permissions, URL validation, selector validation)
 - Image compression (JPEG 60%, 50% scale by default)
 - Payload optimization (text truncation, node limits)
@@ -251,10 +252,28 @@ Dynamic page readiness detection replaces hardcoded delays. Screenshots now wait
 - Other agents get: `OWNERSHIP: Cannot <operation> tab X (owned by agent_Y)`
 - Use `getTabs` to see ownership info for all tabs
 
+**Tab Pool Coordination (v0.4.9):**
+- Agents can only evict their **own** tabs when pool is full
+- If agent has no tabs but needs one, returns `POOL_FULL` error:
+  ```
+  POOL_FULL: Tab pool is full and you have no tabs to evict.
+    Tab pool: 10/10
+    Owner breakdown: agent_ec2e...: 7, agent_d99a...: 3
+    Hint: Wait for other agents to release tabs, or ask them to close tabs.
+  ```
+- No silent eviction of other agents' tabs
+
 **Screenshot Mutex:**
 - All screenshot requests are serialized via promise chain
 - Prevents tab-switching collisions when multiple agents screenshot simultaneously
-- Each request waits for previous to complete before switching tabs
+- If mutex held >5s by another agent, returns `MUTEX_BUSY` error:
+  ```
+  MUTEX_BUSY: Screenshot mutex held by another agent.
+    Holder: agent_ec2e...
+    Held for: 6234ms
+    Tab pool: 8/10
+    Hint: Use getPageState (no mutex) or retry after delay.
+  ```
 
 **Agent IDs (v0.4.5):**
 - Generated at MCP server startup: `agent_<128-bit-hex>_<pid>`
