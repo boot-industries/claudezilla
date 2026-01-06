@@ -38,65 +38,47 @@
       <h1>☕ Support Claudezilla</h1>
       <p class="subtitle">Help keep this project free and open source</p>
 
-      <!-- Amount Selection -->
-      <div class="amount-section">
-        <label>Amount (USD)</label>
-        <div class="suggested-amounts">
-          <button class="amount-pill" data-amount="500">$5</button>
-          <button class="amount-pill" data-amount="1000">$10</button>
-          <button class="amount-pill active" data-amount="2000">$20</button>
-          <button class="amount-pill" data-amount="5000">$50</button>
-        </div>
-        <div class="custom-amount">
-          <span class="currency">$</span>
-          <input type="number" id="customAmount" placeholder="20" min="3" step="1">
-        </div>
+      <!-- Amount Label -->
+      <label class="amount-label">Amount (USD)</label>
+
+      <!-- Amount Pills -->
+      <div class="suggested-amounts">
+        <button class="amount-pill" data-amount="500">$5</button>
+        <button class="amount-pill" data-amount="1000">$10</button>
+        <button class="amount-pill active" data-amount="2000">$20</button>
+        <button class="amount-pill" data-amount="5000">$50</button>
+      </div>
+
+      <!-- Custom Amount Input -->
+      <div class="custom-amount">
+        <span class="currency">$</span>
+        <input type="number" id="customAmount" placeholder="20" min="3" step="1">
       </div>
 
       <!-- Frequency Toggle -->
-      <div class="frequency-section">
-        <label>Frequency</label>
-        <div class="frequency-toggle">
-          <button class="frequency-btn active" data-frequency="one-time">One-time</button>
-          <button class="frequency-btn" data-frequency="monthly">Monthly</button>
-        </div>
+      <div class="frequency-toggle">
+        <button class="frequency-btn active" data-frequency="one-time">ONE-TIME</button>
+        <button class="frequency-btn" data-frequency="monthly">REGULAR</button>
       </div>
 
       <!-- Submit Button -->
       <button id="submitBtn" class="submit-btn">
-        CONTRIBUTE $20
+        PAY WITH STRIPE
       </button>
 
-      <p class="note">Powered by Stripe. Secure checkout.</p>
+      <!-- Stripe Note -->
+      <p class="stripe-note">Secure checkout.</p>
+
+      <!-- Crypto Button -->
+      <a href="https://moonpay.hel.io/pay/695cb05415de374626355640" target="_blank" rel="noopener" class="crypto-btn">
+        PAY WITH SOLANA
+      </a>
+
+      <!-- Crypto Note -->
+      <p class="crypto-note">SOL or USDC.</p>
 
       <!-- Error Display -->
       <div id="errorMessage" class="error-message" style="display: none;"></div>
-
-      <!-- Divider -->
-      <div class="divider">
-        <span>OR PAY WITH CRYPTO</span>
-      </div>
-
-      <!-- Crypto Section -->
-      <div class="crypto-section">
-        <a href="https://moonpay.hel.io/pay/695cb05415de374626355640" target="_blank" rel="noopener" class="crypto-btn">
-          PAY WITH SOLANA
-        </a>
-        <p class="crypto-note" style="margin-top: 16px; margin-bottom: 16px;">Or send directly to wallet:</p>
-        <div class="crypto-info">
-          <div class="wallet-address" id="walletAddress">
-            <code>AuHfKsmAEyRtj9Wtdj2XQyB1L84tHTXifUq1QEsuxejC</code>
-            <button class="copy-btn" id="copyBtn" title="Copy address">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-              </svg>
-            </button>
-          </div>
-          <span id="copyFeedback" class="copy-feedback">Copied!</span>
-        </div>
-        <p class="crypto-note">SOL, USDC, or any SPL token</p>
-      </div>
 
       <!-- Loading Overlay -->
       <div id="loadingOverlay" class="loading-overlay" style="display: none;">

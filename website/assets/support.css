@@ -93,10 +93,10 @@ body::before {
 .container {
   position: relative;
   z-index: 1;
-  max-width: 500px;
+  max-width: 900px;
   width: 100%;
   margin: 0 auto;
-  padding: 60px 32px;
+  padding: 32px 32px 40px;
 }
 
 .support-card {
@@ -105,20 +105,30 @@ body::before {
   border-radius: 12px;
   padding: 40px;
   position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: auto auto auto auto auto auto auto;
+  gap: 16px;
+  column-gap: 60px;
+  align-items: start;
 }
 
 h1 {
   font-family: 'Orbitron', sans-serif;
-  font-size: 36px;
+  font-size: 32px;
   font-weight: 900;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   color: var(--terracotta);
+  grid-column: 1 / -1;
+  grid-row: 1;
 }
 
 .subtitle {
   font-size: 16px;
   color: var(--text-secondary);
-  margin-bottom: 40px;
+  margin-bottom: 0;
+  grid-column: 1 / -1;
+  grid-row: 2;
 }
 
 label {
@@ -127,24 +137,26 @@ label {
   color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 1.2px;
-  margin-bottom: 12px;
   font-weight: 700;
 }
 
-/* Amount Selection */
-.amount-section {
-  margin-bottom: 32px;
+/* Amount Label */
+.amount-label {
+  grid-column: 1;
+  grid-row: 3;
 }
 
+/* Amount Pills */
 .suggested-amounts {
+  grid-column: 1;
+  grid-row: 4;
   display: flex;
   gap: 12px;
-  margin-bottom: 16px;
 }
 
 .amount-pill {
   flex: 1;
-  padding: 12px;
+  padding: 14px 12px;
   background: transparent;
   border: 2px solid var(--text-secondary);
   border-radius: 8px;
@@ -154,6 +166,10 @@ label {
   font-weight: 700;
   cursor: pointer;
   transition: all 0.3s;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .amount-pill:hover {
@@ -167,13 +183,16 @@ label {
 }
 
 .custom-amount {
+  grid-column: 1;
+  grid-row: 5;
   display: flex;
   align-items: center;
   gap: 8px;
   background: #000;
   border: 1px solid var(--text-secondary);
   border-radius: 8px;
-  padding: 12px 16px;
+  padding: 14px 16px;
+  height: 52px;
 }
 
 .currency {
@@ -197,18 +216,16 @@ label {
 }
 
 /* Frequency Toggle */
-.frequency-section {
-  margin-bottom: 32px;
-}
-
 .frequency-toggle {
+  grid-column: 1;
+  grid-row: 6;
   display: flex;
   gap: 12px;
 }
 
 .frequency-btn {
   flex: 1;
-  padding: 12px;
+  padding: 14px 12px;
   background: transparent;
   border: 2px solid var(--text-secondary);
   border-radius: 8px;
@@ -219,6 +236,10 @@ label {
   text-transform: uppercase;
   cursor: pointer;
   transition: all 0.3s;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .frequency-btn:hover {
@@ -233,8 +254,10 @@ label {
 
 /* Submit Button */
 .submit-btn {
+  grid-column: 2;
+  grid-row: 4;
   width: 100%;
-  padding: 16px;
+  padding: 0;
   background: var(--terracotta);
   border: none;
   border-radius: 8px;
@@ -246,7 +269,10 @@ label {
   letter-spacing: 1.5px;
   cursor: pointer;
   transition: all 0.3s;
-  margin-bottom: 16px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .submit-btn:hover {
@@ -254,11 +280,13 @@ label {
   box-shadow: 0 0 20px var(--terracotta-glow);
 }
 
-.note {
+.stripe-note {
+  grid-column: 2;
+  grid-row: 5;
   text-align: center;
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-secondary);
-  margin-bottom: 16px;
+  margin: 0;
 }
 
 /* Error Message */
@@ -311,9 +339,7 @@ label {
 
 /* Divider */
 .divider {
-  display: flex;
-  align-items: center;
-  margin: 32px 0;
+  display: none;
 }
 
 .divider::before,
@@ -333,77 +359,14 @@ label {
   font-weight: 700;
 }
 
-/* Crypto Section */
-.crypto-section {
-  text-align: center;
-}
-
-.crypto-info {
-  margin-bottom: 12px;
-}
-
-.crypto-label {
-  display: block;
-  font-size: 12px;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 1.2px;
-  margin-bottom: 12px;
-  font-weight: 700;
-}
-
-.wallet-address {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  background: #000;
-  border: 1px solid var(--text-secondary);
-  border-radius: 8px;
-  padding: 12px 16px;
-  max-width: 100%;
-}
-
-.wallet-address code {
-  font-family: 'Space Mono', monospace;
-  font-size: 12px;
-  color: var(--text-primary);
-  word-break: break-all;
-}
-
-.copy-btn {
-  background: transparent;
-  border: none;
-  color: var(--text-secondary);
-  cursor: pointer;
-  padding: 4px;
+.crypto-btn {
+  grid-column: 2;
+  grid-row: 6;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: color 0.3s;
-  flex-shrink: 0;
-}
-
-.copy-btn:hover {
-  color: var(--terracotta);
-}
-
-.copy-feedback {
-  display: block;
-  font-size: 12px;
-  color: #22C55E;
-  margin-top: 8px;
-  opacity: 0;
-  transition: opacity 0.3s;
-}
-
-.copy-feedback.visible {
-  opacity: 1;
-}
-
-.crypto-btn {
-  display: block;
   width: 100%;
-  padding: 16px;
+  padding: 0;
   background: linear-gradient(135deg, #9945FF 0%, #14F195 100%);
   border: none;
   border-radius: 8px;
@@ -413,10 +376,10 @@ label {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 1.5px;
-  text-align: center;
   text-decoration: none;
   cursor: pointer;
   transition: all 0.3s;
+  height: 52px;
 }
 
 .crypto-btn:hover {
@@ -425,14 +388,18 @@ label {
 }
 
 .crypto-note {
-  font-size: 12px;
+  grid-column: 2;
+  grid-row: 7;
+  font-size: 11px;
   color: var(--text-secondary);
+  text-align: center;
+  margin: 0;
 }
 
 /* Back Link */
 .back-link {
   text-align: center;
-  margin-top: 24px;
+  margin-top: 16px;
 }
 
 .back-link a {
@@ -523,6 +490,29 @@ label {
   }
 }
 
+/* Revert to single column on tablets */
+@media (max-width: 768px) {
+  .support-card {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+    gap: 24px;
+  }
+
+  h1,
+  .subtitle,
+  .amount-label,
+  .suggested-amounts,
+  .custom-amount,
+  .frequency-toggle,
+  .submit-btn,
+  .stripe-note,
+  .crypto-btn,
+  .crypto-note {
+    grid-column: 1;
+    grid-row: auto;
+  }
+}
+
 @media (max-width: 600px) {
   .support-card {
     padding: 32px 24px;
@@ -533,7 +523,9 @@ label {
   }
 
   .suggested-amounts {
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
   }
 
   .amount-pill {
