@@ -86,6 +86,7 @@ const ALLOWED_COMMANDS = new Set([
   'requestTabSpace',
   'grantTabSpace',
   'getSlotRequests',
+  'cleanupOrphanedTabs',
 ]);
 
 /**

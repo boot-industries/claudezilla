@@ -52,6 +52,57 @@ function loadAuthToken() {
 // Previous: 4 bytes (32 bits) was too weak and predictable
 const AGENT_ID = `agent_${randomBytes(16).toString('hex')}_${process.pid}`;
 
+// Agent heartbeat tracking for orphaned tab cleanup
+const agentHeartbeats = new Map(); // agentId -> lastSeenTimestamp
+const AGENT_TIMEOUT_MS = 120000; // 2 minutes - agent is considered dead after this
+const CLEANUP_INTERVAL_MS = 60000; // 1 minute - check for orphaned agents every minute
+
+/**
+ * Update agent heartbeat - called on every command that includes agentId
+ */
+function updateAgentHeartbeat(agentId) {
+  if (!agentId || agentId === 'unknown') return;
+  agentHeartbeats.set(agentId, Date.now());
+}
+
+/**
+ * Check for orphaned agents and trigger tab cleanup
+ * An agent is orphaned if it hasn't been seen in AGENT_TIMEOUT_MS
+ */
+async function cleanupOrphanedAgents() {
+  const now = Date.now();
+  const orphanedAgents = [];
+
+  // Find agents that haven't been seen in AGENT_TIMEOUT_MS
+  for (const [agentId, lastSeen] of agentHeartbeats.entries()) {
+    if (now - lastSeen > AGENT_TIMEOUT_MS) {
+      orphanedAgents.push(agentId);
+    }
+  }
+
+  // Cleanup tabs for each orphaned agent
+  for (const agentId of orphanedAgents) {
+    try {
+      console.error(`[claudezilla] Cleaning up orphaned agent: ${agentId} (last seen ${Math.round((now - agentHeartbeats.get(agentId)) / 1000)}s ago)`);
+
+      // Send cleanup command to extension
+      const response = await sendCommand('cleanupOrphanedTabs', { agentId });
+
+      if (response.success && response.result?.tabsClosed > 0) {
+        console.error(`[claudezilla] Closed ${response.result.tabsClosed} orphaned tab(s) from ${agentId}`);
+      }
+
+      // Remove from heartbeat tracking
+      agentHeartbeats.delete(agentId);
+    } catch (error) {
+      console.error(`[claudezilla] Error cleaning up orphaned agent ${agentId}:`, error.message);
+    }
+  }
+}
+
+// Start periodic orphaned agent cleanup
+setInterval(cleanupOrphanedAgents, CLEANUP_INTERVAL_MS);
+
 /**
  * Send command to Claudezilla via Unix socket
  * SECURITY: Includes auth token read from host-created file
@@ -716,7 +767,7 @@ const TOOL_TO_COMMAND = {
 const server = new Server(
   {
     name: 'claudezilla',
-    version: '0.4.9',
+    version: '0.5.0',
   },
   {
     capabilities: {
@@ -779,6 +830,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     ];
     if (OWNERSHIP_COMMANDS.includes(name)) {
       commandParams.agentId = AGENT_ID;
+      // Update heartbeat for this agent
+      updateAgentHeartbeat(AGENT_ID);
     }
 
     const response = await sendCommand(command, commandParams);

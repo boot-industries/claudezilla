@@ -1,13 +1,14 @@
 # Claudezilla - Claude Code Firefox Extension
 
-**Version:** 0.4.9
+**Version:** 0.5.0
 
 ## Overview
 
 Firefox extension providing browser automation for Claude Code CLI. A Google-free alternative to the official Chrome extension.
 
-**Key Features (v0.4.9):**
-- **NEW: Fair multi-agent coordination** - POOL_FULL and MUTEX_BUSY errors with clear feedback
+**Key Features (v0.5.0):**
+- **NEW: Orphaned tab cleanup** - Automatic cleanup of tabs from disconnected agents (2-minute timeout)
+- Fair multi-agent coordination - POOL_FULL and MUTEX_BUSY errors with clear feedback
 - Concentration loops - Persistent iterative development like Ralph Wiggum
 - Single window with max 10 tabs shared across Claude agents
 - Multi-agent safety (tab ownership, screenshot mutex, 128-bit agent IDs, own-tab-only eviction)
@@ -268,6 +269,23 @@ When blocked by POOL_FULL, agents can request tab space:
 | `firefox_request_tab_space` | Queue request for tab space (used when POOL_FULL) |
 | `firefox_grant_tab_space` | Release oldest tab to help waiting agent (requires >2 tabs) |
 | `firefox_get_slot_requests` | Check if agents are waiting for space |
+
+**Orphaned Tab Cleanup (v0.5.0):**
+Automatic cleanup of tabs from disconnected agents prevents tab pool exhaustion:
+- **Heartbeat tracking**: MCP server tracks agent activity via command timestamps
+- **Timeout threshold**: Agent is orphaned if no commands received in 2 minutes (120s)
+- **Periodic cleanup**: MCP server checks every 60s for orphaned agents
+- **Automatic recovery**: All tabs from orphaned agent are closed and space returned to pool
+- **Logging**: Cleanup events logged to MCP server stderr with agent ID and tab count
+
+How it works:
+1. Each agent command updates heartbeat timestamp in MCP server
+2. Every 60s, MCP server checks for agents with no activity in >120s
+3. For each orphaned agent, MCP server sends `cleanupOrphanedTabs` command to extension
+4. Extension closes all tabs owned by orphaned agent and updates tab pool tracking
+5. Freed tab space becomes immediately available for active agents
+
+This solves the "ghost agent" problem where tabs remain allocated to Claude sessions that have crashed, been killed, or lost connection.
 
 **Screenshot Mutex:**
 - All screenshot requests are serialized via promise chain

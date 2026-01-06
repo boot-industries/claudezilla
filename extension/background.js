@@ -524,9 +524,9 @@ async function handleCliCommand(message) {
 
       case 'version':
         result = {
-          extension: '0.4.8',
+          extension: '0.5.0',
           browser: navigator.userAgent,
-          features: ['devtools', 'network', 'console', 'evaluate', 'focusglow', 'tabgroups', 'security-hardened'],
+          features: ['devtools', 'network', 'console', 'evaluate', 'focusglow', 'tabgroups', 'security-hardened', 'orphan-cleanup'],
         };
         break;
 
@@ -926,6 +926,64 @@ async function handleCliCommand(message) {
           hint: ownTabCount > 4 && pendingSlotRequests.length > 0
             ? 'You have >4 tabs and agents are waiting. Consider using grantTabSpace.'
             : null
+        };
+        break;
+      }
+
+      case 'cleanupOrphanedTabs': {
+        // Close all tabs owned by a specific agent (for orphaned agent cleanup)
+        // Called by MCP server when an agent hasn't been seen in >2 minutes
+        const { agentId } = params;
+
+        if (!agentId) {
+          throw new Error('agentId is required');
+        }
+
+        if (!claudezillaWindow) {
+          result = { tabsClosed: 0, message: 'No Claudezilla window active' };
+          break;
+        }
+
+        // Find all tabs owned by this agent
+        const orphanedTabs = claudezillaWindow.tabs.filter(t => t.ownerId === agentId);
+
+        if (orphanedTabs.length === 0) {
+          result = { tabsClosed: 0, message: `No tabs found for agent ${agentId}` };
+          break;
+        }
+
+        // Close all tabs owned by this agent
+        const closedTabIds = [];
+        for (const tabEntry of orphanedTabs) {
+          try {
+            await browser.tabs.remove(tabEntry.tabId);
+            closedTabIds.push(tabEntry.tabId);
+
+            // Remove from tracking
+            const tabIndex = claudezillaWindow.tabs.indexOf(tabEntry);
+            if (tabIndex !== -1) {
+              claudezillaWindow.tabs.splice(tabIndex, 1);
+            }
+
+            console.log(`[claudezilla] Closed orphaned tab ${tabEntry.tabId} from agent ${agentId}`);
+          } catch (e) {
+            console.log(`[claudezilla] Could not close orphaned tab ${tabEntry.tabId}:`, e.message);
+          }
+        }
+
+        // Update active tab if we closed it
+        if (closedTabIds.includes(activeTabId)) {
+          const lastTab = claudezillaWindow.tabs[claudezillaWindow.tabs.length - 1];
+          activeTabId = lastTab?.tabId || null;
+        }
+
+        result = {
+          tabsClosed: closedTabIds.length,
+          closedTabIds,
+          agentId: agentId.slice(0, 20) + '...',
+          tabCount: claudezillaWindow.tabs.length,
+          maxTabs: MAX_TABS,
+          message: `Cleaned up ${closedTabIds.length} orphaned tab(s) from agent ${agentId.slice(0, 20)}...`
         };
         break;
       }
