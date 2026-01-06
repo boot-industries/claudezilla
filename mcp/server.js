@@ -249,7 +249,7 @@ const TOOLS = [
   },
   {
     name: 'firefox_screenshot',
-    description: 'Capture a screenshot. SERIALIZED: Requests are queued to prevent collisions when multiple agents screenshot simultaneously. If tabId specified, switches to that tab first (only screenshot requires visible tab). Prefer firefox_get_page_state for faster, collision-free page analysis. Default: JPEG 60% quality, 50% scale.',
+    description: 'Capture a screenshot with dynamic page readiness detection. Automatically waits for network idle (XHR, scripts) and render settlement before capture. Returns timing data showing what signals were detected. SERIALIZED: Requests queued to prevent collisions. Default: JPEG 60% quality, 50% scale.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -269,6 +269,18 @@ const TOOLS = [
           type: 'string',
           enum: ['jpeg', 'png'],
           description: 'Image format (default: jpeg). JPEG is much smaller.',
+        },
+        maxWait: {
+          type: 'number',
+          description: 'Maximum ms to wait for page ready (default: 10000). Captures after this even if not idle.',
+        },
+        waitForImages: {
+          type: 'boolean',
+          description: 'Wait for images/fonts to load (default: true). Set false for faster capture of text-heavy pages.',
+        },
+        skipReadiness: {
+          type: 'boolean',
+          description: 'Skip all readiness detection (instant capture). Use when page is known to be ready.',
         },
       },
     },

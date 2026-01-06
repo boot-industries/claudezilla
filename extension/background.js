@@ -196,6 +196,147 @@ function getNetworkRequests(params = {}) {
 }
 
 /**
+ * Get network status for a specific tab (for screenshot timing)
+ * @param {number} tabId - Tab to check
+ * @returns {object} Network status with pending counts by type
+ */
+function getTabNetworkStatus(tabId) {
+  const now = Date.now();
+  const recentWindow = 2000; // Only consider requests from last 2s
+
+  const tabRequests = networkRequests.filter(r =>
+    r.tabId === tabId && (now - r.timestamp) < recentWindow
+  );
+
+  const pending = tabRequests.filter(r => r.status === 'pending');
+  const pendingByType = {};
+  pending.forEach(r => {
+    pendingByType[r.type] = (pendingByType[r.type] || 0) + 1;
+  });
+
+  // Critical = blocks rendering (scripts, stylesheets, xhr/fetch)
+  const criticalTypes = ['script', 'stylesheet', 'xmlhttprequest', 'fetch', 'main_frame', 'sub_frame'];
+  const criticalPending = pending.filter(r => criticalTypes.includes(r.type)).length;
+
+  // Visual = affects appearance (images, fonts)
+  const visualTypes = ['image', 'font', 'media'];
+  const visualPending = pending.filter(r => visualTypes.includes(r.type)).length;
+
+  return {
+    pending: pending.length,
+    pendingByType,
+    criticalPending,
+    visualPending,
+    lastActivity: tabRequests.length > 0 ? Math.max(...tabRequests.map(r => r.timestamp)) : 0,
+    isIdle: pending.length === 0,
+    isCriticalIdle: criticalPending === 0
+  };
+}
+
+/**
+ * Wait for page to be ready for screenshot (dynamic detection)
+ * @param {number} tabId - Tab to wait for
+ * @param {object} options - Wait options
+ * @returns {Promise<object>} Readiness result with timeline
+ */
+async function waitForPageReady(tabId, options = {}) {
+  const {
+    maxWait = 10000,          // Absolute maximum wait
+    idleThreshold = 150,      // ms of no activity to consider "settled"
+    requireVisualIdle = true, // Wait for images too?
+  } = options;
+
+  const startTime = Date.now();
+  const timeline = [];
+  let lastActivityTime = startTime;
+
+  const log = (event, data = {}) => timeline.push({
+    t: Date.now() - startTime,
+    event,
+    ...data
+  });
+
+  log('start', { maxWait, idleThreshold, requireVisualIdle });
+
+  // Fast path: check if already idle
+  const initialStatus = getTabNetworkStatus(tabId);
+  if (initialStatus.isIdle) {
+    log('already_idle');
+    // Still do render check for paint settlement
+    try {
+      const readiness = await executeInTab(tabId, 'checkPageReadiness', {});
+      log('render_settled', readiness);
+    } catch (e) {
+      log('render_check_failed', { error: e.message });
+    }
+    const totalWait = Date.now() - startTime;
+    log('complete', { totalWait });
+    return { totalWaitMs: totalWait, timeline, timedOut: false };
+  }
+
+  // Phase 1: Wait for critical resources (scripts, XHR, stylesheets)
+  while (Date.now() - startTime < maxWait) {
+    const status = getTabNetworkStatus(tabId);
+
+    if (status.isCriticalIdle) {
+      log('critical_idle', { pending: status.pending, visualPending: status.visualPending });
+      break;
+    }
+
+    if (status.criticalPending > 0) {
+      lastActivityTime = Date.now();
+    }
+
+    // Check if we've been waiting too long with no progress
+    if (Date.now() - lastActivityTime > idleThreshold * 3) {
+      log('critical_timeout', { pending: status.criticalPending });
+      break;
+    }
+
+    await new Promise(r => setTimeout(r, 25)); // Tight polling for responsiveness
+  }
+
+  // Phase 2: Optional visual idle (images, fonts) - capped at 3s
+  if (requireVisualIdle) {
+    const visualStart = Date.now();
+    const visualMaxWait = Math.min(3000, maxWait - (Date.now() - startTime));
+
+    while (Date.now() - visualStart < visualMaxWait) {
+      const status = getTabNetworkStatus(tabId);
+
+      if (status.isIdle) {
+        log('visual_idle');
+        break;
+      }
+
+      await new Promise(r => setTimeout(r, 25));
+    }
+
+    if (Date.now() - visualStart >= visualMaxWait) {
+      const status = getTabNetworkStatus(tabId);
+      log('visual_timeout', { visualPending: status.visualPending });
+    }
+  }
+
+  // Phase 3: Render frame settlement (via content script)
+  try {
+    const readiness = await executeInTab(tabId, 'checkPageReadiness', {});
+    log('render_settled', readiness);
+  } catch (e) {
+    log('render_check_failed', { error: e.message });
+  }
+
+  const totalWait = Date.now() - startTime;
+  log('complete', { totalWait });
+
+  return {
+    totalWaitMs: totalWait,
+    timeline,
+    timedOut: totalWait >= maxWait
+  };
+}
+
+/**
  * Connect to native messaging host
  */
 function connect() {
@@ -786,7 +927,18 @@ async function handleCliCommand(message) {
         const settings = { compressImages: true, ...(stored.claudezilla || {}) };
         const defaultFormat = settings.compressImages ? 'jpeg' : 'png';
 
-        const { windowId, tabId: requestedTabId, agentId, quality = 60, scale = 0.5, format = defaultFormat } = params;
+        const {
+          windowId,
+          tabId: requestedTabId,
+          agentId,
+          quality = 60,
+          scale = 0.5,
+          format = defaultFormat,
+          // NEW: Page readiness options
+          maxWait = 10000,
+          waitForImages = true,
+          skipReadiness = false
+        } = params;
 
         // SECURITY: Verify agent owns the target tab before queuing screenshot
         if (requestedTabId && agentId) {
@@ -798,6 +950,7 @@ async function handleCliCommand(message) {
 
         const screenshotPromise = screenshotLock.then(async () => {
           const session = await getSession(windowId);
+          let screenshotReadiness = null;
 
           // Determine which tab to capture
           const tabIds = claudezillaWindow?.tabs.map(t => t.tabId) || [];
@@ -810,13 +963,26 @@ async function handleCliCommand(message) {
           if (targetTabId && targetTabId !== activeTabId) {
             await browser.tabs.update(targetTabId, { active: true });
             activeTabId = targetTabId;
-            // Wait for tab to render - use longer delay for reliability
-            await new Promise(r => setTimeout(r, 150));
-            // Verify the tab is still active after delay (prevents race)
+
+            // Dynamic page readiness detection (replaces hardcoded 150ms)
+            if (!skipReadiness) {
+              screenshotReadiness = await waitForPageReady(targetTabId, {
+                maxWait,
+                requireVisualIdle: waitForImages
+              });
+            }
+
+            // Verify the tab is still active after wait (prevents race)
             const [currentActive] = await browser.tabs.query({ active: true, windowId: session.windowId });
             if (currentActive?.id !== targetTabId) {
               throw new Error(`Screenshot race: tab ${targetTabId} was switched away during capture`);
             }
+          } else if (!skipReadiness) {
+            // Even without tab switch, do quick render check for current tab
+            screenshotReadiness = await waitForPageReady(targetTabId, {
+              maxWait: Math.min(maxWait, 2000), // Shorter wait for already-visible tab
+              requireVisualIdle: waitForImages
+            });
           }
 
           // Capture with JPEG compression (much smaller than PNG)
@@ -827,6 +993,18 @@ async function handleCliCommand(message) {
           }
           const rawDataUrl = await browser.tabs.captureVisibleTab(session.windowId, captureOpts);
 
+          // Build base response with readiness data
+          const baseResponse = {
+            tabId: targetTabId,
+            format: captureFormat,
+            quality,
+            readiness: screenshotReadiness ? {
+              waitMs: screenshotReadiness.totalWaitMs,
+              timedOut: screenshotReadiness.timedOut,
+              timeline: screenshotReadiness.timeline
+            } : { waitMs: 0, timedOut: false, timeline: [] }
+          };
+
           // If scale < 1, resize via content script
           if (scale < 1) {
             const response = await executeInTab(targetTabId, 'resizeImage', {
@@ -836,16 +1014,14 @@ async function handleCliCommand(message) {
               format: captureFormat,
             });
             return {
-              tabId: targetTabId,
+              ...baseResponse,
               dataUrl: response.result.dataUrl,
               originalSize: response.result.originalSize,
               scaledSize: response.result.scaledSize,
-              format: captureFormat,
-              quality,
               scale,
             };
           } else {
-            return { tabId: targetTabId, dataUrl: rawDataUrl, format: captureFormat, quality, scale: 1 };
+            return { ...baseResponse, dataUrl: rawDataUrl, scale: 1 };
           }
         });
 

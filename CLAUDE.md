@@ -119,7 +119,7 @@ claudezilla@boot.industries
 | pressKey | Send keyboard events |
 | scroll | Scroll to element/position |
 | waitFor | Wait for element to appear |
-| screenshot | Capture viewport (JPEG, configurable) |
+| screenshot | Capture viewport with dynamic readiness detection |
 
 ### Page Analysis
 | Command | Description |
@@ -191,6 +191,42 @@ ln -s "$(pwd)/plugin" ~/.claude/plugins/claudezilla-loop
 - Loop status shown in extension popup
 - Iteration counter and prompt preview
 - Stop button for manual cancellation
+
+## Screenshot Timing (v0.5.1)
+
+Dynamic page readiness detection replaces hardcoded delays. Screenshots now wait for actual signals from the page before capture.
+
+**How it works:**
+1. **Network idle detection** - Waits for XHR/fetch/scripts to complete (critical resources)
+2. **Visual idle** - Optional wait for images/fonts (3s max)
+3. **Render settlement** - Double requestAnimationFrame + requestIdleCallback
+
+**Parameters:**
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `maxWait` | 10000 | Maximum ms to wait for page ready |
+| `waitForImages` | true | Wait for images/fonts to load |
+| `skipReadiness` | false | Skip all detection (instant capture) |
+
+**Response includes timing data:**
+```javascript
+{
+  tabId: 123,
+  dataUrl: "data:image/jpeg;base64,...",
+  readiness: {
+    waitMs: 347,        // Total wait time
+    timedOut: false,    // Did we hit maxWait?
+    timeline: [         // Decision log
+      { t: 0, event: "start" },
+      { t: 45, event: "critical_idle" },
+      { t: 312, event: "visual_idle" },
+      { t: 347, event: "render_settled" }
+    ]
+  }
+}
+```
+
+**Fast path:** If page is already idle, captures in <50ms (just double RAF).
 
 ## Payload Optimization (v0.4.3)
 

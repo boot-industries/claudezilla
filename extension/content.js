@@ -738,6 +738,51 @@ async function waitFor(params) {
 }
 
 /**
+ * Check page readiness for screenshot (render settlement)
+ * Uses double RAF + requestIdleCallback for precise timing
+ * @param {object} params - Parameters (currently unused, reserved for future)
+ * @returns {Promise<object>} Readiness result with timing info
+ */
+async function checkPageReadiness(params = {}) {
+  const result = {
+    readyState: document.readyState,
+    timestamp: Date.now(),
+    viewport: {
+      width: window.innerWidth,
+      height: window.innerHeight,
+      scrollY: window.scrollY
+    }
+  };
+
+  // Wait for double RAF (ensures paint cycle complete)
+  // First RAF schedules after current frame, second RAF after next frame
+  const rafStart = performance.now();
+  await new Promise(resolve => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(resolve);
+    });
+  });
+  result.rafWaitMs = Math.round((performance.now() - rafStart) * 100) / 100;
+
+  // Check for running animations
+  if (typeof document.getAnimations === 'function') {
+    const animations = document.getAnimations();
+    result.runningAnimations = animations.filter(a => a.playState === 'running').length;
+  }
+
+  // Wait for idle callback if main thread is busy (with short timeout)
+  if ('requestIdleCallback' in window) {
+    const idleStart = performance.now();
+    await new Promise(resolve => {
+      requestIdleCallback(resolve, { timeout: 100 }); // Short timeout for responsiveness
+    });
+    result.idleWaitMs = Math.round((performance.now() - idleStart) * 100) / 100;
+  }
+
+  return result;
+}
+
+/**
  * Evaluate JavaScript in page context
  * @param {object} params - Parameters
  * @param {string} params.expression - JavaScript expression to evaluate
@@ -1469,6 +1514,10 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
         case 'waitFor':
           result = await waitFor(params);
+          break;
+
+        case 'checkPageReadiness':
+          result = await checkPageReadiness(params);
           break;
 
         case 'evaluate':
