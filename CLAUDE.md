@@ -66,6 +66,8 @@ claudezilla/
 wrangler pages deploy website --project-name=claudezilla
 ```
 
+⚠️ **CDN cache propagation:** After deploying, the main domain (claudezilla.com) may serve cached content for a few minutes. The deployment preview URL (e.g., `https://[hash].claudezilla.pages.dev`) always shows the latest version immediately. Wait 2-5 minutes for CDN cache to propagate to the production domain.
+
 ## Development
 
 ### Setup
