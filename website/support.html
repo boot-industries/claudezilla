@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Support - Claudezilla</title>
+  <meta name="description" content="Support Claudezilla development with a one-time or monthly donation.">
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="Support Claudezilla">
+  <meta property="og:description" content="Help keep Claudezilla free and open source">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://claudezilla.com/support.html">
+
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="/assets/support.css">
+</head>
+<body>
+  <!-- Navigation -->
+  <nav class="main-nav">
+    <a href="/" class="nav-logo">Claudezilla</a>
+    <div class="nav-links">
+      <a href="/">Home</a>
+      <a href="/extension.html">Setup</a>
+      <a href="/docs.html">Docs</a>
+      <a href="/support.html" class="active">Support</a>
+      <a href="https://github.com/boot-industries/claudezilla" target="_blank" rel="noopener">GitHub</a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="support-card">
+      <h1>☕ Support Claudezilla</h1>
+      <p class="subtitle">Help keep this project free and open source</p>
+
+      <!-- Amount Selection -->
+      <div class="amount-section">
+        <label>Amount (USD)</label>
+        <div class="suggested-amounts">
+          <button class="amount-pill" data-amount="500">$5</button>
+          <button class="amount-pill" data-amount="1000">$10</button>
+          <button class="amount-pill active" data-amount="2000">$20</button>
+          <button class="amount-pill" data-amount="5000">$50</button>
+        </div>
+        <div class="custom-amount">
+          <span class="currency">$</span>
+          <input type="number" id="customAmount" placeholder="20" min="3" step="1">
+        </div>
+      </div>
+
+      <!-- Frequency Toggle -->
+      <div class="frequency-section">
+        <label>Frequency</label>
+        <div class="frequency-toggle">
+          <button class="frequency-btn active" data-frequency="one-time">One-time</button>
+          <button class="frequency-btn" data-frequency="monthly">Monthly</button>
+        </div>
+      </div>
+
+      <!-- Submit Button -->
+      <button id="submitBtn" class="submit-btn">
+        CONTRIBUTE $20
+      </button>
+
+      <p class="note">Powered by Stripe. Secure checkout.</p>
+
+      <!-- Error Display -->
+      <div id="errorMessage" class="error-message" style="display: none;"></div>
+
+      <!-- Loading Overlay -->
+      <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+        <div class="spinner"></div>
+        <p>Opening Stripe Checkout...</p>
+      </div>
+    </div>
+
+    <div class="back-link">
+      <a href="/">← Back to Home</a>
+    </div>
+  </div>
+
+  <script src="/scripts/support.js"></script>
+</body>
+</html>

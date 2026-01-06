@@ -1,0 +1,121 @@
+<svg class="monster-logo" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-label="Claudezilla logo">
+  <defs>
+    <!-- Atomic core glow -->
+    <radialGradient id="heroAtomicGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#E05A38" stop-opacity="0.9"/>
+      <stop offset="40%" stop-color="#D14D32" stop-opacity="0.6"/>
+      <stop offset="70%" stop-color="#D14D32" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#D14D32" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Eye glow gradient -->
+    <radialGradient id="heroEyeGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#FFF7E0" stop-opacity="1"/>
+      <stop offset="50%" stop-color="#FCD34D" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#F59E0B" stop-opacity="0.8"/>
+    </radialGradient>
+
+    <!-- Spine energy gradient -->
+    <linearGradient id="heroSpineGlow" x1="0%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" stop-color="#D14D32" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#FCD34D" stop-opacity="0.4"/>
+    </linearGradient>
+  </defs>
+
+  <!-- LAYER 1 (BACK): Tesseract frame -->
+  <g class="hero-tesseract">
+    <path d="M32 6 L56 17 L56 47 L32 58 L8 47 L8 17 Z"
+          stroke="#D14D32" stroke-width="1.5" fill="none" stroke-linejoin="round" opacity="0.7"/>
+    <path d="M32 6 L32 58 M8 17 L56 47 M56 17 L8 47"
+          stroke="#D14D32" stroke-width="1" stroke-linecap="round" opacity="0.5"/>
+  </g>
+
+  <!-- LAYER 2: Electrons tracing tesseract -->
+  <g class="hero-electrons" opacity="0.7">
+    <!-- Electron 1: Around outer hexagon -->
+    <circle r="1.5" fill="url(#heroEyeGlow)">
+      <animateMotion dur="6s" repeatCount="indefinite" path="M32 6 L56 17 L56 47 L32 58 L8 47 L8 17 Z"/>
+    </circle>
+    <!-- Electron 2: Outer hexagon (opposite phase) -->
+    <circle r="1.2" fill="url(#heroEyeGlow)">
+      <animateMotion dur="6s" repeatCount="indefinite" begin="-3s" path="M32 6 L56 17 L56 47 L32 58 L8 47 L8 17 Z"/>
+    </circle>
+    <!-- Electron 3: Vertical line -->
+    <circle r="1" fill="#FCD34D">
+      <animateMotion dur="4s" repeatCount="indefinite" path="M32 6 L32 58 L32 6"/>
+    </circle>
+    <!-- Electron 4: Diagonal 1 -->
+    <circle r="1" fill="#FCD34D">
+      <animateMotion dur="5s" repeatCount="indefinite" begin="-1s" path="M8 17 L56 47 L8 17"/>
+    </circle>
+    <!-- Electron 5: Diagonal 2 -->
+    <circle r="1" fill="#FCD34D">
+      <animateMotion dur="5s" repeatCount="indefinite" begin="-2.5s" path="M56 17 L8 47 L56 17"/>
+    </circle>
+  </g>
+
+  <!-- LAYER 3: Glow (explicit group) -->
+  <g class="hero-glow">
+    <circle cx="32" cy="32" r="30" fill="url(#heroAtomicGlow)" opacity="0.5">
+      <animate attributeName="r" values="30;31;30" dur="4s" repeatCount="indefinite"/>
+    </circle>
+    <ellipse cx="32" cy="32" rx="14" ry="16" fill="#D14D32" opacity="0.35">
+      <animate attributeName="opacity" values="0.35;0.45;0.35" dur="3s" repeatCount="indefinite"/>
+    </ellipse>
+    <ellipse cx="32" cy="32" rx="10" ry="12" fill="#E05A38" opacity="0.25"/>
+  </g>
+
+  <!-- LAYER 4 (FRONT): Claudezilla - spines (conical, bases extend into head) -->
+  <g transform="translate(32, 32)">
+    <!-- Spine glows (behind) -->
+    <path d="M-1.2 -9 L0 -15 L1.2 -9" fill="url(#heroSpineGlow)" opacity="0.7">
+      <animate attributeName="opacity" values="0.5;0.8;0.5" dur="2s" repeatCount="indefinite"/>
+    </path>
+    <path d="M2 -6 L5 -12 L5 -5" fill="url(#heroSpineGlow)" opacity="0.7">
+      <animate attributeName="opacity" values="0.5;0.8;0.5" dur="2s" repeatCount="indefinite" begin="0.3s"/>
+    </path>
+    <path d="M-2 -6 L-5 -12 L-5 -5" fill="url(#heroSpineGlow)" opacity="0.7">
+      <animate attributeName="opacity" values="0.5;0.8;0.5" dur="2s" repeatCount="indefinite" begin="0.6s"/>
+    </path>
+    <!-- Spine dark cones (bases extend into head, body covers them) -->
+    <path d="M-1 -9 L0 -15 L1 -9 Z" fill="#1a1a1a"/>
+    <path d="M2.5 -6 L5 -12 L4.5 -5 Z" fill="#1a1a1a"/>
+    <path d="M-2.5 -6 L-5 -12 L-4.5 -5 Z" fill="#1a1a1a"/>
+  </g>
+
+  <!-- LAYER 5: Claudezilla - arms (bases extend into body, round hands) -->
+  <g transform="translate(32, 32)">
+    <g class="hero-left-arm">
+      <!-- Glow behind -->
+      <path d="M-5 0 Q-8 -0.5 -11 -3" stroke="#D14D32" stroke-width="3" stroke-linecap="round" fill="none" opacity="0.6">
+        <animateTransform attributeName="transform" type="rotate" values="0 -8 -1; -6 -8 -1; 0 -8 -1" dur="3s" repeatCount="indefinite"/>
+      </path>
+      <!-- Dark on top - round linecap for hands, body covers base -->
+      <path d="M-5 0 Q-8 -0.5 -11 -3" stroke="#1a1a1a" stroke-width="2" stroke-linecap="round" fill="none">
+        <animateTransform attributeName="transform" type="rotate" values="0 -8 -1; -6 -8 -1; 0 -8 -1" dur="3s" repeatCount="indefinite"/>
+      </path>
+    </g>
+    <g class="hero-right-arm">
+      <!-- Glow behind -->
+      <path d="M5 0 Q8 0.8 11 -1" stroke="#D14D32" stroke-width="3" stroke-linecap="round" fill="none" opacity="0.6">
+        <animateTransform attributeName="transform" type="rotate" values="0 8 -1; 6 8 -1; 0 8 -1" dur="3s" repeatCount="indefinite" begin="1.5s"/>
+      </path>
+      <!-- Dark on top - round linecap for hands, body covers base -->
+      <path d="M5 0 Q8 0.8 11 -1" stroke="#1a1a1a" stroke-width="2" stroke-linecap="round" fill="none">
+        <animateTransform attributeName="transform" type="rotate" values="0 8 -1; 6 8 -1; 0 8 -1" dur="3s" repeatCount="indefinite" begin="1.5s"/>
+      </path>
+    </g>
+  </g>
+
+  <!-- LAYER 6: Claudezilla - body and eye -->
+  <g class="hero-character" transform="translate(32, 32)">
+    <!-- Body silhouette (subtle leg curves, rounded feet via arcs) -->
+    <path d="M-6 9 Q-6.2 5.5 -6 2 L-8 -1 L-8 -5 L-6 -7 L-3 -7 L0 -11 L3 -7 L6 -7 L8 -5 L8 -1 L6 2 Q6.2 5.5 6 9 A1.5 1.5 0 0 1 3 9 Q2.8 6.5 3 4 L1.5 6 Q0 7 -1.5 6 L-3 4 Q-2.8 6.5 -3 9 A1.5 1.5 0 0 1 -6 9"
+          fill="#1a1a1a"/>
+    <!-- Eye socket glow -->
+    <ellipse cx="0" cy="-4" rx="4" ry="3.5" fill="#D14D32" opacity="0.4"/>
+    <!-- Eye -->
+    <circle cx="0" cy="-4" r="3" fill="url(#heroEyeGlow)"/>
+    <circle cx="0.8" cy="-4.8" r="1" fill="#FFF7E0" opacity="0.9"/>
+  </g>
+</svg>

@@ -1,0 +1,10 @@
+name = "claudezilla-worker"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+
+[vars]
+FRONTEND_URL = "https://claudezilla.com"
+
+# Secrets (set via: wrangler secret put STRIPE_SECRET_KEY)
+# STRIPE_SECRET_KEY (required) - Stripe API secret key (sk_...)
+# STRIPE_WEBHOOK_SECRET (optional, for future webhook handling)
