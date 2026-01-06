@@ -176,6 +176,16 @@ async function init() {
 
   // Manual test button
   pingBtn.addEventListener('click', testConnection);
+
+  // Support link - open support page in new tab
+  const supportLink = document.getElementById('supportLink');
+  if (supportLink) {
+    supportLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      browser.tabs.create({ url: browser.runtime.getURL('support.html') });
+      window.close(); // Close popup after opening
+    });
+  }
 }
 
 init();

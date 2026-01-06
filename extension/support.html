@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Support Claudezilla</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="support.css">
+</head>
+<body>
+  <div class="container">
+    <div class="support-card">
+      <h1>☕ Support Claudezilla</h1>
+      <p class="subtitle">Help keep this project free and open source</p>
+
+      <!-- Amount Selection -->
+      <div class="amount-section">
+        <label>Amount (USD)</label>
+        <div class="suggested-amounts">
+          <button class="amount-pill" data-amount="500">$5</button>
+          <button class="amount-pill" data-amount="1000">$10</button>
+          <button class="amount-pill active" data-amount="2000">$20</button>
+          <button class="amount-pill" data-amount="5000">$50</button>
+        </div>
+        <div class="custom-amount">
+          <span class="currency">$</span>
+          <input type="number" id="customAmount" placeholder="20" min="3" step="1">
+        </div>
+      </div>
+
+      <!-- Frequency Toggle -->
+      <div class="frequency-section">
+        <label>Frequency</label>
+        <div class="frequency-toggle">
+          <button class="frequency-btn active" data-frequency="one-time">One-time</button>
+          <button class="frequency-btn" data-frequency="monthly">Monthly</button>
+        </div>
+      </div>
+
+      <!-- Submit Button -->
+      <button id="submitBtn" class="submit-btn">
+        CONTRIBUTE $20
+      </button>
+
+      <p class="note">Powered by Stripe. Secure checkout.</p>
+
+      <!-- Error Display -->
+      <div id="errorMessage" class="error-message" style="display: none;"></div>
+
+      <!-- Loading Overlay -->
+      <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+        <div class="spinner"></div>
+        <p>Opening Stripe Checkout...</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="support.js"></script>
+</body>
+</html>

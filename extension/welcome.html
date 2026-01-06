@@ -523,6 +523,129 @@
         flex-direction: column;
       }
     }
+
+    /* Support Section */
+    .support-section {
+      margin-top: 80px;
+      text-align: center;
+    }
+
+    .support-cta {
+      margin-top: 32px;
+    }
+
+    .support-btn {
+      background: var(--terracotta);
+      color: var(--bg-dark);
+      border: none;
+      padding: 20px 48px;
+      border-radius: 12px;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 18px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 0 0 30px var(--terracotta-glow);
+    }
+
+    .support-btn:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 40px var(--terracotta-glow);
+      background: #E05A38;
+    }
+
+    .btn-icon {
+      font-size: 24px;
+    }
+
+    .support-note {
+      margin-top: 16px;
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    /* Thank You Modal */
+    .thank-you-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.9);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+      animation: fadeIn 0.3s;
+      transition: opacity 0.3s;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+      }
+      to {
+        opacity: 1;
+      }
+    }
+
+    .thank-you-modal {
+      background: var(--bg-card);
+      border: 2px solid var(--terracotta);
+      border-radius: 16px;
+      padding: 48px;
+      max-width: 480px;
+      text-align: center;
+      box-shadow: 0 0 40px var(--terracotta-glow);
+    }
+
+    .checkmark {
+      width: 64px;
+      height: 64px;
+      background: var(--terracotta);
+      color: var(--bg-dark);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 36px;
+      font-weight: 900;
+      margin: 0 auto 24px;
+      animation: scaleIn 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes scaleIn {
+      from {
+        transform: scale(0);
+      }
+      to {
+        transform: scale(1);
+      }
+    }
+
+    .thank-you-modal h2 {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 32px;
+      color: var(--terracotta);
+      margin-bottom: 16px;
+    }
+
+    .thank-you-modal p {
+      font-size: 16px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+      margin-bottom: 12px;
+    }
+
+    .receipt-note {
+      font-size: 14px !important;
+      color: #666 !important;
+    }
   </style>
 </head>
 <body>
@@ -788,6 +911,22 @@
           interference. You can still use Claudezilla without this permission, but some features
           will be restricted. You can enable this anytime from <code>about:addons</code>.
         </p>
+      </div>
+    </div>
+
+    <!-- Support Section -->
+    <div class="support-section">
+      <h2 class="section-title">☕ Support This Project</h2>
+      <p class="section-subtitle">
+        Claudezilla is free and open source. Your support helps keep it that way.
+      </p>
+
+      <div class="support-cta">
+        <button id="supportBtn" class="support-btn">
+          <span class="btn-icon">☕</span>
+          <span class="btn-text">Buy Me a Coffee</span>
+        </button>
+        <p class="support-note">One-time or monthly • Powered by Stripe</p>
       </div>
     </div>
   </div>

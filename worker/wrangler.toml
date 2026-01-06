@@ -3,7 +3,9 @@ main = "src/index.ts"
 compatibility_date = "2024-01-01"
 
 [vars]
-FRONTEND_URL = "https://claudezilla.com"
+FRONTEND_URL = "https://boot.industries"
+
+# Note: claudezilla.com Pages setup pending. Using boot.industries for Stripe redirect.
 
 # Secrets (set via: wrangler secret put STRIPE_SECRET_KEY)
 # STRIPE_SECRET_KEY (required) - Stripe API secret key (sk_...)

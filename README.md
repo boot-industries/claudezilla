@@ -62,6 +62,16 @@ cd claudezilla/mcp && npm install
 | **Screenshot** | Capture pages (JPEG, configurable quality) |
 | **Wait** | Handle SPAs and dynamic content |
 
+## Support Development
+
+Claudezilla is free and open source. You can support its development with a one-time donation or monthly sponsorship:
+
+- Click the **☕ Buy Me a Coffee** button on the welcome page after first install
+- Or use the **☕ Support this project** link in the extension popup
+- Donations are processed securely through Stripe
+
+See [STRIPE_SETUP.md](./STRIPE_SETUP.md) for deployment and configuration details.
+
 ## Example Usage
 
 Once connected, Claude can use commands like:
