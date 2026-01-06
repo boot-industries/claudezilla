@@ -59,6 +59,11 @@ claudezilla/
 
 ⚠️ **Cloudflare Pages deployment:** Deploy the `website/` directory, NOT `extension/`. The extension files are bundled into the XPI via manifest.json; the website/ directory contains the marketing landing page for claudezilla.com.
 
+⚠️ **Manual deployment required:** This repo is under a GitHub org (boot-industries) which has connection issues with Cloudflare Pages auto-deploy. You must deploy manually after pushing:
+```bash
+wrangler pages deploy website --project-name=claudezilla
+```
+
 ## Development
 
 ### Setup
