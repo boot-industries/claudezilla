@@ -1,7 +1,24 @@
 # CLZ002 Changelog
 
 **Project:** Claudezilla
-**Current Version:** 0.4.8
+**Current Version:** 0.4.9
+
+## v0.4.9 (2026-01-06)
+
+**Hotfix: Popup version display.**
+
+### Bug Fixes
+
+- **Popup version string** - Fixed hardcoded v0.4.5 displaying in extension popup
+  - Users saw v0.4.5 in popup while running v0.4.8 binary
+  - Popup now displays correct runtime version (v0.4.9)
+
+### Notes
+
+- No functional changes to error handling or browser automation
+- v0.4.8 was shipped but popup showed stale version — this corrects that UI oversight
+
+---
 
 ## v0.4.8 (2026-01-06)
 
