@@ -767,7 +767,7 @@ const TOOL_TO_COMMAND = {
 const server = new Server(
   {
     name: 'claudezilla',
-    version: '0.5.0',
+    version: '0.5.1',
   },
   {
     capabilities: {

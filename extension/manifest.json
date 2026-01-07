@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "Claudezilla",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Firefox browser automation for Claude Code",
   "author": "Chris Lyons <support@boot.industries>",
 

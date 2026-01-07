@@ -1,5 +1,5 @@
 /**
- * Task Detector for Claudezilla Focus Loops (v0.5.0)
+ * Task Detector for Claudezilla Focus Loops (v0.5.1)
  *
  * Detects iterative tasks that would benefit from focus loops.
  * Uses keyword matching and behavioral pattern analysis.
