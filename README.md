@@ -2,6 +2,8 @@
 
 **Firefox browser automation for Claude Code.** A privacy-friendly alternative to Chrome-based solutions.
 
+[![Version](https://img.shields.io/badge/version-0.4.8-blue.svg)](./CHANGELOG.md)
+
 Give Claude the ability to browse the web, fill out forms, take screenshots, and extract data — all through Firefox.
 
 ## Why Claudezilla?

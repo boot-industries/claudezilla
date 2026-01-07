@@ -1,7 +1,42 @@
 # CLZ002 Changelog
 
 **Project:** Claudezilla
-**Current Version:** 0.4.5
+**Current Version:** 0.4.8
+
+## v0.4.8 (2026-01-06)
+
+**Critical error handling + comprehensive documentation.**
+
+### Features
+
+- **Error reporting for all content-script commands** - Agents now get clear error messages
+  - `firefox_click` - Reports "Element not found: selector" when target missing
+  - `firefox_type` - Reports invalid selector or element not found
+  - `firefox_getContent`, `firefox_scroll`, `firefox_waitFor`, `firefox_evaluate`, etc. - All properly propagate errors
+  - `firefox_getPageState`, `firefox_getAccessibilitySnapshot`, `firefox_getConsoleLogs` - Errors no longer silently dropped
+- **Comprehensive documentation** - Global CLAUDE.md updated with complete Claudezilla reference
+  - Full tool list organized by category (Window/Tab, DOM, Content Analysis, DevTools, etc.)
+  - Performance hints (use getPageState over screenshot, mutex details)
+  - Multi-agent coordination explained (mercy system, orphaned cleanup)
+
+### Bug Fixes
+
+- **Silent error suppression** - Background.js now checks response.success flag
+  - Previously: Content script errors → undefined response.result → empty response with no error
+  - Now: Content script errors properly thrown and propagated to agents
+  - Affects 11 commands: click, type, getContent, scroll, waitFor, evaluate, getElementInfo, getPageState, getAccessibilitySnapshot, pressKey, getConsoleLogs
+
+### Breaking Changes
+
+- None - all changes are backward compatible (errors were previously silent)
+
+### Multi-Agent Safety
+
+- Agents can now reliably detect failures and retry with different selectors
+- Full visibility into what went wrong during browser automation
+- Essential for giving Claude complete control over Firefox
+
+---
 
 ## v0.4.5 (2026-01-06)
 
