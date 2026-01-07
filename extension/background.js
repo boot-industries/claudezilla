@@ -1112,6 +1112,9 @@ async function handleCliCommand(message) {
           verifyTabOwnership(targetTab, agentId, 'read content from');
         }
         const response = await executeInTab(tabId, 'getContent', contentParams);
+        if (!response.success) {
+          throw new Error(response.error);
+        }
         result = { tabId, ...response.result };
         break;
       }
@@ -1125,6 +1128,9 @@ async function handleCliCommand(message) {
           verifyTabOwnership(targetTab, agentId, 'click in');
         }
         const response = await executeInTab(tabId, 'click', clickParams);
+        if (!response.success) {
+          throw new Error(response.error);
+        }
         result = { tabId, ...response.result };
         break;
       }
@@ -1138,6 +1144,9 @@ async function handleCliCommand(message) {
           verifyTabOwnership(targetTab, agentId, 'type in');
         }
         const response = await executeInTab(tabId, 'type', typeParams);
+        if (!response.success) {
+          throw new Error(response.error);
+        }
         result = { tabId, ...response.result };
         break;
       }
@@ -1291,6 +1300,9 @@ async function handleCliCommand(message) {
           verifyTabOwnership(targetTab, agentId, 'read console from');
         }
         const response = await executeInTab(tabId, 'getConsoleLogs', consoleParams);
+        if (!response.success) {
+          throw new Error(response.error);
+        }
         result = { tabId, ...response.result };
         break;
       }
@@ -1316,6 +1328,9 @@ async function handleCliCommand(message) {
           verifyTabOwnership(targetTab, agentId, 'scroll in');
         }
         const response = await executeInTab(tabId, 'scroll', scrollParams);
+        if (!response.success) {
+          throw new Error(response.error);
+        }
         result = { tabId, ...response.result };
         break;
       }
@@ -1329,6 +1344,9 @@ async function handleCliCommand(message) {
           verifyTabOwnership(targetTab, agentId, 'wait in');
         }
         const response = await executeInTab(tabId, 'waitFor', waitParams);
+        if (!response.success) {
+          throw new Error(response.error);
+        }
         result = { tabId, ...response.result };
         break;
       }
@@ -1342,6 +1360,9 @@ async function handleCliCommand(message) {
           verifyTabOwnership(targetTab, agentId, 'evaluate in');
         }
         const response = await executeInTab(tabId, 'evaluate', evalParams);
+        if (!response.success) {
+          throw new Error(response.error);
+        }
         result = { tabId, ...response.result };
         break;
       }
@@ -1355,6 +1376,9 @@ async function handleCliCommand(message) {
           verifyTabOwnership(targetTab, agentId, 'inspect element in');
         }
         const response = await executeInTab(tabId, 'getElementInfo', elementParams);
+        if (!response.success) {
+          throw new Error(response.error);
+        }
         result = { tabId, ...response.result };
         break;
       }
@@ -1368,6 +1392,9 @@ async function handleCliCommand(message) {
           verifyTabOwnership(targetTab, agentId, 'read page state from');
         }
         const response = await executeInTab(tabId, 'getPageState', {});
+        if (!response.success) {
+          throw new Error(response.error);
+        }
         result = { tabId, ...response.result };
         break;
       }
@@ -1381,6 +1408,9 @@ async function handleCliCommand(message) {
           verifyTabOwnership(targetTab, agentId, 'read accessibility from');
         }
         const response = await executeInTab(tabId, 'getAccessibilitySnapshot', a11yParams);
+        if (!response.success) {
+          throw new Error(response.error);
+        }
         result = { tabId, ...response.result };
         break;
       }
@@ -1394,6 +1424,9 @@ async function handleCliCommand(message) {
           verifyTabOwnership(targetTab, agentId, 'send keys to');
         }
         const response = await executeInTab(tabId, 'pressKey', keyParams);
+        if (!response.success) {
+          throw new Error(response.error);
+        }
         result = { tabId, ...response.result };
         break;
       }
