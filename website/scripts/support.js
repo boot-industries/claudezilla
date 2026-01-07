@@ -82,6 +82,12 @@ document.getElementById('submitBtn').addEventListener('click', async () => {
 
     const { url } = await response.json();
 
+    // Set timeout to redirect to thanks page after 10s
+    // Assumes user completed payment if they're still here
+    setTimeout(() => {
+      window.location.href = '/#thanks';
+    }, 10000);
+
     // Redirect to Stripe Checkout
     window.location.href = url;
 
