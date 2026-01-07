@@ -4,15 +4,15 @@
   <meta charset="utf-8">
   <style>
     html {
-      height: 800px;
+      height: 600px;
     }
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      font-size: 14px;
-      padding: 16px;
+      font-size: 13px;
+      padding: 10px 12px;
       min-width: 280px;
-      height: 800px;
+      height: 600px;
       margin: 0;
       background: #1a1a1a;
       color: #e0e0e0;
@@ -20,13 +20,13 @@
     }
 
     h1 {
-      margin: 8px 0 12px 0;
-      font-size: 18px;
+      margin: 2px 0 6px 0;
+      font-size: 16px;
       font-weight: 600;
       color: #fff;
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
     }
 
     .version {
@@ -38,9 +38,9 @@
     .status {
       display: flex;
       align-items: center;
-      gap: 8px;
-      margin-bottom: 12px;
-      padding: 8px 12px;
+      gap: 6px;
+      margin-bottom: 6px;
+      padding: 6px 10px;
       border-radius: 6px;
       background: #2a2a2a;
     }
@@ -61,15 +61,15 @@
     }
 
     .section {
-      margin-bottom: 12px;
+      margin-bottom: 6px;
     }
 
     .section-title {
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 600;
       text-transform: uppercase;
       color: #888;
-      margin-bottom: 8px;
+      margin-bottom: 4px;
       letter-spacing: 0.5px;
     }
 
@@ -82,7 +82,7 @@
     .setting-row {
       display: flex;
       align-items: center;
-      padding: 8px 12px;
+      padding: 5px 10px;
       cursor: pointer;
       transition: background 0.15s;
     }
@@ -121,16 +121,16 @@
     }
 
     .info {
-      font-size: 12px;
+      font-size: 11px;
       color: #888;
-      margin-bottom: 12px;
+      margin-bottom: 6px;
       background: #2a2a2a;
       border-radius: 6px;
-      padding: 8px 12px;
+      padding: 6px 10px;
     }
 
     .info div {
-      margin: 4px 0;
+      margin: 2px 0;
     }
 
     .info strong {
@@ -194,9 +194,9 @@
     /* Support footer */
     .support-footer {
       text-align: center;
-      padding: 12px 16px 16px;
+      padding: 8px 12px 10px;
       border-top: 1px solid rgba(255, 255, 255, 0.1);
-      margin: 12px -16px -16px -16px;
+      margin: 6px -12px -10px -12px;
     }
 
     .support-link {
@@ -224,7 +224,7 @@
     <span id="statusText" class="status-text">Checking...</span>
   </div>
 
-  <div id="permissionStatus" class="info" style="display: block; margin-bottom: 12px; padding: 8px 12px;">
+  <div id="permissionStatus" class="info" style="display: block; margin-bottom: 6px; padding: 6px 10px;">
     <div>
       <strong>Private Windows:</strong>
       <span id="permissionState" style="color: #888;">Checking...</span>
@@ -261,7 +261,7 @@
           <span>Compress screencaps</span>
         </label>
       </div>
-      <div style="padding: 0 12px 8px 40px; font-size: 11px; color: #666;">
+      <div style="padding: 0 10px 4px 36px; font-size: 10px; color: #666;">
         Reduce file size (default: on)
       </div>
     </div>
@@ -291,15 +291,15 @@
   <div class="section">
     <div class="section-title">Auto-Loop Detection</div>
     <div class="settings-group">
-      <label class="checkbox-label" style="display: flex; align-items: center; gap: 8px; padding: 8px 12px; cursor: pointer;">
-        <input type="checkbox" id="enableAutoDetect" checked style="width: 16px; height: 16px;">
+      <label class="checkbox-label" style="display: flex; align-items: center; gap: 6px; padding: 5px 10px; cursor: pointer;">
+        <input type="checkbox" id="enableAutoDetect" checked style="width: 14px; height: 14px;">
         <span>Auto-detect iterative tasks</span>
       </label>
-      <label class="checkbox-label" style="display: flex; align-items: center; gap: 8px; padding: 8px 12px; cursor: pointer;">
-        <input type="checkbox" id="enableAutoStart" style="width: 16px; height: 16px;">
+      <label class="checkbox-label" style="display: flex; align-items: center; gap: 6px; padding: 5px 10px; cursor: pointer;">
+        <input type="checkbox" id="enableAutoStart" style="width: 14px; height: 14px;">
         <span>Auto-start loops (no confirmation)</span>
       </label>
-      <label style="display: flex; align-items: center; gap: 8px; padding: 8px 12px;">
+      <label style="display: flex; align-items: center; gap: 6px; padding: 5px 10px;">
         <span style="flex-shrink: 0;">Default iterations:</span>
         <input type="number" id="defaultMaxIterations" value="15" min="5" max="50"
                style="width: 60px; padding: 4px 8px; border: 1px solid #444; border-radius: 4px; background: #2a2a2a; color: #fff;">
