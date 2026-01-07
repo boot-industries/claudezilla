@@ -9,8 +9,8 @@
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      font-size: 13px;
-      padding: 10px 12px;
+      font-size: 14px;
+      padding: 12px 14px;
       min-width: 280px;
       height: 600px;
       margin: 0;
@@ -20,8 +20,8 @@
     }
 
     h1 {
-      margin: 2px 0 6px 0;
-      font-size: 16px;
+      margin: 4px 0 10px 0;
+      font-size: 17px;
       font-weight: 600;
       color: #fff;
       display: flex;
@@ -38,9 +38,9 @@
     .status {
       display: flex;
       align-items: center;
-      gap: 6px;
-      margin-bottom: 6px;
-      padding: 6px 10px;
+      gap: 8px;
+      margin-bottom: 8px;
+      padding: 7px 11px;
       border-radius: 6px;
       background: #2a2a2a;
     }
@@ -61,15 +61,15 @@
     }
 
     .section {
-      margin-bottom: 6px;
+      margin-bottom: 8px;
     }
 
     .section-title {
-      font-size: 10px;
+      font-size: 11px;
       font-weight: 600;
       text-transform: uppercase;
       color: #888;
-      margin-bottom: 4px;
+      margin-bottom: 5px;
       letter-spacing: 0.5px;
     }
 
@@ -82,7 +82,7 @@
     .setting-row {
       display: flex;
       align-items: center;
-      padding: 5px 10px;
+      padding: 6px 11px;
       cursor: pointer;
       transition: background 0.15s;
     }
@@ -121,16 +121,16 @@
     }
 
     .info {
-      font-size: 11px;
+      font-size: 12px;
       color: #888;
-      margin-bottom: 6px;
+      margin-bottom: 8px;
       background: #2a2a2a;
       border-radius: 6px;
-      padding: 6px 10px;
+      padding: 7px 11px;
     }
 
     .info div {
-      margin: 2px 0;
+      margin: 3px 0;
     }
 
     .info strong {
@@ -194,9 +194,9 @@
     /* Support footer */
     .support-footer {
       text-align: center;
-      padding: 8px 12px 10px;
+      padding: 10px 14px 12px;
       border-top: 1px solid rgba(255, 255, 255, 0.1);
-      margin: 6px -12px -10px -12px;
+      margin: 8px -14px -12px -14px;
     }
 
     .support-link {
@@ -224,7 +224,7 @@
     <span id="statusText" class="status-text">Checking...</span>
   </div>
 
-  <div id="permissionStatus" class="info" style="display: block; margin-bottom: 6px; padding: 6px 10px;">
+  <div id="permissionStatus" class="info" style="display: block;">
     <div>
       <strong>Private Windows:</strong>
       <span id="permissionState" style="color: #888;">Checking...</span>
@@ -261,7 +261,7 @@
           <span>Compress screencaps</span>
         </label>
       </div>
-      <div style="padding: 0 10px 4px 36px; font-size: 10px; color: #666;">
+      <div style="padding: 0 11px 6px 38px; font-size: 11px; color: #666;">
         Reduce file size (default: on)
       </div>
     </div>
@@ -291,15 +291,15 @@
   <div class="section">
     <div class="section-title">Auto-Loop Detection</div>
     <div class="settings-group">
-      <label class="checkbox-label" style="display: flex; align-items: center; gap: 6px; padding: 5px 10px; cursor: pointer;">
-        <input type="checkbox" id="enableAutoDetect" checked style="width: 14px; height: 14px;">
+      <label class="checkbox-label" style="display: flex; align-items: center; gap: 6px; padding: 6px 11px; cursor: pointer;">
+        <input type="checkbox" id="enableAutoDetect" checked style="width: 15px; height: 15px;">
         <span>Auto-detect iterative tasks</span>
       </label>
-      <label class="checkbox-label" style="display: flex; align-items: center; gap: 6px; padding: 5px 10px; cursor: pointer;">
-        <input type="checkbox" id="enableAutoStart" style="width: 14px; height: 14px;">
+      <label class="checkbox-label" style="display: flex; align-items: center; gap: 6px; padding: 6px 11px; cursor: pointer;">
+        <input type="checkbox" id="enableAutoStart" style="width: 15px; height: 15px;">
         <span>Auto-start loops (no confirmation)</span>
       </label>
-      <label style="display: flex; align-items: center; gap: 6px; padding: 5px 10px;">
+      <label style="display: flex; align-items: center; gap: 6px; padding: 6px 11px;">
         <span style="flex-shrink: 0;">Default iterations:</span>
         <input type="number" id="defaultMaxIterations" value="15" min="5" max="50"
                style="width: 60px; padding: 4px 8px; border: 1px solid #444; border-radius: 4px; background: #2a2a2a; color: #fff;">
