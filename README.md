@@ -2,7 +2,7 @@
 
 **Firefox browser automation for Claude Code.** A privacy-friendly alternative to Chrome-based solutions.
 
-[![Version](https://img.shields.io/badge/version-0.4.9-blue.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.5.2-blue.svg)](./CHANGELOG.md)
 
 Give Claude the ability to browse the web, fill out forms, take screenshots, and extract data — all through Firefox.
 
@@ -61,6 +61,7 @@ cd claudezilla/mcp && npm install
 | **Interact** | Click buttons, fill forms, press keys, scroll |
 | **Screenshot** | Capture pages (JPEG, configurable quality) |
 | **Wait** | Handle SPAs and dynamic content |
+| **Focus Loops** | Persistent iterative tasks until completion |
 
 ## Support Development
 
@@ -92,6 +93,11 @@ Claude, get all the links on this page
 - `firefox_press_key` — Keyboard events (Enter, Tab, shortcuts)
 - `firefox_screenshot` — Capture viewport
 - `firefox_get_tabs` / `firefox_close_tab` — Manage tabs
+
+### Focus Loops
+- `firefox_start_loop` — Start persistent iteration with prompt and max iterations
+- `firefox_stop_loop` — Stop active loop manually
+- `firefox_loop_status` — Check iteration count and state
 
 ### Page Analysis
 - `firefox_get_page_state` — Structured data (headings, links, buttons)
