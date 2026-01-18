@@ -1,7 +1,42 @@
 # CLZ002 Changelog
 
 **Project:** Claudezilla
-**Current Version:** 0.5.0
+**Current Version:** 0.5.3
+
+## v0.5.3 (2026-01-18)
+
+**Reconnection resilience + diagnostics.**
+
+### Features
+
+- **Auto-reconnect** - Extension automatically reconnects when host disconnects
+  - Exponential backoff (1s → 30s) with max 10 attempts
+  - Manual retry resets backoff state
+  - Connection status available via `getConnectionStatus()` action
+- **`firefox_diagnose` tool** - Comprehensive connection health check
+  - Checks socket file existence and permissions
+  - Validates auth token file
+  - Tests connection ping with latency measurement
+  - Reports extension version and tab pool status
+  - Provides actionable recommendations for issues
+- **MCP retry logic** - Automatic retry with backoff for transient failures
+  - 3 retries with 100ms → 1000ms exponential backoff
+  - Retries on ENOENT, ECONNREFUSED, ECONNRESET errors
+
+### Improvements
+
+- **Better error messages** - Connection errors now include diagnostic info
+  - Shows socket/auth token state: `[Socket: exists/missing, Auth: exists/missing]`
+  - Specific fix instructions for each error type
+  - Clear guidance on how to reconnect
+
+### Updated
+
+- **MCP SDK** - Updated from 0.5.0 to 1.25.2 for Claude Code 2.1.x compatibility
+  - Supports tool search auto-mode
+  - Supports `list_changed` notifications
+
+---
 
 ## v0.5.0 (2026-01-06)
 

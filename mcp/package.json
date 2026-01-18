@@ -1,6 +1,6 @@
 {
   "name": "claudezilla-mcp",
-  "version": "0.3.0",
+  "version": "0.5.3",
   "description": "MCP server for Claudezilla Firefox browser automation",
   "type": "module",
   "main": "server.js",

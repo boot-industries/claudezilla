@@ -597,7 +597,7 @@ async function handleCliCommand(message) {
 
       case 'version':
         result = {
-          extension: '0.5.0',
+          extension: '0.5.3',
           browser: navigator.userAgent,
           features: ['devtools', 'network', 'console', 'evaluate', 'focusglow', 'tabgroups', 'security-hardened', 'orphan-cleanup', 'focus-loop', 'auto-retry', 'task-detection'],
         };

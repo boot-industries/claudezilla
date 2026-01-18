@@ -2,7 +2,7 @@
 
 **Firefox browser automation for Claude Code.** A privacy-friendly alternative to Chrome-based solutions.
 
-[![Version](https://img.shields.io/badge/version-0.5.2-blue.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.5.3-blue.svg)](./CHANGELOG.md)
 
 Give Claude the ability to browse the web, fill out forms, take screenshots, and extract data — all through Firefox.
 
@@ -105,6 +105,9 @@ Claude, get all the links on this page
 - `firefox_get_element` — Element attributes and styles
 - `firefox_wait_for` — Wait for element to appear
 - `firefox_scroll` — Scroll to element or position
+
+### Diagnostics
+- `firefox_diagnose` — Check connection health, socket status, and troubleshoot issues
 
 ## Requirements
 
