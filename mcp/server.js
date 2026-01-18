@@ -17,7 +17,7 @@ import { connect } from 'net';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { randomBytes } from 'crypto';
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync, existsSync, statSync } from 'fs';
 
 // SECURITY: Use validated temp directory (same logic as host)
 const SAFE_TMPDIR = (() => {
@@ -102,6 +102,141 @@ async function cleanupOrphanedAgents() {
 
 // Start periodic orphaned agent cleanup
 setInterval(cleanupOrphanedAgents, CLEANUP_INTERVAL_MS);
+
+/**
+ * Run diagnostics on Claudezilla connection
+ * Checks socket, auth token, permissions, and connectivity
+ */
+async function runDiagnostics() {
+  const diagnostics = {
+    timestamp: new Date().toISOString(),
+    socketPath: SOCKET_PATH,
+    authTokenPath: AUTH_TOKEN_FILE,
+    checks: [],
+    summary: 'unknown',
+    recommendation: null,
+  };
+
+  // Check 1: Socket file exists
+  const socketExists = existsSync(SOCKET_PATH);
+  let socketPermissions = null;
+  if (socketExists) {
+    try {
+      const stats = statSync(SOCKET_PATH);
+      socketPermissions = (stats.mode & 0o777).toString(8);
+    } catch (e) {
+      socketPermissions = 'error: ' + e.message;
+    }
+  }
+  diagnostics.checks.push({
+    name: 'socket_file',
+    status: socketExists ? 'ok' : 'missing',
+    path: SOCKET_PATH,
+    permissions: socketPermissions,
+  });
+
+  // Check 2: Auth token file exists
+  const authTokenExists = existsSync(AUTH_TOKEN_FILE);
+  let authTokenLength = null;
+  if (authTokenExists) {
+    try {
+      const token = readFileSync(AUTH_TOKEN_FILE, 'utf8').trim();
+      authTokenLength = token.length;
+    } catch (e) {
+      authTokenLength = 'error: ' + e.message;
+    }
+  }
+  diagnostics.checks.push({
+    name: 'auth_token',
+    status: authTokenExists ? 'ok' : 'missing',
+    path: AUTH_TOKEN_FILE,
+    tokenLength: authTokenLength,
+  });
+
+  // Check 3: Connection test (only if socket and auth exist)
+  if (socketExists && authTokenExists) {
+    try {
+      const pingStart = Date.now();
+      const pingResult = await sendCommandOnce('ping', {});
+      const pingLatency = Date.now() - pingStart;
+      diagnostics.checks.push({
+        name: 'connection_ping',
+        status: pingResult.success ? 'ok' : 'failed',
+        latencyMs: pingLatency,
+        result: pingResult.result,
+      });
+    } catch (e) {
+      diagnostics.checks.push({
+        name: 'connection_ping',
+        status: 'failed',
+        error: e.message,
+      });
+    }
+  } else {
+    diagnostics.checks.push({
+      name: 'connection_ping',
+      status: 'skipped',
+      reason: !socketExists ? 'socket missing' : 'auth token missing',
+    });
+  }
+
+  // Check 4: Extension version (only if connected)
+  const pingCheck = diagnostics.checks.find(c => c.name === 'connection_ping');
+  if (pingCheck?.status === 'ok') {
+    try {
+      const versionResult = await sendCommandOnce('version', {});
+      diagnostics.checks.push({
+        name: 'extension_version',
+        status: 'ok',
+        version: versionResult.result,
+      });
+    } catch (e) {
+      diagnostics.checks.push({
+        name: 'extension_version',
+        status: 'failed',
+        error: e.message,
+      });
+    }
+
+    // Check 5: Tab pool status
+    try {
+      const tabsResult = await sendCommandOnce('getTabs', {});
+      diagnostics.checks.push({
+        name: 'tab_pool',
+        status: 'ok',
+        tabCount: tabsResult.result?.tabCount || 0,
+        maxTabs: tabsResult.result?.maxTabs || 10,
+      });
+    } catch (e) {
+      diagnostics.checks.push({
+        name: 'tab_pool',
+        status: 'failed',
+        error: e.message,
+      });
+    }
+  }
+
+  // Generate summary and recommendation
+  const failedChecks = diagnostics.checks.filter(c => c.status === 'failed' || c.status === 'missing');
+  if (failedChecks.length === 0) {
+    diagnostics.summary = 'healthy';
+    diagnostics.recommendation = 'Claudezilla is connected and working properly.';
+  } else if (!socketExists && !authTokenExists) {
+    diagnostics.summary = 'disconnected';
+    diagnostics.recommendation = 'Claudezilla host not running. Click the Claudezilla extension icon in Firefox to reconnect.';
+  } else if (!socketExists) {
+    diagnostics.summary = 'partial';
+    diagnostics.recommendation = 'Socket missing but auth token exists. The host may have crashed. Reload the Claudezilla extension.';
+  } else if (!authTokenExists) {
+    diagnostics.summary = 'partial';
+    diagnostics.recommendation = 'Auth token missing. The host may not have started correctly. Reload the Claudezilla extension.';
+  } else {
+    diagnostics.summary = 'error';
+    diagnostics.recommendation = `Connection issues detected: ${failedChecks.map(c => c.name).join(', ')}. Try reloading the Claudezilla extension.`;
+  }
+
+  return diagnostics;
+}
 
 // Retry configuration for transient connection failures
 const RETRY_CONFIG = {
@@ -809,6 +944,16 @@ const TOOLS = [
       properties: {},
     },
   },
+
+  // ===== DIAGNOSTICS =====
+  {
+    name: 'firefox_diagnose',
+    description: 'Diagnose Claudezilla connection health. Checks socket file, auth token, connection status, and extension version. Use when troubleshooting connection issues.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
 ];
 
 // Map MCP tool names to Claudezilla commands
@@ -877,6 +1022,24 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 // Handle tool calls
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
+
+  // Special case: firefox_diagnose runs locally, not through sendCommand
+  if (name === 'firefox_diagnose') {
+    try {
+      const diagnostics = await runDiagnostics();
+      return {
+        content: [{
+          type: 'text',
+          text: JSON.stringify(diagnostics, null, 2),
+        }],
+      };
+    } catch (error) {
+      return {
+        content: [{ type: 'text', text: `Diagnostic error: ${error.message}` }],
+        isError: true,
+      };
+    }
+  }
 
   const command = TOOL_TO_COMMAND[name];
   if (!command) {

@@ -22,6 +22,17 @@ let port = null;
 let messageId = 0;
 const pendingRequests = new Map();
 
+// Auto-reconnect configuration
+const RECONNECT_CONFIG = {
+  maxAttempts: 10,
+  initialDelayMs: 1000,
+  maxDelayMs: 30000,
+  backoffMultiplier: 1.5,
+};
+let reconnectAttempt = 0;
+let reconnectTimer = null;
+let lastDisconnectReason = null;
+
 // Session tracking - single window, max 10 tabs
 const MAX_TABS = 10;
 let claudezillaWindow = null; // { windowId, tabs: [{tabId, ownerId}, ...], createdAt, groupId }
@@ -372,19 +383,81 @@ function connect() {
       const error = p?.error?.message || 'Unknown disconnect reason';
       console.log('[claudezilla] Disconnected from host:', error);
       port = null;
+      lastDisconnectReason = error;
 
       // Reject all pending requests
       for (const [id, { reject }] of pendingRequests) {
         reject(new Error('Native host disconnected: ' + error));
       }
       pendingRequests.clear();
+
+      // Start auto-reconnect timer (don't reconnect if this was initial connect failure)
+      if (reconnectAttempt === 0) {
+        scheduleReconnect();
+      }
     });
 
+    // Connection succeeded - reset reconnect state
+    reconnectAttempt = 0;
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
+    lastDisconnectReason = null;
     console.log('[claudezilla] Connected to native host');
   } catch (error) {
     console.error('[claudezilla] Failed to connect:', error);
     port = null;
+    // Schedule reconnect on connection failure too
+    scheduleReconnect();
   }
+}
+
+/**
+ * Schedule a reconnection attempt with exponential backoff
+ */
+function scheduleReconnect() {
+  // Don't schedule if already connected or timer already running
+  if (port || reconnectTimer) {
+    return;
+  }
+
+  // Check if we've exceeded max attempts
+  if (reconnectAttempt >= RECONNECT_CONFIG.maxAttempts) {
+    console.log(`[claudezilla] Max reconnect attempts (${RECONNECT_CONFIG.maxAttempts}) reached. Click toolbar icon to retry.`);
+    reconnectAttempt = 0; // Reset for manual retry
+    return;
+  }
+
+  // Calculate delay with exponential backoff
+  const delay = Math.min(
+    RECONNECT_CONFIG.initialDelayMs * Math.pow(RECONNECT_CONFIG.backoffMultiplier, reconnectAttempt),
+    RECONNECT_CONFIG.maxDelayMs
+  );
+
+  reconnectAttempt++;
+  console.log(`[claudezilla] Scheduling reconnect attempt ${reconnectAttempt}/${RECONNECT_CONFIG.maxAttempts} in ${Math.round(delay / 1000)}s`);
+
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null;
+    if (!port) {
+      console.log(`[claudezilla] Attempting reconnect ${reconnectAttempt}/${RECONNECT_CONFIG.maxAttempts}...`);
+      connect();
+    }
+  }, delay);
+}
+
+/**
+ * Get connection status for popup/diagnostics
+ */
+function getConnectionStatus() {
+  return {
+    connected: !!port,
+    reconnectAttempt,
+    maxReconnectAttempts: RECONNECT_CONFIG.maxAttempts,
+    lastDisconnectReason,
+    reconnectScheduled: !!reconnectTimer,
+  };
 }
 
 /**
@@ -1471,6 +1544,10 @@ browser.runtime.onMessage.addListener((message, sender) => {
           result = await sendToHost('version');
           break;
 
+        case 'getConnectionStatus':
+          result = getConnectionStatus();
+          break;
+
         // Loop/concentration commands - forward to native host
         case 'getLoopState':
           result = await sendToHost('getLoopState');
@@ -1603,6 +1680,12 @@ connect();
 // Reconnect on browser action click if disconnected
 browser.browserAction.onClicked.addListener(() => {
   if (!port) {
+    // Reset reconnect state for fresh manual attempt
+    reconnectAttempt = 0;
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
     connect();
   }
 });
