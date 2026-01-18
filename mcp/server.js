@@ -103,16 +103,70 @@ async function cleanupOrphanedAgents() {
 // Start periodic orphaned agent cleanup
 setInterval(cleanupOrphanedAgents, CLEANUP_INTERVAL_MS);
 
+// Retry configuration for transient connection failures
+const RETRY_CONFIG = {
+  maxRetries: 3,
+  initialDelayMs: 100,
+  maxDelayMs: 1000,
+  // Only retry these error codes (transient failures)
+  retryableCodes: ['ENOENT', 'ECONNREFUSED', 'ECONNRESET'],
+};
+
 /**
- * Send command to Claudezilla via Unix socket
+ * Sleep for specified milliseconds
+ */
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Build actionable error message based on error code
+ */
+function buildErrorMessage(errCode, socketPath, authTokenFile) {
+  const socketExists = existsSync(socketPath);
+  const authTokenExists = existsSync(authTokenFile);
+
+  // Diagnostic info for troubleshooting
+  const diagnostics = `[Socket: ${socketExists ? 'exists' : 'missing'}, Auth: ${authTokenExists ? 'exists' : 'missing'}]`;
+
+  switch (errCode) {
+    case 'NO_AUTH_TOKEN':
+      return `Claudezilla extension not connected. ${diagnostics}\n\n` +
+        `To fix: Click the Claudezilla extension icon in Firefox to reconnect.\n` +
+        `If not visible: Firefox menu → Add-ons → Extensions → Enable Claudezilla`;
+
+    case 'ENOENT':
+      return `Claudezilla socket not found. ${diagnostics}\n\n` +
+        `To fix: Click the Claudezilla extension icon in Firefox to reconnect.\n` +
+        `If Firefox isn't running: Open Firefox first, then click the extension icon.`;
+
+    case 'ECONNREFUSED':
+      return `Claudezilla connection refused. ${diagnostics}\n\n` +
+        `The socket exists but the host isn't accepting connections.\n` +
+        `To fix: Reload the Claudezilla extension (about:addons → Claudezilla → Reload)`;
+
+    case 'ECONNRESET':
+      return `Claudezilla connection reset. ${diagnostics}\n\n` +
+        `The host disconnected unexpectedly.\n` +
+        `To fix: Click the Claudezilla extension icon in Firefox to reconnect.`;
+
+    default:
+      return `Claudezilla error: ${errCode}. ${diagnostics}`;
+  }
+}
+
+/**
+ * Send command to Claudezilla via Unix socket (single attempt)
  * SECURITY: Includes auth token read from host-created file
  */
-function sendCommand(command, params = {}) {
+function sendCommandOnce(command, params = {}) {
   return new Promise((resolve, reject) => {
     // SECURITY: Load auth token on each command (handles host restarts)
     const authToken = loadAuthToken();
     if (!authToken) {
-      reject(new Error('Auth token not found. Claudezilla host may not be running.'));
+      const err = new Error(buildErrorMessage('NO_AUTH_TOKEN', SOCKET_PATH, AUTH_TOKEN_FILE));
+      err.code = 'NO_AUTH_TOKEN';
+      reject(err);
       return;
     }
 
@@ -145,13 +199,10 @@ function sendCommand(command, params = {}) {
 
     socket.on('error', (err) => {
       if (resolved) return;
-      if (err.code === 'ENOENT') {
-        reject(new Error('Claudezilla not running. Open Firefox with the Claudezilla extension loaded.'));
-      } else if (err.code === 'ECONNREFUSED') {
-        reject(new Error('Connection refused. Reload the Claudezilla extension in Firefox.'));
-      } else {
-        reject(err);
-      }
+      // Preserve the error code for retry logic
+      const wrappedErr = new Error(buildErrorMessage(err.code, SOCKET_PATH, AUTH_TOKEN_FILE));
+      wrappedErr.code = err.code;
+      reject(wrappedErr);
     });
 
     socket.on('close', () => {
@@ -176,6 +227,39 @@ function sendCommand(command, params = {}) {
 
     socket.setTimeout(30000);
   });
+}
+
+/**
+ * Send command to Claudezilla with automatic retry for transient failures
+ * Retries with exponential backoff for ENOENT, ECONNREFUSED, ECONNRESET
+ */
+async function sendCommand(command, params = {}) {
+  let lastError;
+  let delay = RETRY_CONFIG.initialDelayMs;
+
+  for (let attempt = 0; attempt <= RETRY_CONFIG.maxRetries; attempt++) {
+    try {
+      return await sendCommandOnce(command, params);
+    } catch (err) {
+      lastError = err;
+
+      // Only retry for transient connection errors
+      const isRetryable = RETRY_CONFIG.retryableCodes.includes(err.code);
+      const hasRetriesLeft = attempt < RETRY_CONFIG.maxRetries;
+
+      if (isRetryable && hasRetriesLeft) {
+        console.error(`[claudezilla] Connection failed (${err.code}), retrying in ${delay}ms... (attempt ${attempt + 1}/${RETRY_CONFIG.maxRetries})`);
+        await sleep(delay);
+        delay = Math.min(delay * 2, RETRY_CONFIG.maxDelayMs);
+        continue;
+      }
+
+      // No more retries or non-retryable error
+      break;
+    }
+  }
+
+  throw lastError;
 }
 
 /**
