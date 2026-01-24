@@ -1,7 +1,41 @@
 # CLZ002 Changelog
 
 **Project:** Claudezilla
-**Current Version:** 0.5.3
+**Current Version:** 0.5.4
+
+## v0.5.4 (2026-01-24)
+
+**Security hardening + performance optimization.**
+
+### Security
+
+- **Expression validation** - `firefox_evaluate` now blocks dangerous patterns
+  - Blocked: `fetch()`, `XMLHttpRequest`, `eval()`, `Function()`, `setTimeout/setInterval`
+  - Blocked: `document.cookie`, `localStorage`, `sessionStorage`, dynamic `import()`
+  - Expression length limit: 10,000 characters (prevents DoS)
+- **Loop prompt sanitization** - `promptPreview` field truncates to 100 chars
+  - Full prompt still stored internally for plugin hook
+  - Logs and API responses only show truncated preview
+- **Agent ID truncation** - Privacy-enhanced logging
+  - `truncateAgentId()` helper shows first 12 chars + `...`
+  - Applied to all orphan cleanup logs and error messages
+
+### Performance
+
+- **Selector alternative search optimization** - `findSelectorAlternatives()`
+  - MAX_SEARCH limit: 100 elements per category (was unbounded)
+  - Early exit when MAX_ALTERNATIVES (5) reached
+  - For-of loops with break instead of forEach (allows early termination)
+- **Screenshot mutex timeout reduced** - 3000ms (was 5000ms)
+  - Agents get MUTEX_BUSY feedback faster
+  - Reduces wait time in multi-agent scenarios
+
+### Updated
+
+- Version bumped to 0.5.4 across all components
+- Features array includes `expression-validation` flag
+
+---
 
 ## v0.5.3 (2026-01-18)
 

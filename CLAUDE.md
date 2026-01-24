@@ -1,15 +1,18 @@
 # Claudezilla - Claude Code Firefox Extension
 
-**Version:** 0.5.0
+**Version:** 0.5.4
 
 ## Overview
 
 Firefox extension providing browser automation for Claude Code CLI. A Google-free alternative to the official Chrome extension.
 
-**Key Features (v0.5.0):**
-- **NEW: Focus loops** - Renamed from "concentration loops" with `/focus` slash command
-- **NEW: Auto-retry system** - Smart element waiting with enhanced error messages
-- **NEW: Task detection** - Automatic detection of iterative tasks for focus loop suggestions
+**Key Features (v0.5.4):**
+- **NEW: Expression validation** - Blocked dangerous patterns in `firefox_evaluate` (fetch, eval, cookies)
+- **NEW: Agent ID truncation** - Privacy-enhanced logging (12-char truncation in all outputs)
+- **NEW: Selector search optimization** - Early exit and 100-element limit per category
+- Focus loops - `/focus` slash command for iterative development
+- Auto-retry system - Smart element waiting with enhanced error messages
+- Task detection - Automatic detection of iterative tasks for focus loop suggestions
 - Orphaned tab cleanup - Automatic cleanup of tabs from disconnected agents (2-minute timeout)
 - Fair multi-agent coordination - POOL_FULL and MUTEX_BUSY errors with clear feedback
 - Focus loops - Persistent iterative development like Ralph Wiggum
