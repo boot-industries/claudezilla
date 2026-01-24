@@ -52,6 +52,17 @@ function loadAuthToken() {
 // Previous: 4 bytes (32 bits) was too weak and predictable
 const AGENT_ID = `agent_${randomBytes(16).toString('hex')}_${process.pid}`;
 
+/**
+ * SECURITY: Truncate agent ID for privacy in logs and error messages
+ * Shows enough for debugging without exposing full 128-bit ID
+ * @param {string} id - Full agent ID
+ * @returns {string} Truncated ID (first 12 chars + ...)
+ */
+function truncateAgentId(id) {
+  if (!id || id === 'unknown') return 'unknown';
+  return id.length > 15 ? id.slice(0, 12) + '...' : id;
+}
+
 // Agent heartbeat tracking for orphaned tab cleanup
 const agentHeartbeats = new Map(); // agentId -> lastSeenTimestamp
 const AGENT_TIMEOUT_MS = 120000; // 2 minutes - agent is considered dead after this
@@ -83,19 +94,19 @@ async function cleanupOrphanedAgents() {
   // Cleanup tabs for each orphaned agent
   for (const agentId of orphanedAgents) {
     try {
-      console.error(`[claudezilla] Cleaning up orphaned agent: ${agentId} (last seen ${Math.round((now - agentHeartbeats.get(agentId)) / 1000)}s ago)`);
+      console.error(`[claudezilla] Cleaning up orphaned agent: ${truncateAgentId(agentId)} (last seen ${Math.round((now - agentHeartbeats.get(agentId)) / 1000)}s ago)`);
 
       // Send cleanup command to extension
       const response = await sendCommand('cleanupOrphanedTabs', { agentId });
 
       if (response.success && response.result?.tabsClosed > 0) {
-        console.error(`[claudezilla] Closed ${response.result.tabsClosed} orphaned tab(s) from ${agentId}`);
+        console.error(`[claudezilla] Closed ${response.result.tabsClosed} orphaned tab(s) from ${truncateAgentId(agentId)}`);
       }
 
       // Remove from heartbeat tracking
       agentHeartbeats.delete(agentId);
     } catch (error) {
-      console.error(`[claudezilla] Error cleaning up orphaned agent ${agentId}:`, error.message);
+      console.error(`[claudezilla] Error cleaning up orphaned agent ${truncateAgentId(agentId)}:`, error.message);
     }
   }
 }
@@ -996,7 +1007,7 @@ const TOOL_TO_COMMAND = {
 const server = new Server(
   {
     name: 'claudezilla',
-    version: '0.5.3',
+    version: '0.5.4',
   },
   {
     capabilities: {

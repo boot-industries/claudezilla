@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claudezilla - Architecture Gallery</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'dark',
+            themeVariables: {
+                darkMode: true,
+                background: '#1a1a1a',
+                primaryColor: '#FF6B00',
+                primaryTextColor: '#e0e0e0',
+                primaryBorderColor: '#FF9500',
+                lineColor: '#4CAF50',
+                secondaryColor: '#2196F3',
+                tertiaryColor: '#9C27B0'
+            },
+            flowchart: { curve: 'basis' },
+            sequence: { mirrorActors: false }
+        });
+    </script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #1a1a1a;
+            color: #e0e0e0;
+            padding: 1rem 2rem;
+            line-height: 1.5;
+            font-size: 0.875rem;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+            color: #fff;
+        }
+
+        h1 .emoji {
+            font-size: 1.25rem;
+        }
+
+        h2 {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #FF9500;
+            margin: 1.5rem 0 0.75rem 0;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #333;
+        }
+
+        .subtitle {
+            color: #888;
+            margin-bottom: 0.75rem;
+            font-size: 0.75rem;
+        }
+
+        .last-updated {
+            color: #666;
+            font-size: 0.625rem;
+            margin-bottom: 1rem;
+        }
+
+        .info {
+            background: #2a2a1a;
+            border-left: 3px solid #FF9500;
+            padding: 0.75rem;
+            margin-bottom: 1rem;
+            border-radius: 3px;
+            font-size: 0.75rem;
+        }
+
+        .info-title {
+            color: #FF9500;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .stat-card {
+            background: #242424;
+            padding: 0.75rem;
+            border-radius: 6px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .stat-label {
+            font-size: 0.625rem;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .diagram-grid {
+            display: grid;
+            gap: 1rem;
+        }
+
+        .diagram-card {
+            background: #242424;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        .diagram-header {
+            background: #2a2a2a;
+            padding: 0.75rem 1rem;
+            cursor: pointer;
+            user-select: none;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            border-bottom: 1px solid #333;
+        }
+
+        .diagram-header:hover {
+            background: #333;
+        }
+
+        .diagram-header::before {
+            content: '\25BC';
+            font-size: 0.625rem;
+            transition: transform 0.2s;
+            color: #888;
+        }
+
+        .diagram-header.collapsed::before {
+            transform: rotate(-90deg);
+        }
+
+        .diagram-title {
+            font-weight: 600;
+            color: #fff;
+            font-size: 0.875rem;
+        }
+
+        .diagram-type {
+            font-size: 0.625rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 3px;
+            font-weight: 600;
+            margin-left: auto;
+        }
+
+        .diagram-type.flowchart { background: #3a2a1a; color: #FF9500; }
+        .diagram-type.sequence { background: #2a3a4a; color: #4CAF50; }
+        .diagram-type.class { background: #3a3a2a; color: #FFB74D; }
+        .diagram-type.er { background: #3a2a3a; color: #CE93D8; }
+
+        .diagram-description {
+            font-size: 0.7rem;
+            color: #888;
+            margin-left: 0.5rem;
+        }
+
+        .diagram-content {
+            padding: 1rem;
+            overflow-x: auto;
+            background: #1e1e1e;
+        }
+
+        .diagram-content.hidden {
+            display: none;
+        }
+
+        .diagram-content pre {
+            background: transparent;
+            margin: 0;
+        }
+
+        .mermaid {
+            display: flex;
+            justify-content: center;
+        }
+
+        .mermaid svg {
+            max-width: 100%;
+            height: auto;
+        }
+
+        footer {
+            margin-top: 1.5rem;
+            padding-top: 1rem;
+            border-top: 1px solid #333;
+            color: #666;
+            font-size: 0.625rem;
+        }
+
+        footer a {
+            color: #FF9500;
+        }
+
+        .quick-nav {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .quick-nav a {
+            background: #2a2a2a;
+            color: #FF9500;
+            padding: 0.4rem 0.75rem;
+            border-radius: 4px;
+            text-decoration: none;
+            font-size: 0.7rem;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+
+        .quick-nav a:hover {
+            background: #3a3a3a;
+        }
+
+        .quick-nav a.section-label {
+            background: transparent;
+            color: #666;
+            padding-left: 0;
+            cursor: default;
+        }
+
+        .color-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+            padding: 0.75rem;
+            background: #242424;
+            border-radius: 6px;
+        }
+
+        .color-item {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            font-size: 0.65rem;
+        }
+
+        .color-swatch {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+        }
+
+        kbd {
+            background: #333;
+            padding: 0.1rem 0.4rem;
+            border-radius: 3px;
+            font-size: 0.65rem;
+            border: 1px solid #444;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 0.5rem 1rem;
+            }
+            .diagram-content {
+                padding: 0.5rem;
+            }
+            .stats {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1><span class="emoji">🦎</span> Claudezilla - Architecture Gallery</h1>
+        <p class="subtitle">Firefox Browser Automation for Claude Code CLI - A Google-free Alternative</p>
+        <p class="last-updated">Last updated: 2026-01-18 | Version: 0.5.3</p>
+
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-value">7</div>
+                <div class="stat-label">Diagrams</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">30+</div>
+                <div class="stat-label">MCP Tools</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">10</div>
+                <div class="stat-label">Tab Pool</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">128</div>
+                <div class="stat-label">Agent ID Bits</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">2min</div>
+                <div class="stat-label">Orphan Timeout</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">4</div>
+                <div class="stat-label">Layers</div>
+            </div>
+        </div>
+
+        <div class="info">
+            <div class="info-title">Interactive Diagram Collection</div>
+            7 architectural diagrams covering system architecture, component relationships, data flow, repository structure, entry points, database schema, and deployment infrastructure.
+            Click headers to expand/collapse. Diagrams render via Mermaid.js. Press <kbd>a</kbd> to expand all, <kbd>Esc</kbd> to collapse all.
+        </div>
+
+        <div class="color-legend">
+            <div class="color-item">
+                <span class="color-swatch" style="background: #bbdefb;"></span>
+                <span>MCP Layer</span>
+            </div>
+            <div class="color-item">
+                <span class="color-swatch" style="background: #c8e6c9;"></span>
+                <span>Extension</span>
+            </div>
+            <div class="color-item">
+                <span class="color-swatch" style="background: #fff9c4;"></span>
+                <span>Native Host</span>
+            </div>
+            <div class="color-item">
+                <span class="color-swatch" style="background: #f8bbd0;"></span>
+                <span>Security</span>
+            </div>
+            <div class="color-item">
+                <span class="color-swatch" style="background: #e1bee7;"></span>
+                <span>Plugin</span>
+            </div>
+            <div class="color-item">
+                <span class="color-swatch" style="background: #ffe0b2;"></span>
+                <span>Cloud Services</span>
+            </div>
+        </div>
+
+        <nav class="quick-nav">
+            <span class="section-label">System:</span>
+            <a href="#architecture">Architecture</a>
+            <a href="#components">Components</a>
+            <a href="#dataflow">Data Flow</a>
+            <span class="section-label">Structure:</span>
+            <a href="#repo">Repository</a>
+            <a href="#entry">Entry Points</a>
+            <a href="#database">Database</a>
+            <a href="#deployment">Deployment</a>
+        </nav>
+
+        <!-- ================================================================== -->
+        <!-- SYSTEM OVERVIEW SECTION -->
+        <!-- ================================================================== -->
+
+        <h2>System Overview</h2>
+
+        <div class="diagram-grid">
+            <!-- Architecture Overview -->
+            <div class="diagram-card" id="architecture">
+                <div class="diagram-header" onclick="toggleDiagram(this)">
+                    <span class="diagram-title">System Architecture</span>
+                    <span class="diagram-description">4-layer architecture: Claude CLI → MCP → Host → Extension</span>
+                    <span class="diagram-type flowchart">FLOWCHART</span>
+                </div>
+                <div class="diagram-content">
+                    <pre class="mermaid">
+flowchart TB
+    subgraph CLAUDE["Claude Code CLI"]
+        SDK["Anthropic SDK"]
+        MCP_CLIENT["MCP Client"]
+    end
+
+    subgraph MCP_LAYER["MCP Server Layer"]
+        MCP_SERVER["MCP Server<br/>(mcp/server.js)"]
+        TOOLS["30+ Browser Tools"]
+        HEARTBEAT["Agent Heartbeat<br/>Tracking"]
+        ORPHAN["Orphan Cleanup<br/>(2min timeout)"]
+    end
+
+    subgraph HOST_LAYER["Native Host Layer"]
+        SOCKET["Unix Socket Server<br/>(claudezilla.sock)"]
+        AUTH["Auth Token<br/>(32-byte random)"]
+        LOOP_STATE["Loop State<br/>Manager"]
+        PROTO["Protocol Handler<br/>(4-byte header)"]
+    end
+
+    subgraph EXTENSION_LAYER["Firefox Extension Layer"]
+        BG["Background Script<br/>(Persistent)"]
+        SESSION["Session Manager<br/>(10-tab pool)"]
+        MUTEX["Screenshot Mutex<br/>(Serialized)"]
+        NETWORK["Network Monitor<br/>(webRequest API)"]
+    end
+
+    subgraph CONTENT_LAYER["Content Scripts"]
+        DOM["DOM Manipulation"]
+        VISUALS["Claudezilla Visuals<br/>(Watermark, Glow)"]
+        CONSOLE["Console Capture"]
+        A11Y["Accessibility Tree"]
+    end
+
+    subgraph BROWSER["Firefox Browser"]
+        PRIVATE["Private Window"]
+        TABS["Tab Pool<br/>(Max 10)"]
+        PAGES["Web Pages"]
+    end
+
+    subgraph PLUGIN_LAYER["Claude Plugin"]
+        STOP_HOOK["Stop Hook<br/>(focus-loop.sh)"]
+        COMMANDS["Slash Commands<br/>(/focus, /cancel-focus)"]
+    end
+
+    CLAUDE -->|MCP Protocol| MCP_SERVER
+    MCP_SERVER -->|Agent ID| HEARTBEAT
+    HEARTBEAT -->|Timeout| ORPHAN
+    MCP_SERVER -->|Commands + Auth| SOCKET
+    SOCKET -->|Native Messaging| BG
+    BG -->|executeInTab| DOM
+    BG -->|browser.tabs| TABS
+    TABS --> PAGES
+    DOM --> PAGES
+    VISUALS --> PAGES
+
+    STOP_HOOK -.->|Query State| SOCKET
+    COMMANDS -.->|Start/Stop| MCP_SERVER
+
+    AUTH -->|Validates| SOCKET
+    MUTEX -.->|Serializes| BG
+    SESSION -.->|Ownership| TABS
+                    </pre>
+                </div>
+            </div>
+
+            <!-- Component Map -->
+            <div class="diagram-card" id="components">
+                <div class="diagram-header" onclick="toggleDiagram(this)">
+                    <span class="diagram-title">Component Map</span>
+                    <span class="diagram-description">Modules with APIs and tool categories</span>
+                    <span class="diagram-type class">CLASS</span>
+                </div>
+                <div class="diagram-content">
+                    <pre class="mermaid">
+classDiagram
+    class MCPServer {
+        +Server server
+        +String AGENT_ID
+        +Map agentHeartbeats
+        +sendCommand(command, params)
+        +runDiagnostics()
+        +cleanupOrphanedAgents()
+        +updateAgentHeartbeat(agentId)
+    }
+
+    class NativeHost {
+        +Object loopState
+        +Server socketServer
+        +String SOCKET_AUTH_TOKEN
+        +Map pendingCliRequests
+        +handleLoopCommand(command, params)
+        +handleCliCommand(command, params, auth)
+        +handleExtensionMessage(message)
+        +startSocketServer()
+    }
+
+    class BackgroundScript {
+        +Port port
+        +Map pendingRequests
+        +Object claudezillaWindow
+        +Number activeTabId
+        +Promise screenshotLock
+        +Array pendingSlotRequests
+        +connect()
+        +sendToHost(command, params)
+        +handleCliCommand(message)
+        +verifyTabOwnership(tabId, agentId)
+        +waitForPageReady(tabId, options)
+    }
+
+    class ContentScript {
+        +click(params) Object
+        +type(params) Object
+        +getContent(params) Object
+        +getPageState() Object
+        +getAccessibilitySnapshot() Object
+        +evaluate(expression) Object
+        +enableClaudezillaVisuals()
+    }
+
+    class BrowserTools {
+        firefox_create_window()
+        firefox_navigate()
+        firefox_close_tab()
+        firefox_get_tabs()
+    }
+
+    class PageTools {
+        firefox_get_content()
+        firefox_click()
+        firefox_type()
+        firefox_press_key()
+        firefox_scroll()
+    }
+
+    class AnalysisTools {
+        firefox_screenshot()
+        firefox_get_page_state()
+        firefox_get_accessibility_snapshot()
+        firefox_evaluate()
+    }
+
+    class LoopTools {
+        firefox_start_loop()
+        firefox_stop_loop()
+        firefox_loop_status()
+    }
+
+    MCPServer --> NativeHost : Unix socket
+    NativeHost --> BackgroundScript : native messaging
+    BackgroundScript --> ContentScript : executeInTab
+
+    MCPServer ..> BrowserTools
+    MCPServer ..> PageTools
+    MCPServer ..> AnalysisTools
+    MCPServer ..> LoopTools
+                    </pre>
+                </div>
+            </div>
+
+            <!-- Data Flow -->
+            <div class="diagram-card" id="dataflow">
+                <div class="diagram-header" onclick="toggleDiagram(this)">
+                    <span class="diagram-title">Data Flow</span>
+                    <span class="diagram-description">Command flow, screenshot mutex, focus loop lifecycle</span>
+                    <span class="diagram-type sequence">SEQUENCE</span>
+                </div>
+                <div class="diagram-content">
+                    <pre class="mermaid">
+sequenceDiagram
+    participant Claude as Claude Code CLI
+    participant MCP as MCP Server
+    participant Socket as Unix Socket
+    participant Host as Native Host
+    participant BG as Background Script
+    participant CS as Content Script
+    participant Page as Web Page
+
+    Note over Claude,Page: Standard Command Flow (e.g., firefox_click)
+
+    Claude->>+MCP: CallToolRequest {name: "firefox_click", args}
+    MCP->>MCP: Inject agentId, updateHeartbeat()
+    MCP->>+Socket: JSON + auth {command, params, authToken}
+    Socket->>+Host: Validate authToken
+    Host->>Host: Check command whitelist
+    Host->>+BG: Native Messaging: {id, type, command, params}
+    BG->>BG: verifyTabOwnership(tabId, agentId)
+    BG->>+CS: browser.tabs.sendMessage({action: "click"})
+    CS->>+Page: element.click()
+    Page-->>-CS: Event dispatched
+    CS-->>-BG: {success: true, result}
+    BG-->>-Host: port.postMessage response
+    Host-->>-Socket: JSON response
+    Socket-->>-MCP: Parse response
+    MCP-->>-Claude: {content: [{type: "text", text: result}]}
+
+    Note over Claude,Page: Screenshot with Mutex
+
+    Claude->>+MCP: firefox_screenshot({tabId})
+    MCP->>+BG: screenshot command
+    BG->>BG: Check screenshotMutexHolder
+    alt Mutex held by another agent >5s
+        BG-->>MCP: MUTEX_BUSY error
+    else Mutex available
+        BG->>BG: Acquire mutex
+        BG->>BG: Switch to target tab
+        BG->>+CS: waitForPageReady()
+        CS-->>-BG: {timeline, waitMs}
+        BG->>BG: captureVisibleTab()
+        BG->>+CS: resizeImage(dataUrl, scale)
+        CS-->>-BG: Compressed JPEG
+        BG->>BG: Release mutex
+        BG-->>-MCP: {dataUrl, readiness}
+        MCP-->>-Claude: {type: "image", data: base64}
+    end
+                    </pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================================================================== -->
+        <!-- STRUCTURE SECTION -->
+        <!-- ================================================================== -->
+
+        <h2>Repository Structure</h2>
+
+        <div class="diagram-grid">
+            <!-- Repository Structure -->
+            <div class="diagram-card" id="repo">
+                <div class="diagram-header" onclick="toggleDiagram(this)">
+                    <span class="diagram-title">Repository Structure</span>
+                    <span class="diagram-description">Extension + Host + MCP + Plugin + Website + Worker</span>
+                    <span class="diagram-type flowchart">FLOWCHART</span>
+                </div>
+                <div class="diagram-content">
+                    <pre class="mermaid">
+graph TB
+    subgraph ROOT["claudezilla/"]
+        CLAUDE["CLAUDE.md<br/>(Project docs)"]
+        CHANGELOG["CHANGELOG.md"]
+        README["README.md"]
+        SECURITY["SECURITY.md"]
+    end
+
+    subgraph EXTENSION["extension/<br/>Firefox WebExtension"]
+        MANIFEST["manifest.json<br/>(MV2)"]
+        BG["background.js<br/>(Native messaging)"]
+        CONTENT["content.js<br/>(DOM interaction)"]
+        POPUP["popup/<br/>(Status UI)"]
+    end
+
+    subgraph HOST["host/<br/>Native Messaging Host"]
+        HOST_INDEX["index.js<br/>(Main entry)"]
+        HOST_PROTO["protocol.js<br/>(4-byte header)"]
+    end
+
+    subgraph MCP["mcp/<br/>MCP Server"]
+        MCP_SERVER["server.js<br/>(30+ tools)"]
+        MCP_TASK["task-detector.js"]
+    end
+
+    subgraph PLUGIN["plugin/<br/>Claude Code Plugin"]
+        HOOKS["hooks/<br/>(stop-hook.sh)"]
+        COMMANDS["commands/<br/>(/focus, /help)"]
+    end
+
+    subgraph WEBSITE["website/<br/>Marketing Site"]
+        WEB_INDEX["index.html"]
+        WEB_DOCS["docs.html"]
+        WEB_SUPPORT["support.html"]
+    end
+
+    subgraph WORKER["worker/<br/>Cloudflare Worker"]
+        WORKER_TS["src/index.ts<br/>(Stripe API)"]
+    end
+
+    ROOT --> EXTENSION
+    ROOT --> HOST
+    ROOT --> MCP
+    ROOT --> PLUGIN
+    ROOT --> WEBSITE
+    ROOT --> WORKER
+
+    BG -.->|native messaging| HOST_INDEX
+    HOST_INDEX -.->|unix socket| MCP_SERVER
+    PLUGIN -.->|stop hook| HOST_INDEX
+                    </pre>
+                </div>
+            </div>
+
+            <!-- Entry Points -->
+            <div class="diagram-card" id="entry">
+                <div class="diagram-header" onclick="toggleDiagram(this)">
+                    <span class="diagram-title">Entry Points</span>
+                    <span class="diagram-description">All ways to interact: MCP tools, slash commands, popup, APIs</span>
+                    <span class="diagram-type flowchart">FLOWCHART</span>
+                </div>
+                <div class="diagram-content">
+                    <pre class="mermaid">
+flowchart TB
+    subgraph CLAUDE_CODE["Claude Code CLI"]
+        MCP_TOOLS["MCP Tools<br/>(30+ firefox_* tools)"]
+        SLASH_CMDS["Slash Commands<br/>(/focus, /cancel-focus)"]
+    end
+
+    subgraph PLUGIN["Claude Plugin"]
+        STOP_HOOK["Stop Hook<br/>(hooks/stop-hook.sh)"]
+        CMD_FOCUS["focus.md"]
+        CMD_CANCEL["cancel-focus.md"]
+    end
+
+    subgraph EXTENSION["Firefox Extension"]
+        POPUP["Extension Popup<br/>(Click toolbar icon)"]
+        BG_CONNECT["Background Script<br/>(Auto-connects)"]
+    end
+
+    subgraph HOST["Native Host"]
+        SOCKET_SERVER["Unix Socket<br/>(claudezilla.sock)"]
+        NATIVE_MSG["Native Messaging<br/>(stdin/stdout)"]
+    end
+
+    subgraph CLOUD_API["Cloud APIs"]
+        CHECKOUT["POST /create-checkout<br/>(Stripe session)"]
+        NOTIFY["POST /notify<br/>(Email signup)"]
+        HEALTH["GET /health"]
+    end
+
+    subgraph CLI_TOOLS["CLI Tools"]
+        WEB_EXT["web-ext run<br/>(Development)"]
+        INSTALL_SH["install-*.sh<br/>(Setup host)"]
+    end
+
+    MCP_TOOLS -->|Commands| SOCKET_SERVER
+    SLASH_CMDS --> CMD_FOCUS
+    STOP_HOOK -->|Query loop state| SOCKET_SERVER
+    POPUP -->|Test connection| BG_CONNECT
+    BG_CONNECT <-->|Native Messaging| NATIVE_MSG
+    SOCKET_SERVER <--> NATIVE_MSG
+                    </pre>
+                </div>
+            </div>
+
+            <!-- Database Schema -->
+            <div class="diagram-card" id="database">
+                <div class="diagram-header" onclick="toggleDiagram(this)">
+                    <span class="diagram-title">Database Schema</span>
+                    <span class="diagram-description">D1 database + in-memory state structures</span>
+                    <span class="diagram-type er">ER DIAGRAM</span>
+                </div>
+                <div class="diagram-content">
+                    <pre class="mermaid">
+erDiagram
+    EMAIL_SIGNUPS {
+        INTEGER id PK
+        TEXT email UK
+        INTEGER created_at
+    }
+
+    LOOP_STATE {
+        BOOLEAN active
+        TEXT prompt
+        INTEGER iteration
+        INTEGER maxIterations
+        TEXT completionPromise
+        TEXT startedAt
+    }
+
+    CLAUDEZILLA_WINDOW {
+        INTEGER windowId
+        INTEGER createdAt
+        INTEGER groupId
+    }
+
+    TAB_ENTRY {
+        INTEGER tabId PK
+        TEXT ownerId
+    }
+
+    AGENT_HEARTBEAT {
+        TEXT agentId PK
+        INTEGER lastSeen
+    }
+
+    SCREENSHOT_MUTEX {
+        TEXT agentId
+        INTEGER acquiredAt
+        TEXT requestId
+    }
+
+    NETWORK_REQUEST {
+        TEXT requestId PK
+        TEXT url
+        TEXT method
+        TEXT type
+        INTEGER tabId
+        TEXT status
+        INTEGER statusCode
+    }
+
+    CLAUDEZILLA_WINDOW ||--o{ TAB_ENTRY : "contains max 10"
+    TAB_ENTRY }o--|| AGENT_HEARTBEAT : "owned by"
+                    </pre>
+                </div>
+            </div>
+
+            <!-- Deployment Infrastructure -->
+            <div class="diagram-card" id="deployment">
+                <div class="diagram-header" onclick="toggleDiagram(this)">
+                    <span class="diagram-title">Deployment Infrastructure</span>
+                    <span class="diagram-description">User machine + Cloudflare Edge + External services</span>
+                    <span class="diagram-type flowchart">FLOWCHART</span>
+                </div>
+                <div class="diagram-content">
+                    <pre class="mermaid">
+flowchart TB
+    subgraph USER_MACHINE["User's Machine"]
+        subgraph FIREFOX["Firefox Browser"]
+            EXT["Claudezilla Extension<br/>(MV2 WebExtension)"]
+            PRIVATE["Private Window<br/>(10-tab pool)"]
+        end
+
+        subgraph NATIVE["Native Components"]
+            HOST["Native Host<br/>(~/.claudezilla/)"]
+            SOCKET["Unix Socket<br/>($TMPDIR/claudezilla.sock)"]
+        end
+
+        subgraph CLAUDE_CODE["Claude Code CLI"]
+            MCP["MCP Server<br/>(Node.js)"]
+            PLUGIN["Plugin<br/>(~/.claude/plugins/)"]
+        end
+    end
+
+    subgraph CLOUDFLARE["Cloudflare Edge"]
+        PAGES["Cloudflare Pages<br/>(claudezilla.com)"]
+        WORKER["Cloudflare Worker<br/>(Stripe API)"]
+        D1["D1 Database<br/>(email_signups)"]
+    end
+
+    subgraph EXTERNAL["External Services"]
+        STRIPE["Stripe API"]
+        AMO["Firefox Add-ons"]
+        GITHUB["GitHub"]
+    end
+
+    EXT <-->|Native Messaging| HOST
+    EXT -->|Controls| PRIVATE
+    HOST <-->|IPC| SOCKET
+    SOCKET <-->|Commands| MCP
+    PLUGIN -.->|Stop hook| SOCKET
+
+    PAGES -.->|Serves| WEBSITE[/"Website"/]
+    WORKER -.->|Payment| STRIPE
+    WORKER -.->|Store| D1
+
+    AMO -.->|Install| EXT
+    GITHUB -.->|Deploy| PAGES
+                    </pre>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p><strong>Source:</strong> <code>wireframes/v0.5.3/*.mermaid.md</code></p>
+            <p>Generated for: <strong>Claudezilla</strong> | Location: <code>~/dev/claudezilla</code></p>
+            <p>Stack: Node.js (MCP, Host), JavaScript (Extension), TypeScript (Worker)</p>
+            <p>Links: <a href="https://claudezilla.com">Website</a> | <a href="https://github.com/boot-industries/claudezilla">GitHub</a> | <a href="https://addons.mozilla.org/firefox/addon/claudezilla/">Firefox Add-ons</a></p>
+        </footer>
+    </div>
+
+    <script>
+        function toggleDiagram(header) {
+            header.classList.toggle('collapsed');
+            const content = header.nextElementSibling;
+            content.classList.toggle('hidden');
+        }
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                document.querySelectorAll('.diagram-header:not(.collapsed)').forEach(h => {
+                    h.classList.add('collapsed');
+                    h.nextElementSibling.classList.add('hidden');
+                });
+            }
+            // 'a' to expand all
+            if (e.key === 'a' && !e.ctrlKey && !e.metaKey && document.activeElement.tagName !== 'INPUT') {
+                document.querySelectorAll('.diagram-header.collapsed').forEach(h => {
+                    h.classList.remove('collapsed');
+                    h.nextElementSibling.classList.remove('hidden');
+                });
+            }
+        });
+    </script>
+</body>
+</html>

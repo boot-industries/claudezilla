@@ -787,11 +787,17 @@ function generateUniqueSelector(element) {
 
 /**
  * Find alternative selectors based on failed selector
+ * PERFORMANCE: Limited search to MAX_SEARCH elements per category
  * @param {string} failedSelector - The selector that didn't work
  * @returns {Array} Array of {selector, reason} alternatives
  */
 function findSelectorAlternatives(failedSelector) {
   const alternatives = [];
+  const MAX_SEARCH = 100; // Stop searching after 100 elements per category (performance)
+  const MAX_ALTERNATIVES = 5;
+
+  // Early exit if we have enough alternatives
+  const hasEnough = () => alternatives.length >= MAX_ALTERNATIVES;
 
   // Extract potential text/ID hints from selector
   const idMatch = failedSelector.match(/#([a-zA-Z0-9_-]+)/);
@@ -806,30 +812,34 @@ function findSelectorAlternatives(failedSelector) {
   if (ariaMatch) textHints.push(ariaMatch[1]);
 
   // If it looks like an ID selector, try similar IDs
-  if (idMatch) {
+  if (idMatch && !hasEnough()) {
     const idValue = idMatch[1].toLowerCase();
-    document.querySelectorAll('[id]').forEach(el => {
-      if (el.id.toLowerCase().includes(idValue) && alternatives.length < 3) {
+    const allIds = Array.from(document.querySelectorAll('[id]')).slice(0, MAX_SEARCH);
+    for (const el of allIds) {
+      if (hasEnough()) break;
+      if (el.id.toLowerCase().includes(idValue)) {
         alternatives.push({
           selector: `#${el.id}`,
           reason: `Similar ID found`
         });
       }
-    });
+    }
   }
 
   // Try to find elements by text content (for buttons/links)
   const isButtonSelector = failedSelector.includes('button') || failedSelector.includes('btn');
   const isLinkSelector = failedSelector.includes('a[') || failedSelector.includes('link');
 
-  if (isButtonSelector || textHints.length > 0) {
+  if ((isButtonSelector || textHints.length > 0) && !hasEnough()) {
     const searchText = textHints[0]?.toLowerCase() || '';
-    document.querySelectorAll('button, [role="button"], input[type="submit"], input[type="button"]').forEach(el => {
+    const allButtons = Array.from(document.querySelectorAll('button, [role="button"], input[type="submit"], input[type="button"]')).slice(0, MAX_SEARCH);
+    for (const el of allButtons) {
+      if (hasEnough()) break;
       const btnText = (el.textContent || el.value || '').trim().toLowerCase();
       const ariaLabel = (el.getAttribute('aria-label') || '').toLowerCase();
 
       if ((searchText && (btnText.includes(searchText) || ariaLabel.includes(searchText))) ||
-          (isButtonSelector && btnText && alternatives.length < 3)) {
+          (isButtonSelector && btnText)) {
         const uniqueSelector = generateUniqueSelector(el);
         if (!alternatives.some(a => a.selector === uniqueSelector)) {
           alternatives.push({
@@ -838,14 +848,16 @@ function findSelectorAlternatives(failedSelector) {
           });
         }
       }
-    });
+    }
   }
 
-  if (isLinkSelector || textHints.length > 0) {
+  if ((isLinkSelector || textHints.length > 0) && !hasEnough()) {
     const searchText = textHints[0]?.toLowerCase() || '';
-    document.querySelectorAll('a[href]').forEach(el => {
+    const allLinks = Array.from(document.querySelectorAll('a[href]')).slice(0, MAX_SEARCH);
+    for (const el of allLinks) {
+      if (hasEnough()) break;
       const linkText = el.textContent.trim().toLowerCase();
-      if (searchText && linkText.includes(searchText) && alternatives.length < 5) {
+      if (searchText && linkText.includes(searchText)) {
         const uniqueSelector = generateUniqueSelector(el);
         if (!alternatives.some(a => a.selector === uniqueSelector)) {
           alternatives.push({
@@ -854,15 +866,17 @@ function findSelectorAlternatives(failedSelector) {
           });
         }
       }
-    });
+    }
   }
 
   // Try aria-label matching for any element
-  if (textHints.length > 0) {
+  if (textHints.length > 0 && !hasEnough()) {
     const searchText = textHints[0].toLowerCase();
-    document.querySelectorAll('[aria-label]').forEach(el => {
+    const allAriaLabeled = Array.from(document.querySelectorAll('[aria-label]')).slice(0, MAX_SEARCH);
+    for (const el of allAriaLabeled) {
+      if (hasEnough()) break;
       const ariaLabel = el.getAttribute('aria-label').toLowerCase();
-      if (ariaLabel.includes(searchText) && alternatives.length < 5) {
+      if (ariaLabel.includes(searchText)) {
         const uniqueSelector = generateUniqueSelector(el);
         if (!alternatives.some(a => a.selector === uniqueSelector)) {
           alternatives.push({
@@ -871,10 +885,10 @@ function findSelectorAlternatives(failedSelector) {
           });
         }
       }
-    });
+    }
   }
 
-  return alternatives.slice(0, 5); // Max 5 suggestions
+  return alternatives.slice(0, MAX_ALTERNATIVES);
 }
 
 /**
@@ -1042,7 +1056,25 @@ async function checkPageReadiness(params = {}) {
 }
 
 /**
+ * SECURITY: Blocked expression patterns for evaluate()
+ * These patterns could be used for exfiltration or dangerous operations
+ */
+const BLOCKED_EXPRESSION_PATTERNS = [
+  /\bfetch\s*\(/i,           // fetch() - network exfiltration
+  /\bXMLHttpRequest\b/i,     // XHR - network exfiltration
+  /\bimport\s*\(/i,          // dynamic import
+  /\beval\s*\(/i,            // nested eval
+  /\bFunction\s*\(/i,        // Function constructor
+  /\bsetTimeout\s*\(/i,      // async execution (can bypass detection)
+  /\bsetInterval\s*\(/i,     // async execution
+  /\bdocument\.cookie\b/i,   // cookie access
+  /\blocalStorage\b/i,       // storage access (allowed in expression result, blocked in modification)
+  /\bsessionStorage\b/i,     // storage access
+];
+
+/**
  * Evaluate JavaScript in page context
+ * SECURITY: Expression is validated before execution to block dangerous patterns
  * @param {object} params - Parameters
  * @param {string} params.expression - JavaScript expression to evaluate
  * @returns {object} Result
@@ -1054,8 +1086,20 @@ function evaluate(params) {
     throw new Error('expression is required');
   }
 
+  // SECURITY: Limit expression length to prevent DoS
+  if (expression.length > 10000) {
+    throw new Error('Expression too long (max 10000 characters)');
+  }
+
+  // SECURITY: Block dangerous patterns
+  for (const pattern of BLOCKED_EXPRESSION_PATTERNS) {
+    if (pattern.test(expression)) {
+      throw new Error(`Blocked expression pattern detected: ${pattern.source.slice(0, 20)}...`);
+    }
+  }
+
   try {
-    // Use Function constructor for safer eval
+    // Use Function constructor for safer eval (page-isolated)
     const result = new Function(`return (${expression})`)();
 
     // Serialize result
