@@ -1,6 +1,6 @@
 /**
  * Claudezilla Popup Script
- * v0.5.0 - Auto-loop detection settings, focus loop terminology
+ * v0.5.5 - Windows support, security hardening
  */
 
 // Elements
