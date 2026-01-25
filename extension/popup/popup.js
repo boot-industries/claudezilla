@@ -255,6 +255,23 @@ async function stopLoop() {
 
 // Initialize
 async function init() {
+  // IMPORTANT: Attach support link handler FIRST, before any async operations
+  // that might fail and prevent this from running
+  const supportLink = document.getElementById('supportLink');
+  if (supportLink) {
+    supportLink.addEventListener('click', async (e) => {
+      e.preventDefault();
+      try {
+        await browser.tabs.create({ url: 'https://claudezilla.com/support' });
+      } catch (err) {
+        console.error('[claudezilla] Failed to open support page:', err);
+        // Fallback: open in current context
+        window.open('https://claudezilla.com/support', '_blank');
+      }
+      window.close();
+    });
+  }
+
   // Check for first run
   await checkFirstRun();
 
@@ -286,16 +303,6 @@ async function init() {
   // Stop loop button
   if (stopLoopBtn) {
     stopLoopBtn.addEventListener('click', stopLoop);
-  }
-
-  // Support link - open support page in new tab
-  const supportLink = document.getElementById('supportLink');
-  if (supportLink) {
-    supportLink.addEventListener('click', async (e) => {
-      e.preventDefault();
-      await browser.tabs.create({ url: 'https://claudezilla.com/support' });
-      window.close(); // Close popup after opening
-    });
   }
 
   // Periodically refresh loop status while popup is open
