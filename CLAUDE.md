@@ -1,15 +1,18 @@
 # Claudezilla - Claude Code Firefox Extension
 
-**Version:** 0.5.4
+**Version:** 0.5.5
 
 ## Overview
 
 Firefox extension providing browser automation for Claude Code CLI. A Google-free alternative to the official Chrome extension.
 
-**Key Features (v0.5.4):**
-- **NEW: Expression validation** - Blocked dangerous patterns in `firefox_evaluate` (fetch, eval, cookies)
-- **NEW: Agent ID truncation** - Privacy-enhanced logging (12-char truncation in all outputs)
-- **NEW: Selector search optimization** - Early exit and 100-element limit per category
+**Key Features (v0.5.5):**
+- **NEW: Windows 10/11 support** - Named pipes, ACL security, platform-independent IPC abstraction
+- **NEW: Path security validation** - Prevents null bytes, path traversal, UNC injection
+- **NEW: PowerShell installer hardening** - ConvertTo-Json serialization, process check on uninstall
+- Expression validation - Blocked dangerous patterns in `firefox_evaluate` (fetch, eval, cookies)
+- Agent ID truncation - Privacy-enhanced logging (12-char truncation in all outputs)
+- Selector search optimization - Early exit and 100-element limit per category
 - Focus loops - `/focus` slash command for iterative development
 - Auto-retry system - Smart element waiting with enhanced error messages
 - Task detection - Automatic detection of iterative tasks for focus loop suggestions

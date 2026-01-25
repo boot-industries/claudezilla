@@ -6,6 +6,27 @@
 
 $ErrorActionPreference = "Stop"
 
+# SECURITY: Path validation function
+function Test-SafePath {
+    param(
+        [Parameter(Mandatory=$true)][string]$Path,
+        [Parameter(Mandatory=$true)][string]$Context
+    )
+    if ([string]::IsNullOrWhiteSpace($Path)) {
+        throw "$Context is empty"
+    }
+    if ($Path -match '\.\.') {
+        throw "$Context contains path traversal"
+    }
+    if ($Path -match '^\\\\' -and $Path -notmatch '^\\\\\.\\pipe\\') {
+        throw "$Context is UNC network path"
+    }
+    if ($Path -match '[<>"|?*]') {
+        throw "$Context contains invalid characters"
+    }
+    return $true
+}
+
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectDir = Split-Path -Parent $ScriptDir
 $HostPath = Join-Path $ProjectDir "host\index.js"
@@ -50,24 +71,27 @@ Write-Host "[OK] Found host script: $HostPath"
 $NodeExe = (Get-Command node).Source
 Write-Host "[OK] Node executable: $NodeExe"
 
+# SECURITY: Validate paths before using them
+Test-SafePath -Path $NodeExe -Context "Node.js executable"
+Test-SafePath -Path $HostPath -Context "Host script path"
+
 # Create manifest directory
 if (-not (Test-Path $ManifestDir)) {
     New-Item -ItemType Directory -Force -Path $ManifestDir | Out-Null
 }
 Write-Host "[OK] Manifest directory: $ManifestDir"
 
-# Create native messaging manifest
+# Create native messaging manifest using ConvertTo-Json (safe serialization)
 # Note: path uses node.exe, args passes the host script
-$ManifestContent = @"
-{
-    "name": "claudezilla",
-    "description": "Claudezilla native messaging host for Firefox browser automation",
-    "path": "$($NodeExe -replace '\\', '\\\\')",
-    "args": ["$($HostPath -replace '\\', '\\\\')"],
-    "type": "stdio",
-    "allowed_extensions": ["claudezilla@boot.industries"]
+$ManifestObject = @{
+    name = "claudezilla"
+    description = "Claudezilla native messaging host for Firefox browser automation"
+    path = $NodeExe
+    args = @($HostPath)
+    type = "stdio"
+    allowed_extensions = @("claudezilla@boot.industries")
 }
-"@
+$ManifestContent = $ManifestObject | ConvertTo-Json -Depth 10
 
 Set-Content -Path $ManifestPath -Value $ManifestContent -Encoding UTF8
 Write-Host "[OK] Created manifest: $ManifestPath"

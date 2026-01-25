@@ -19,6 +19,27 @@ Write-Host "Claudezilla Uninstaller for Windows"
 Write-Host "===================================="
 Write-Host ""
 
+# SECURITY: Check for running Claudezilla processes before removal
+$runningProcesses = Get-Process -ErrorAction SilentlyContinue | Where-Object {
+    $_.Path -and $_.Path -match 'claudezilla'
+}
+
+if ($runningProcesses) {
+    Write-Host "[WARNING] Claudezilla processes are running:" -ForegroundColor Yellow
+    $runningProcesses | ForEach-Object {
+        Write-Host "  - $($_.ProcessName) (PID: $($_.Id))"
+    }
+    $response = Read-Host "Kill processes and continue? (y/N)"
+    if ($response -eq 'y' -or $response -eq 'Y') {
+        $runningProcesses | Stop-Process -Force -ErrorAction SilentlyContinue
+        Start-Sleep -Seconds 2
+        Write-Host "[OK] Processes terminated"
+    } else {
+        Write-Host "Uninstall cancelled."
+        exit 1
+    }
+}
+
 $itemsRemoved = 0
 
 # Remove registry key
