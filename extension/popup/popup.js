@@ -1,6 +1,6 @@
 /**
  * Claudezilla Popup Script
- * v0.5.0 - Auto-loop detection settings, focus loop terminology
+ * v0.5.4 - Fix support link not opening (await browser.tabs.create)
  */
 
 // Elements
@@ -291,9 +291,9 @@ async function init() {
   // Support link - open support page in new tab
   const supportLink = document.getElementById('supportLink');
   if (supportLink) {
-    supportLink.addEventListener('click', (e) => {
+    supportLink.addEventListener('click', async (e) => {
       e.preventDefault();
-      browser.tabs.create({ url: 'https://claudezilla.com/support' });
+      await browser.tabs.create({ url: 'https://claudezilla.com/support' });
       window.close(); // Close popup after opening
     });
   }
