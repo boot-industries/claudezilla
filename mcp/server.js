@@ -14,23 +14,13 @@ import {
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import { connect } from 'net';
-import { tmpdir } from 'os';
-import { join } from 'path';
 import { randomBytes } from 'crypto';
 import { readFileSync, existsSync, statSync } from 'fs';
+import { getSocketPath, getAuthTokenPath } from '../host/ipc.js';
 
-// SECURITY: Use validated temp directory (same logic as host)
-const SAFE_TMPDIR = (() => {
-  const tmp = tmpdir();
-  const xdgRuntime = process.env.XDG_RUNTIME_DIR;
-  if (xdgRuntime && existsSync(xdgRuntime)) {
-    return xdgRuntime;
-  }
-  return tmp;
-})();
-
-const SOCKET_PATH = join(SAFE_TMPDIR, 'claudezilla.sock');
-const AUTH_TOKEN_FILE = join(SAFE_TMPDIR, 'claudezilla-auth.token');
+// Platform-independent paths from ipc.js abstraction layer
+const SOCKET_PATH = getSocketPath();
+const AUTH_TOKEN_FILE = getAuthTokenPath();
 
 /**
  * Load auth token from file (written by host on startup)
@@ -1007,7 +997,7 @@ const TOOL_TO_COMMAND = {
 const server = new Server(
   {
     name: 'claudezilla',
-    version: '0.5.4',
+    version: '0.5.5',
   },
   {
     capabilities: {

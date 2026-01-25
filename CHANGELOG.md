@@ -1,7 +1,41 @@
 # CLZ002 Changelog
 
 **Project:** Claudezilla
-**Current Version:** 0.5.4
+**Current Version:** 0.5.5
+
+## v0.5.5 (2026-01-25)
+
+**Windows 10/11 support + security hardening.**
+
+### Features
+
+- **Windows support** - Full Windows 10/11 compatibility
+  - Named pipes (`\\.\pipe\claudezilla`) for Windows IPC
+  - Platform-independent path resolution via `host/ipc.js` abstraction
+  - Windows ACL via `icacls` for auth token file (user-only access)
+  - PowerShell installer with `ConvertTo-Json` (safe serialization)
+
+### Security
+
+- **Path validation** - New `validatePath()` function in `ipc.js`
+  - Prevents null byte injection
+  - Blocks path traversal (`..`)
+  - Rejects UNC network paths (except named pipes)
+- **Environment variable validation** - `getSafeTempDir()` validates paths from `LOCALAPPDATA`, `TEMP`, `XDG_RUNTIME_DIR`
+- **PowerShell hardening**
+  - `Test-SafePath` function validates paths before use
+  - Process check in uninstaller prevents race conditions
+
+### Bug Fixes
+
+- **Support link** - Popup support link now uses async/await properly
+
+### Updated
+
+- Version bumped to 0.5.5 across all components (9 files)
+- GitHub Actions workflow for Windows CI testing
+
+---
 
 ## v0.5.4 (2026-01-24)
 

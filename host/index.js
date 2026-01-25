@@ -15,25 +15,22 @@
 import { readMessage, sendMessage } from './protocol.js';
 import { appendFileSync, unlinkSync, existsSync, chmodSync, writeFileSync } from 'fs';
 import { createServer } from 'net';
-import { tmpdir } from 'os';
-import { join } from 'path';
 import { randomUUID, randomBytes } from 'crypto';
+import {
+  getSocketPath,
+  getAuthTokenPath,
+  getDebugLogPath,
+  cleanupSocket,
+  setSecurePermissions,
+  setWindowsFileACL,
+  ensureParentDir,
+  isWindows
+} from './ipc.js';
 
-// SECURITY: Use validated temp directory
-// Prevents TMPDIR hijacking by validating the path
-const SAFE_TMPDIR = (() => {
-  const tmp = tmpdir();
-  // On macOS/Linux, prefer XDG_RUNTIME_DIR if available (per-user, secure)
-  const xdgRuntime = process.env.XDG_RUNTIME_DIR;
-  if (xdgRuntime && existsSync(xdgRuntime)) {
-    return xdgRuntime;
-  }
-  return tmp;
-})();
-
-const DEBUG_LOG = join(SAFE_TMPDIR, 'claudezilla-debug.log');
-const SOCKET_PATH = join(SAFE_TMPDIR, 'claudezilla.sock');
-const AUTH_TOKEN_FILE = join(SAFE_TMPDIR, 'claudezilla-auth.token');
+// Platform-independent paths from ipc.js abstraction layer
+const DEBUG_LOG = getDebugLogPath();
+const SOCKET_PATH = getSocketPath();
+const AUTH_TOKEN_FILE = getAuthTokenPath();
 
 // SECURITY: Max buffer size to prevent memory exhaustion (10MB)
 const MAX_BUFFER_SIZE = 10 * 1024 * 1024;
@@ -301,10 +298,10 @@ function handleExtensionMessage(message) {
       id,
       success: true,
       result: {
-        host: '0.5.4',
+        host: '0.5.5',
         node: process.version,
         platform: process.platform,
-        features: ['security-hardened', 'focus-loop', 'auto-retry', 'task-detection', 'expression-validation'],
+        features: ['security-hardened', 'focus-loop', 'auto-retry', 'task-detection', 'expression-validation', 'windows-support'],
       },
     });
   }
@@ -314,14 +311,8 @@ function handleExtensionMessage(message) {
  * Start Unix socket server for CLI commands
  */
 function startSocketServer() {
-  // Clean up old socket
-  if (existsSync(SOCKET_PATH)) {
-    try {
-      unlinkSync(SOCKET_PATH);
-    } catch (e) {
-      log('Warning: Could not remove old socket:', e.message);
-    }
-  }
+  // Clean up old socket (Unix only - named pipes auto-cleanup on Windows)
+  cleanupSocket(SOCKET_PATH);
 
   const server = createServer((socket) => {
     log('CLI client connected');
@@ -371,20 +362,22 @@ function startSocketServer() {
     });
   });
 
-  server.listen(SOCKET_PATH, () => {
+  server.listen(SOCKET_PATH, async () => {
     log(`Socket server listening on ${SOCKET_PATH}`);
-    // SECURITY: Set socket permissions to user-only (0600)
-    try {
-      chmodSync(SOCKET_PATH, 0o600);
-      log('Socket permissions set to 0600 (user only)');
-    } catch (e) {
-      log('Warning: Could not set socket permissions:', e.message);
-    }
+
+    // SECURITY: Set socket permissions to user-only (0600) - Unix only
+    setSecurePermissions(SOCKET_PATH, 0o600);
+    log('Socket permissions set to 0600 (user only)');
 
     // SECURITY: Write auth token to file for MCP server to read
     try {
+      // Ensure parent directory exists (required on Windows)
+      ensureParentDir(AUTH_TOKEN_FILE);
       writeFileSync(AUTH_TOKEN_FILE, SOCKET_AUTH_TOKEN, { mode: 0o600 });
       log(`Auth token written to ${AUTH_TOKEN_FILE}`);
+
+      // SECURITY: Set Windows ACL on auth token file (Windows only)
+      await setWindowsFileACL(AUTH_TOKEN_FILE);
     } catch (e) {
       log('Warning: Could not write auth token file:', e.message);
     }
