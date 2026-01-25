@@ -111,39 +111,34 @@ jobs:
           $installerPath = "install/install-windows.ps1"
           $uninstallerPath = "install/uninstall-windows.ps1"
 
-          try {
-            $null = [System.Management.Automation.Language.Parser]::ParseFile(
-              $installerPath,
-              [ref]$null,
-              [ref]$errors
-            )
-            if ($errors.Count -gt 0) {
-              Write-Host "Installer syntax errors:"
-              $errors | ForEach-Object { Write-Host $_ }
-              exit 1
-            }
-            Write-Host "Installer syntax: PASS"
-          } catch {
-            Write-Host "Installer parse error: $_"
-            exit 1
-          }
+          # Declare variables for parser output
+          $tokens = $null
+          $errors = $null
 
-          try {
-            $null = [System.Management.Automation.Language.Parser]::ParseFile(
-              $uninstallerPath,
-              [ref]$null,
-              [ref]$errors
-            )
-            if ($errors.Count -gt 0) {
-              Write-Host "Uninstaller syntax errors:"
-              $errors | ForEach-Object { Write-Host $_ }
-              exit 1
-            }
-            Write-Host "Uninstaller syntax: PASS"
-          } catch {
-            Write-Host "Uninstaller parse error: $_"
+          $null = [System.Management.Automation.Language.Parser]::ParseFile(
+            $installerPath,
+            [ref]$tokens,
+            [ref]$errors
+          )
+          if ($errors.Count -gt 0) {
+            Write-Host "Installer syntax errors:"
+            $errors | ForEach-Object { Write-Host $_ }
             exit 1
           }
+          Write-Host "Installer syntax: PASS"
+
+          $errors = $null
+          $null = [System.Management.Automation.Language.Parser]::ParseFile(
+            $uninstallerPath,
+            [ref]$tokens,
+            [ref]$errors
+          )
+          if ($errors.Count -gt 0) {
+            Write-Host "Uninstaller syntax errors:"
+            $errors | ForEach-Object { Write-Host $_ }
+            exit 1
+          }
+          Write-Host "Uninstaller syntax: PASS"
 
           Write-Host ""
           Write-Host "=== Test-SafePath Function ==="
