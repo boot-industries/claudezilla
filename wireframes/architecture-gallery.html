@@ -108,6 +108,11 @@
             text-align: center;
         }
 
+        .stat-card.new {
+            background: linear-gradient(135deg, #2a2a1a, #3a3a2a);
+            border: 1px solid #FF9500;
+        }
+
         .stat-value {
             font-size: 1.25rem;
             font-weight: 600;
@@ -281,6 +286,17 @@
             border: 1px solid #444;
         }
 
+        .new-badge {
+            background: #FF9500;
+            color: #000;
+            font-size: 0.5rem;
+            padding: 0.1rem 0.3rem;
+            border-radius: 2px;
+            font-weight: 600;
+            margin-left: 0.5rem;
+            vertical-align: middle;
+        }
+
         @media (max-width: 768px) {
             body {
                 padding: 0.5rem 1rem;
@@ -298,7 +314,7 @@
     <div class="container">
         <h1><span class="emoji">🦎</span> Claudezilla - Architecture Gallery</h1>
         <p class="subtitle">Firefox Browser Automation for Claude Code CLI - A Google-free Alternative</p>
-        <p class="last-updated">Last updated: 2026-01-18 | Version: 0.5.3</p>
+        <p class="last-updated">Last updated: 2026-01-25 | Version: 0.5.5</p>
 
         <div class="stats">
             <div class="stat-card">
@@ -325,11 +341,16 @@
                 <div class="stat-value">4</div>
                 <div class="stat-label">Layers</div>
             </div>
+            <div class="stat-card new">
+                <div class="stat-value">Win</div>
+                <div class="stat-label">Windows Support</div>
+            </div>
         </div>
 
         <div class="info">
-            <div class="info-title">Interactive Diagram Collection</div>
+            <div class="info-title">Interactive Diagram Collection <span class="new-badge">v0.5.5</span></div>
             7 architectural diagrams covering system architecture, component relationships, data flow, repository structure, entry points, database schema, and deployment infrastructure.
+            <strong>New in v0.5.5:</strong> Windows 10/11 support (named pipes, ACL security), IPC abstraction layer, expression validation, path security.
             Click headers to expand/collapse. Diagrams render via Mermaid.js. Press <kbd>a</kbd> to expand all, <kbd>Esc</kbd> to collapse all.
         </div>
 
@@ -358,6 +379,10 @@
                 <span class="color-swatch" style="background: #ffe0b2;"></span>
                 <span>Cloud Services</span>
             </div>
+            <div class="color-item">
+                <span class="color-swatch" style="background: #ffd; border: 1px solid #f90;"></span>
+                <span>New in v0.5.5</span>
+            </div>
         </div>
 
         <nav class="quick-nav">
@@ -383,7 +408,7 @@
             <div class="diagram-card" id="architecture">
                 <div class="diagram-header" onclick="toggleDiagram(this)">
                     <span class="diagram-title">System Architecture</span>
-                    <span class="diagram-description">4-layer architecture: Claude CLI → MCP → Host → Extension</span>
+                    <span class="diagram-description">4-layer architecture with IPC abstraction for cross-platform support</span>
                     <span class="diagram-type flowchart">FLOWCHART</span>
                 </div>
                 <div class="diagram-content">
@@ -399,11 +424,19 @@ flowchart TB
         TOOLS["30+ Browser Tools"]
         HEARTBEAT["Agent Heartbeat<br/>Tracking"]
         ORPHAN["Orphan Cleanup<br/>(2min timeout)"]
+        EXPR_BLOCK["Expression Blocklist<br/>(fetch, eval, cookies)"]
     end
 
     subgraph HOST_LAYER["Native Host Layer"]
-        SOCKET["Unix Socket Server<br/>(claudezilla.sock)"]
+        IPC_LAYER["IPC Abstraction<br/>(host/ipc.js)"]
+        subgraph IPC_UNIX["Unix (macOS/Linux)"]
+            SOCKET["Unix Socket<br/>(claudezilla.sock)"]
+        end
+        subgraph IPC_WIN["Windows 10/11"]
+            NAMED_PIPE["Named Pipe<br/>(\\.\pipe\claudezilla)"]
+        end
         AUTH["Auth Token<br/>(32-byte random)"]
+        PATH_VALID["Path Validation<br/>(validatePath)"]
         LOOP_STATE["Loop State<br/>Manager"]
         PROTO["Protocol Handler<br/>(4-byte header)"]
     end
@@ -411,7 +444,7 @@ flowchart TB
     subgraph EXTENSION_LAYER["Firefox Extension Layer"]
         BG["Background Script<br/>(Persistent)"]
         SESSION["Session Manager<br/>(10-tab pool)"]
-        MUTEX["Screenshot Mutex<br/>(Serialized)"]
+        MUTEX["Screenshot Mutex<br/>(3s timeout)"]
         NETWORK["Network Monitor<br/>(webRequest API)"]
     end
 
@@ -435,19 +468,24 @@ flowchart TB
 
     CLAUDE -->|MCP Protocol| MCP_SERVER
     MCP_SERVER -->|Agent ID| HEARTBEAT
+    MCP_SERVER -->|Validate| EXPR_BLOCK
     HEARTBEAT -->|Timeout| ORPHAN
-    MCP_SERVER -->|Commands + Auth| SOCKET
+    MCP_SERVER -->|Commands + Auth| IPC_LAYER
+    IPC_LAYER -->|macOS/Linux| SOCKET
+    IPC_LAYER -->|Windows| NAMED_PIPE
     SOCKET -->|Native Messaging| BG
+    NAMED_PIPE -->|Native Messaging| BG
     BG -->|executeInTab| DOM
     BG -->|browser.tabs| TABS
     TABS --> PAGES
     DOM --> PAGES
     VISUALS --> PAGES
 
-    STOP_HOOK -.->|Query State| SOCKET
+    STOP_HOOK -.->|Query State| IPC_LAYER
     COMMANDS -.->|Start/Stop| MCP_SERVER
 
-    AUTH -->|Validates| SOCKET
+    AUTH -->|Validates| IPC_LAYER
+    PATH_VALID -->|Secure paths| IPC_LAYER
     MUTEX -.->|Serializes| BG
     SESSION -.->|Ownership| TABS
                     </pre>
@@ -458,7 +496,7 @@ flowchart TB
             <div class="diagram-card" id="components">
                 <div class="diagram-header" onclick="toggleDiagram(this)">
                     <span class="diagram-title">Component Map</span>
-                    <span class="diagram-description">Modules with APIs and tool categories</span>
+                    <span class="diagram-description">Modules with APIs, IPC abstraction, and tool categories</span>
                     <span class="diagram-type class">CLASS</span>
                 </div>
                 <div class="diagram-content">
@@ -468,10 +506,25 @@ classDiagram
         +Server server
         +String AGENT_ID
         +Map agentHeartbeats
+        +Array EXPRESSION_BLOCKLIST
         +sendCommand(command, params)
         +runDiagnostics()
         +cleanupOrphanedAgents()
         +updateAgentHeartbeat(agentId)
+        +truncateAgentId(agentId)
+        +validateExpression(expression)
+    }
+
+    class IPC {
+        &lt;&lt;module&gt;&gt;
+        +getSocketPath() String
+        +getAuthTokenPath() String
+        +getSafeTempDir() String
+        +validatePath(path, context)
+        +cleanupSocket(socketPath)
+        +setSecurePermissions(path, mode)
+        +setWindowsFileACL(path)
+        +isWindows() Boolean
     }
 
     class NativeHost {
@@ -537,7 +590,9 @@ classDiagram
         firefox_loop_status()
     }
 
-    MCPServer --> NativeHost : Unix socket
+    MCPServer --> IPC : platform paths
+    MCPServer --> NativeHost : Unix socket/Named pipe
+    IPC --> NativeHost : socket/pipe paths
     NativeHost --> BackgroundScript : native messaging
     BackgroundScript --> ContentScript : executeInTab
 
@@ -553,7 +608,7 @@ classDiagram
             <div class="diagram-card" id="dataflow">
                 <div class="diagram-header" onclick="toggleDiagram(this)">
                     <span class="diagram-title">Data Flow</span>
-                    <span class="diagram-description">Command flow, screenshot mutex, focus loop lifecycle</span>
+                    <span class="diagram-description">Command flow with IPC layer, screenshot mutex (3s), expression validation</span>
                     <span class="diagram-type sequence">SEQUENCE</span>
                 </div>
                 <div class="diagram-content">
@@ -561,7 +616,7 @@ classDiagram
 sequenceDiagram
     participant Claude as Claude Code CLI
     participant MCP as MCP Server
-    participant Socket as Unix Socket
+    participant IPC as IPC Layer
     participant Host as Native Host
     participant BG as Background Script
     participant CS as Content Script
@@ -571,9 +626,10 @@ sequenceDiagram
 
     Claude->>+MCP: CallToolRequest {name: "firefox_click", args}
     MCP->>MCP: Inject agentId, updateHeartbeat()
-    MCP->>+Socket: JSON + auth {command, params, authToken}
-    Socket->>+Host: Validate authToken
-    Host->>Host: Check command whitelist
+    MCP->>+IPC: getSocketPath()
+    IPC-->>-MCP: Unix socket or Named pipe path
+    MCP->>+Host: JSON + auth {command, params, authToken}
+    Host->>Host: Validate authToken
     Host->>+BG: Native Messaging: {id, type, command, params}
     BG->>BG: verifyTabOwnership(tabId, agentId)
     BG->>+CS: browser.tabs.sendMessage({action: "click"})
@@ -581,16 +637,15 @@ sequenceDiagram
     Page-->>-CS: Event dispatched
     CS-->>-BG: {success: true, result}
     BG-->>-Host: port.postMessage response
-    Host-->>-Socket: JSON response
-    Socket-->>-MCP: Parse response
+    Host-->>-MCP: JSON response
     MCP-->>-Claude: {content: [{type: "text", text: result}]}
 
-    Note over Claude,Page: Screenshot with Mutex
+    Note over Claude,Page: Screenshot with Mutex (3s timeout)
 
     Claude->>+MCP: firefox_screenshot({tabId})
     MCP->>+BG: screenshot command
     BG->>BG: Check screenshotMutexHolder
-    alt Mutex held by another agent >5s
+    alt Mutex held by another agent >3s
         BG-->>MCP: MUTEX_BUSY error
     else Mutex available
         BG->>BG: Acquire mutex
@@ -603,6 +658,20 @@ sequenceDiagram
         BG->>BG: Release mutex
         BG-->>-MCP: {dataUrl, readiness}
         MCP-->>-Claude: {type: "image", data: base64}
+    end
+
+    Note over Claude,Page: Expression Validation (v0.5.5)
+
+    Claude->>+MCP: firefox_evaluate({expression: "fetch(...)"})
+    MCP->>MCP: validateExpression(expression)
+    alt Expression blocked
+        MCP-->>Claude: Error: Blocked pattern 'fetch('
+    else Expression allowed
+        MCP->>+Host: {command: "evaluate", params}
+        Host->>+CS: evaluate(expression)
+        CS-->>-Host: Result
+        Host-->>-MCP: Response
+        MCP-->>-Claude: Result
     end
                     </pre>
                 </div>
@@ -620,7 +689,7 @@ sequenceDiagram
             <div class="diagram-card" id="repo">
                 <div class="diagram-header" onclick="toggleDiagram(this)">
                     <span class="diagram-title">Repository Structure</span>
-                    <span class="diagram-description">Extension + Host + MCP + Plugin + Website + Worker</span>
+                    <span class="diagram-description">Extension + Host + IPC + MCP + Plugin + Website + Worker</span>
                     <span class="diagram-type flowchart">FLOWCHART</span>
                 </div>
                 <div class="diagram-content">
@@ -642,6 +711,7 @@ graph TB
 
     subgraph HOST["host/<br/>Native Messaging Host"]
         HOST_INDEX["index.js<br/>(Main entry)"]
+        HOST_IPC["ipc.js<br/>(IPC abstraction)"]
         HOST_PROTO["protocol.js<br/>(4-byte header)"]
     end
 
@@ -653,6 +723,12 @@ graph TB
     subgraph PLUGIN["plugin/<br/>Claude Code Plugin"]
         HOOKS["hooks/<br/>(stop-hook.sh)"]
         COMMANDS["commands/<br/>(/focus, /help)"]
+    end
+
+    subgraph INSTALL["install/<br/>Setup Scripts"]
+        MAC["install-macos.sh"]
+        LINUX["install-linux.sh"]
+        WIN["install-windows.ps1"]
     end
 
     subgraph WEBSITE["website/<br/>Marketing Site"]
@@ -669,11 +745,13 @@ graph TB
     ROOT --> HOST
     ROOT --> MCP
     ROOT --> PLUGIN
+    ROOT --> INSTALL
     ROOT --> WEBSITE
     ROOT --> WORKER
 
     BG -.->|native messaging| HOST_INDEX
-    HOST_INDEX -.->|unix socket| MCP_SERVER
+    HOST_INDEX -.->|imports| HOST_IPC
+    HOST_INDEX -.->|IPC| MCP_SERVER
     PLUGIN -.->|stop hook| HOST_INDEX
                     </pre>
                 </div>
@@ -683,7 +761,7 @@ graph TB
             <div class="diagram-card" id="entry">
                 <div class="diagram-header" onclick="toggleDiagram(this)">
                     <span class="diagram-title">Entry Points</span>
-                    <span class="diagram-description">All ways to interact: MCP tools, slash commands, popup, APIs</span>
+                    <span class="diagram-description">MCP tools, slash commands, popup, APIs, Windows installer</span>
                     <span class="diagram-type flowchart">FLOWCHART</span>
                 </div>
                 <div class="diagram-content">
@@ -706,7 +784,12 @@ flowchart TB
     end
 
     subgraph HOST["Native Host"]
-        SOCKET_SERVER["Unix Socket<br/>(claudezilla.sock)"]
+        subgraph IPC_UNIX["Unix"]
+            SOCKET_SERVER["Unix Socket"]
+        end
+        subgraph IPC_WIN["Windows"]
+            PIPE_SERVER["Named Pipe"]
+        end
         NATIVE_MSG["Native Messaging<br/>(stdin/stdout)"]
     end
 
@@ -718,15 +801,19 @@ flowchart TB
 
     subgraph CLI_TOOLS["CLI Tools"]
         WEB_EXT["web-ext run<br/>(Development)"]
-        INSTALL_SH["install-*.sh<br/>(Setup host)"]
+        INSTALL_MAC["install-macos.sh"]
+        INSTALL_WIN["install-windows.ps1"]
     end
 
     MCP_TOOLS -->|Commands| SOCKET_SERVER
+    MCP_TOOLS -->|Commands| PIPE_SERVER
     SLASH_CMDS --> CMD_FOCUS
     STOP_HOOK -->|Query loop state| SOCKET_SERVER
+    STOP_HOOK -->|Query loop state| PIPE_SERVER
     POPUP -->|Test connection| BG_CONNECT
     BG_CONNECT <-->|Native Messaging| NATIVE_MSG
     SOCKET_SERVER <--> NATIVE_MSG
+    PIPE_SERVER <--> NATIVE_MSG
                     </pre>
                 </div>
             </div>
@@ -798,26 +885,37 @@ erDiagram
             <div class="diagram-card" id="deployment">
                 <div class="diagram-header" onclick="toggleDiagram(this)">
                     <span class="diagram-title">Deployment Infrastructure</span>
-                    <span class="diagram-description">User machine + Cloudflare Edge + External services</span>
+                    <span class="diagram-description">Unix + Windows machines, Cloudflare Edge, External services</span>
                     <span class="diagram-type flowchart">FLOWCHART</span>
                 </div>
                 <div class="diagram-content">
                     <pre class="mermaid">
 flowchart TB
-    subgraph USER_MACHINE["User's Machine"]
-        subgraph FIREFOX["Firefox Browser"]
-            EXT["Claudezilla Extension<br/>(MV2 WebExtension)"]
-            PRIVATE["Private Window<br/>(10-tab pool)"]
+    subgraph USER_UNIX["User Machine (macOS/Linux)"]
+        subgraph FIREFOX_UNIX["Firefox Browser"]
+            EXT_UNIX["Claudezilla Extension"]
+            PRIVATE_UNIX["Private Window"]
         end
-
-        subgraph NATIVE["Native Components"]
-            HOST["Native Host<br/>(~/.claudezilla/)"]
-            SOCKET["Unix Socket<br/>($TMPDIR/claudezilla.sock)"]
+        subgraph NATIVE_UNIX["Native Components"]
+            HOST_UNIX["Native Host"]
+            SOCKET_UNIX["Unix Socket<br/>($TMPDIR/claudezilla.sock)"]
         end
+        subgraph CLAUDE_UNIX["Claude Code CLI"]
+            MCP_UNIX["MCP Server"]
+        end
+    end
 
-        subgraph CLAUDE_CODE["Claude Code CLI"]
-            MCP["MCP Server<br/>(Node.js)"]
-            PLUGIN["Plugin<br/>(~/.claude/plugins/)"]
+    subgraph USER_WIN["User Machine (Windows)"]
+        subgraph FIREFOX_WIN["Firefox Browser"]
+            EXT_WIN["Claudezilla Extension"]
+            PRIVATE_WIN["Private Window"]
+        end
+        subgraph NATIVE_WIN["Native Components"]
+            HOST_WIN["Native Host"]
+            PIPE_WIN["Named Pipe<br/>(\\\\.\\pipe\\claudezilla)"]
+        end
+        subgraph CLAUDE_WIN["Claude Code CLI"]
+            MCP_WIN["MCP Server"]
         end
     end
 
@@ -833,17 +931,20 @@ flowchart TB
         GITHUB["GitHub"]
     end
 
-    EXT <-->|Native Messaging| HOST
-    EXT -->|Controls| PRIVATE
-    HOST <-->|IPC| SOCKET
-    SOCKET <-->|Commands| MCP
-    PLUGIN -.->|Stop hook| SOCKET
+    EXT_UNIX <-->|Native Messaging| HOST_UNIX
+    HOST_UNIX <-->|Unix Socket| SOCKET_UNIX
+    SOCKET_UNIX <-->|Commands| MCP_UNIX
+
+    EXT_WIN <-->|Native Messaging| HOST_WIN
+    HOST_WIN <-->|Named Pipe| PIPE_WIN
+    PIPE_WIN <-->|Commands| MCP_WIN
 
     PAGES -.->|Serves| WEBSITE[/"Website"/]
     WORKER -.->|Payment| STRIPE
     WORKER -.->|Store| D1
 
-    AMO -.->|Install| EXT
+    AMO -.->|Install| EXT_UNIX
+    AMO -.->|Install| EXT_WIN
     GITHUB -.->|Deploy| PAGES
                     </pre>
                 </div>
@@ -851,7 +952,7 @@ flowchart TB
         </div>
 
         <footer>
-            <p><strong>Source:</strong> <code>wireframes/v0.5.3/*.mermaid.md</code></p>
+            <p><strong>Source:</strong> <code>wireframes/v0.5.5/*.mermaid.md</code></p>
             <p>Generated for: <strong>Claudezilla</strong> | Location: <code>~/dev/claudezilla</code></p>
             <p>Stack: Node.js (MCP, Host), JavaScript (Extension), TypeScript (Worker)</p>
             <p>Links: <a href="https://claudezilla.com">Website</a> | <a href="https://github.com/boot-industries/claudezilla">GitHub</a> | <a href="https://addons.mozilla.org/firefox/addon/claudezilla/">Firefox Add-ons</a></p>
