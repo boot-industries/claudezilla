@@ -16,7 +16,228 @@
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 
   <!-- Styles -->
-  <link rel="stylesheet" href="/assets/styles.css?v=8">
+  <link rel="stylesheet" href="/assets/styles.css?v=9">
+  <style>
+    /* Platform Tabs */
+    .platform-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+
+    .platform-tab {
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      background: var(--bg-card);
+      color: var(--text-secondary);
+      border: 2px solid transparent;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .platform-tab:hover {
+      border-color: var(--terracotta);
+      color: var(--text-primary);
+    }
+
+    .platform-tab.active {
+      background: var(--terracotta);
+      color: var(--bg-dark);
+      border-color: var(--terracotta);
+      box-shadow: 0 0 20px var(--terracotta-glow);
+    }
+
+    .platform-tab .icon {
+      font-size: 18px;
+    }
+
+    .platform-content {
+      display: none;
+    }
+
+    .platform-content.active {
+      display: block;
+      animation: slideInLeft 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    /* Auto-config badge */
+    .auto-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      background: rgba(34, 197, 94, 0.15);
+      color: #22C55E;
+      border: 1px solid #22C55E;
+      margin-left: 12px;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    .auto-badge .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #22C55E;
+    }
+
+    /* Collapsible */
+    .collapsible {
+      margin-top: 32px;
+    }
+
+    .collapsible-trigger {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px 24px;
+      background: var(--bg-card);
+      border: 2px solid rgba(209, 77, 50, 0.2);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.3s;
+      width: 100%;
+      text-align: left;
+    }
+
+    .collapsible-trigger:hover {
+      border-color: var(--terracotta);
+    }
+
+    .collapsible-trigger .icon {
+      font-size: 20px;
+      transition: transform 0.3s;
+    }
+
+    .collapsible-trigger.open .icon {
+      transform: rotate(90deg);
+    }
+
+    .collapsible-trigger h4 {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-secondary);
+      margin: 0;
+    }
+
+    .collapsible-trigger:hover h4 {
+      color: var(--terracotta);
+    }
+
+    .collapsible-content {
+      display: none;
+      padding: 24px;
+      background: rgba(0, 0, 0, 0.3);
+      border: 2px solid rgba(209, 77, 50, 0.1);
+      border-top: none;
+      border-radius: 0 0 8px 8px;
+      animation: slideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .collapsible-content.open {
+      display: block;
+    }
+
+    @keyframes slideDown {
+      from {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* Success checkmark step */
+    .step-number.success {
+      background: linear-gradient(135deg, #22C55E 0%, #16A34A 100%);
+      box-shadow: 0 0 30px rgba(34, 197, 94, 0.4);
+    }
+
+    /* What gets configured list */
+    .config-list {
+      display: grid;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .config-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 16px;
+      background: rgba(34, 197, 94, 0.05);
+      border-radius: 8px;
+      border: 1px solid rgba(34, 197, 94, 0.2);
+    }
+
+    .config-item .check {
+      width: 24px;
+      height: 24px;
+      background: #22C55E;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      color: var(--bg-dark);
+      flex-shrink: 0;
+    }
+
+    .config-item .details {
+      flex: 1;
+    }
+
+    .config-item .details strong {
+      display: block;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+      font-size: 14px;
+    }
+
+    .config-item .details span {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    /* Version badge in hero */
+    .version-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      background: var(--bg-card);
+      border: 1px solid var(--terracotta);
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--terracotta);
+      margin-top: 16px;
+    }
+
+    .version-badge .new {
+      padding: 2px 8px;
+      background: var(--terracotta);
+      color: var(--bg-dark);
+      border-radius: 10px;
+      font-size: 10px;
+    }
+  </style>
 </head>
 <body>
   <!-- Navigation -->
@@ -39,17 +260,20 @@
     <section class="hero" style="min-height: auto; padding-bottom: 40px;">
       <div class="hero-content">
         <h1>Setup Guide</h1>
-        <p class="tagline">Installation in 5 minutes</p>
+        <p class="tagline">3 steps. 2 minutes.</p>
         <p class="description">
-          Follow these steps to install Claudezilla and connect it to Claude Code.
-          Works on macOS and Linux with Firefox 91+.
+          Install Claudezilla and connect it to Claude Code.
+          The installer auto-configures everything for you.
         </p>
         <div class="cta-row">
           <a href="https://addons.mozilla.org/firefox/addon/claudezilla/" class="firefox-badge" target="_blank" rel="noopener">
             <img src="https://blog.mozilla.org/addons/files/2020/04/get-the-addon-fx-apr-2020.svg" alt="Get Claudezilla for Firefox">
           </a>
         </div>
-        <p class="install-hint">Then continue with native host setup below.</p>
+        <div class="version-badge">
+          <span class="new">NEW</span>
+          <span>v0.5.6 — Auto-config for Claude Code</span>
+        </div>
       </div>
       <div class="hero-visual">
         <svg class="monster-logo" style="width: 200px; height: 200px;" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-label="Claudezilla logo">
@@ -65,10 +289,6 @@
               <stop offset="50%" stop-color="#FCD34D" stop-opacity="1"/>
               <stop offset="100%" stop-color="#F59E0B" stop-opacity="0.8"/>
             </radialGradient>
-            <linearGradient id="heroSpineGlow2" x1="0%" y1="100%" x2="0%" y2="0%">
-              <stop offset="0%" stop-color="#D14D32" stop-opacity="0.8"/>
-              <stop offset="100%" stop-color="#FCD34D" stop-opacity="0.4"/>
-            </linearGradient>
           </defs>
           <g class="hero-tesseract">
             <path d="M32 6 L56 17 L56 47 L32 58 L8 47 L8 17 Z" stroke="#D14D32" stroke-width="1.5" fill="none" stroke-linejoin="round" opacity="0.7"/>
@@ -90,61 +310,9 @@
 
     <!-- Installation Steps -->
     <section class="setup-guide">
-      <h2 class="section-title">Native Host Setup</h2>
+      <h2 class="section-title">Quick Start</h2>
       <p class="section-subtitle">
-        The extension needs a native messaging host to communicate with Claude Code.
-      </p>
-
-      <div class="steps">
-        <div class="step">
-          <div class="step-number">1</div>
-          <div class="step-content">
-            <h3>Clone Repository</h3>
-            <p>Clone Claudezilla from GitHub and navigate to the directory.</p>
-            <pre><code>git clone https://github.com/boot-industries/claudezilla.git
-cd claudezilla</code></pre>
-          </div>
-        </div>
-
-        <div class="step">
-          <div class="step-number">2</div>
-          <div class="step-content">
-            <h3>Install Native Host</h3>
-            <p>Run the install script for your platform. This sets up the native messaging host.</p>
-            <pre><code># macOS
-./install/install-macos.sh
-
-# Linux
-./install/install-linux.sh</code></pre>
-          </div>
-        </div>
-
-        <div class="step">
-          <div class="step-number">3</div>
-          <div class="step-content">
-            <h3>Configure Claude Code</h3>
-            <p>Add Claudezilla to your MCP configuration at <code>~/.claude/mcp.json</code>:</p>
-            <pre><code>{
-  "mcpServers": {
-    "claudezilla": {
-      "command": "node",
-      "args": ["/path/to/claudezilla/mcp/server.js"]
-    }
-  }
-}</code></pre>
-            <p style="margin-top: 16px;">Then install MCP server dependencies and restart Claude Code:</p>
-            <pre><code>cd claudezilla/mcp && npm install</code></pre>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Permission Setup -->
-    <section class="setup-guide">
-      <h2 class="section-title">🔒 Enable Private Window Access</h2>
-      <p class="section-subtitle">
-        Claudezilla works best with private window permission. This gives Claude full browser
-        control while keeping your automation isolated and secure.
+        The installer configures everything automatically — MCP server, permissions, and dependencies.
       </p>
 
       <div class="steps">
@@ -152,25 +320,8 @@ cd claudezilla</code></pre>
         <div class="step">
           <div class="step-number">1</div>
           <div class="step-content">
-            <h3>Open Extension Settings</h3>
-            <p>Navigate to Firefox Add-ons manager.</p>
-            <div class="diagram">
-              <div class="browser-chrome">
-                <div class="browser-tabs">
-                  <div class="browser-tab">New Tab</div>
-                  <div class="browser-tab active">Add-ons and Themes</div>
-                  <div class="browser-tab">Settings</div>
-                </div>
-                <div class="browser-address">about:addons</div>
-              </div>
-              <div style="position: relative; margin-top: 16px;">
-                <div class="arrow-indicator" style="top: -10px; right: 20px;">
-                  <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M20 5 L20 30 M20 30 L10 20 M20 30 L30 20" stroke="#D14D32" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-                  </svg>
-                </div>
-              </div>
-            </div>
+            <h3>Install Firefox Extension</h3>
+            <p>Get Claudezilla from Mozilla Add-ons. Click the button above or search "Claudezilla" in Firefox.</p>
           </div>
         </div>
 
@@ -178,38 +329,72 @@ cd claudezilla</code></pre>
         <div class="step">
           <div class="step-number">2</div>
           <div class="step-content">
-            <h3>Find Claudezilla Extension</h3>
-            <p>Locate "Claudezilla" in your installed extensions list.</p>
-            <div class="diagram">
-              <div class="extension-list">
-                <div class="extension-item">
-                  <div class="icon">🔒</div>
-                  <div class="info">
-                    <div class="name">Privacy Badger</div>
-                    <div class="description">Blocks invisible trackers</div>
-                  </div>
-                </div>
-                <div class="extension-item highlighted">
-                  <div class="icon">🦖</div>
-                  <div class="info">
-                    <div class="name">Claudezilla</div>
-                    <div class="description">Browser automation for Claude Code</div>
-                  </div>
-                </div>
-                <div class="extension-item">
-                  <div class="icon">🎨</div>
-                  <div class="info">
-                    <div class="name">Dark Reader</div>
-                    <div class="description">Dark mode for every website</div>
-                  </div>
+            <h3>Run Installer <span class="auto-badge"><span class="dot"></span>Auto-Config</span></h3>
+            <p>Clone the repo and run the installer for your platform. It handles everything else.</p>
+
+            <!-- Platform Tabs -->
+            <div class="platform-tabs">
+              <button class="platform-tab active" data-platform="macos">
+                <span class="icon"></span> macOS
+              </button>
+              <button class="platform-tab" data-platform="linux">
+                <span class="icon"></span> Linux
+              </button>
+              <button class="platform-tab" data-platform="windows">
+                <span class="icon"></span> Windows
+              </button>
+            </div>
+
+            <!-- macOS -->
+            <div class="platform-content active" data-platform="macos">
+              <pre><code>git clone https://github.com/boot-industries/claudezilla.git
+cd claudezilla
+./install/install-macos.sh</code></pre>
+            </div>
+
+            <!-- Linux -->
+            <div class="platform-content" data-platform="linux">
+              <pre><code>git clone https://github.com/boot-industries/claudezilla.git
+cd claudezilla
+./install/install-linux.sh</code></pre>
+            </div>
+
+            <!-- Windows -->
+            <div class="platform-content" data-platform="windows">
+              <pre><code># Run PowerShell as Administrator
+git clone https://github.com/boot-industries/claudezilla.git
+cd claudezilla
+.\install\install-windows.ps1</code></pre>
+            </div>
+
+            <!-- What gets configured -->
+            <div class="config-list">
+              <div class="config-item">
+                <div class="check">✓</div>
+                <div class="details">
+                  <strong>Native Messaging Host</strong>
+                  <span>Connects Firefox extension to Claude Code</span>
                 </div>
               </div>
-              <div style="position: relative; margin-top: 16px;">
-                <div class="arrow-indicator" style="top: -60px; left: 50%; transform: translateX(-50%);">
-                  <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="20" cy="20" r="18" stroke="#D14D32" stroke-width="3" fill="none"/>
-                    <path d="M20 10 L20 30 M15 25 L20 30 L25 25" stroke="#D14D32" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-                  </svg>
+              <div class="config-item">
+                <div class="check">✓</div>
+                <div class="details">
+                  <strong>MCP Server Registration</strong>
+                  <span>Auto-adds to ~/.claude/mcp.json</span>
+                </div>
+              </div>
+              <div class="config-item">
+                <div class="check">✓</div>
+                <div class="details">
+                  <strong>Tool Permissions</strong>
+                  <span>Auto-allows mcp__claudezilla__* in settings.json</span>
+                </div>
+              </div>
+              <div class="config-item">
+                <div class="check">✓</div>
+                <div class="details">
+                  <strong>Dependencies</strong>
+                  <span>Installs npm packages for MCP server</span>
                 </div>
               </div>
             </div>
@@ -218,10 +403,72 @@ cd claudezilla</code></pre>
 
         <!-- Step 3 -->
         <div class="step">
-          <div class="step-number">3</div>
+          <div class="step-number success">3</div>
           <div class="step-content">
-            <h3>Enable Private Window Permission</h3>
-            <p>Click on Claudezilla details, then toggle "Run in Private Windows" to ON.</p>
+            <h3>Restart Claude Code</h3>
+            <p>Close and reopen Claude Code (or run <code>/mcp</code>) to load the new MCP server. That's it!</p>
+            <pre><code># Verify connection in Claude Code
+"Claude, take a screenshot of https://example.com"</code></pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- Manual Config Collapsible -->
+      <div class="collapsible">
+        <button class="collapsible-trigger" onclick="toggleCollapsible(this)">
+          <span class="icon">▶</span>
+          <h4>Manual Configuration (if auto-config fails)</h4>
+        </button>
+        <div class="collapsible-content">
+          <p style="margin-bottom: 16px; color: var(--text-secondary);">
+            If the installer couldn't auto-configure Claude Code, add these manually:
+          </p>
+
+          <h4 style="color: var(--terracotta); margin-bottom: 12px; font-family: 'Orbitron', sans-serif; font-size: 14px;">~/.claude/mcp.json</h4>
+          <pre><code>{
+  "mcpServers": {
+    "claudezilla": {
+      "command": "node",
+      "args": ["/path/to/claudezilla/mcp/server.js"]
+    }
+  }
+}</code></pre>
+
+          <h4 style="color: var(--terracotta); margin: 24px 0 12px; font-family: 'Orbitron', sans-serif; font-size: 14px;">~/.claude/settings.json</h4>
+          <pre><code>{
+  "permissions": {
+    "allow": ["mcp__claudezilla__*"]
+  }
+}</code></pre>
+
+          <p style="margin-top: 16px; color: var(--text-secondary); font-size: 14px;">
+            Replace <code>/path/to/claudezilla</code> with the actual path where you cloned the repo.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Permission Setup -->
+    <section class="setup-guide">
+      <h2 class="section-title">Enable Private Windows</h2>
+      <p class="section-subtitle">
+        Claudezilla uses private windows for isolation. Enable this permission for full functionality.
+      </p>
+
+      <div class="steps">
+        <div class="step">
+          <div class="step-number">1</div>
+          <div class="step-content">
+            <h3>Open Extension Settings</h3>
+            <p>Navigate to <code>about:addons</code> in Firefox and find Claudezilla.</p>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-number">2</div>
+          <div class="step-content">
+            <h3>Toggle Private Window Access</h3>
+            <p>Click on Claudezilla, then enable "Run in Private Windows".</p>
             <div class="diagram">
               <div style="background: #1a1a1a; padding: 20px; border-radius: 6px;">
                 <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 20px;">
@@ -241,13 +488,6 @@ cd claudezilla</code></pre>
                   </div>
                 </div>
               </div>
-              <div style="position: relative; margin-top: 16px;">
-                <div class="arrow-indicator" style="top: -100px; right: 80px;">
-                  <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M5 20 L30 20 M30 20 L20 10 M30 20 L20 30" stroke="#D14D32" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-                  </svg>
-                </div>
-              </div>
             </div>
           </div>
         </div>
@@ -256,40 +496,38 @@ cd claudezilla</code></pre>
       <div class="note">
         <strong>⚡ Why Private Windows?</strong>
         <p>
-          Private window permission allows Claude to create and control browser tabs without
-          interference. You can still use Claudezilla without this permission, but some features
-          will be restricted. You can enable this anytime from <code>about:addons</code>.
+          Private windows provide isolation for browser automation. Your automation runs separately
+          from your normal browsing. You can skip this, but some features will be limited.
         </p>
       </div>
     </section>
 
-    <!-- Verify Installation -->
+    <!-- Troubleshooting -->
     <section class="setup-guide">
-      <h2 class="section-title">Verify Installation</h2>
-      <p class="section-subtitle">
-        Test that everything is working correctly.
-      </p>
+      <h2 class="section-title">Troubleshooting</h2>
 
-      <div class="steps">
-        <div class="step">
-          <div class="step-number">✓</div>
-          <div class="step-content">
-            <h3>Test with Claude</h3>
-            <p>Open Claude Code and try a simple command:</p>
-            <pre><code>"Claude, open https://example.com and take a screenshot"</code></pre>
-            <p style="margin-top: 16px; color: var(--text-secondary);">
-              If Claude can open Firefox and capture a screenshot, you're all set!
-            </p>
-          </div>
-        </div>
+      <div class="note" style="margin-top: 0;">
+        <strong>🔧 Connection Issues?</strong>
+        <p>
+          Check the debug log at <code>/tmp/claudezilla-debug.log</code> (macOS/Linux) or
+          <code>%TEMP%\claudezilla-debug.log</code> (Windows). Make sure Firefox is running
+          before starting Claude Code. Click the Claudezilla icon in Firefox to test the connection.
+        </p>
       </div>
 
       <div class="note">
-        <strong>🔧 Troubleshooting</strong>
+        <strong>🔄 MCP Not Loading?</strong>
         <p>
-          Check <code>/tmp/claudezilla-debug.log</code> for connection issues.
-          Verify the extension is visible in <code>about:addons</code>.
-          Restart Claude Code after any MCP configuration changes.
+          Run <code>/mcp</code> in Claude Code to reconnect. If Claudezilla isn't listed,
+          check that <code>~/.claude/mcp.json</code> has the correct path to <code>server.js</code>.
+        </p>
+      </div>
+
+      <div class="note">
+        <strong>🔒 Permission Denied?</strong>
+        <p>
+          If Claude asks for permission on every tool call, ensure <code>mcp__claudezilla__*</code>
+          is in your <code>~/.claude/settings.json</code> allow list.
         </p>
       </div>
     </section>
@@ -326,6 +564,28 @@ cd claudezilla</code></pre>
   </footer>
 
   <script>
+    // Platform tab switching
+    document.querySelectorAll('.platform-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        const platform = tab.dataset.platform;
+
+        // Update tabs
+        document.querySelectorAll('.platform-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+
+        // Update content
+        document.querySelectorAll('.platform-content').forEach(c => c.classList.remove('active'));
+        document.querySelector(`.platform-content[data-platform="${platform}"]`).classList.add('active');
+      });
+    });
+
+    // Collapsible toggle
+    function toggleCollapsible(trigger) {
+      trigger.classList.toggle('open');
+      const content = trigger.nextElementSibling;
+      content.classList.toggle('open');
+    }
+
     // Check for Stripe checkout success redirect
     (function() {
       const urlParams = new URLSearchParams(window.location.search);
@@ -333,13 +593,11 @@ cd claudezilla</code></pre>
 
       if (sessionId) {
         showThankYouModal();
-        // Clear session_id from URL
         const newUrl = window.location.pathname;
         window.history.replaceState({}, document.title, newUrl);
       }
 
       function showThankYouModal() {
-        // SECURITY: Use safe DOM methods instead of innerHTML
         const overlay = document.createElement('div');
         overlay.className = 'thank-you-overlay';
 
@@ -368,7 +626,6 @@ cd claudezilla</code></pre>
 
         document.body.appendChild(overlay);
 
-        // Auto-close after 4 seconds
         setTimeout(() => {
           overlay.style.opacity = '0';
           setTimeout(() => overlay.remove(), 300);

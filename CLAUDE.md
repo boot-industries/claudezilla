@@ -1,15 +1,17 @@
 # Claudezilla - Claude Code Firefox Extension
 
-**Version:** 0.5.5
+**Version:** 0.5.6
 
 ## Overview
 
 Firefox extension providing browser automation for Claude Code CLI. A Google-free alternative to the official Chrome extension.
 
-**Key Features (v0.5.5):**
-- **NEW: Windows 10/11 support** - Named pipes, ACL security, platform-independent IPC abstraction
-- **NEW: Path security validation** - Prevents null bytes, path traversal, UNC injection
-- **NEW: PowerShell installer hardening** - ConvertTo-Json serialization, process check on uninstall
+**Key Features (v0.5.6):**
+- **NEW: Autonomous installation** - Installers auto-configure Claude Code permissions and MCP settings
+- **NEW: Extended timeouts** - 150s request timeout for long-running browser operations
+- Windows 10/11 support - Named pipes, ACL security, platform-independent IPC abstraction
+- Path security validation - Prevents null bytes, path traversal, UNC injection
+- PowerShell installer hardening - ConvertTo-Json serialization, process check on uninstall
 - Expression validation - Blocked dangerous patterns in `firefox_evaluate` (fetch, eval, cookies)
 - Agent ID truncation - Privacy-enhanced logging (12-char truncation in all outputs)
 - Selector search optimization - Early exit and 100-element limit per category
@@ -19,7 +21,7 @@ Firefox extension providing browser automation for Claude Code CLI. A Google-fre
 - Orphaned tab cleanup - Automatic cleanup of tabs from disconnected agents (2-minute timeout)
 - Fair multi-agent coordination - POOL_FULL and MUTEX_BUSY errors with clear feedback
 - Focus loops - Persistent iterative development like Ralph Wiggum
-- Single window with max 10 tabs shared across Claude agents
+- Single window with max 12 tabs shared across Claude agents
 - Multi-agent safety (tab ownership, screenshot mutex, 128-bit agent IDs, own-tab-only eviction)
 - Security hardening (socket permissions, URL validation, selector validation)
 - Image compression (JPEG 60%, 50% scale by default)
@@ -122,7 +124,7 @@ claudezilla@boot.industries
 |---------|-------------|
 | ping | Test connection |
 | version | Get host version info |
-| createWindow | Open URL in shared 10-tab pool |
+| createWindow | Open URL in shared 12-tab pool |
 | navigate | Navigate tab to URL (with tabId: owned tabs only) |
 | closeTab | Close specific tab by ID |
 | closeWindow | Close entire window |
@@ -269,39 +271,46 @@ Dynamic page readiness detection replaces hardcoded delays. Screenshots now wait
 - If agent has no tabs but needs one, returns `POOL_FULL` error with hint to use mercy system
 - No silent eviction of other agents' tabs
 
-**Mercy System (v0.4.4):**
-When blocked by POOL_FULL, agents can request tab space:
+**Mercy System (v0.4.4, enhanced v0.5.6):**
+When blocked by POOL_FULL, agents can request tab space with guaranteed slot reservation:
 1. Blocked agent calls `firefox_request_tab_space` → queues request
-2. Agents with >4 tabs see pending requests via `firefox_get_slot_requests`
-3. Generous agent calls `firefox_grant_tab_space` → releases oldest tab to waiting agent
+2. When any agent closes a tab or calls `grantTabSpace`, a **30-second slot reservation** is created
+3. Waiting agent calls `firefox_get_slot_requests` to check `youHaveReservation` status
+4. If reserved, call `createWindow` to claim the slot (bypasses POOL_FULL check during reservation window)
 
 | Command | Description |
 |---------|-------------|
 | `firefox_request_tab_space` | Queue request for tab space (used when POOL_FULL) |
-| `firefox_grant_tab_space` | Release oldest tab to help waiting agent (requires >2 tabs) |
-| `firefox_get_slot_requests` | Check if agents are waiting for space |
+| `firefox_grant_tab_space` | Release oldest tab, creates 30s reservation for waiting agent |
+| `firefox_get_slot_requests` | Check pending requests, active reservations, your reservation status |
 
-**Orphaned Tab Cleanup (v0.4.5):**
-Automatic cleanup of tabs from disconnected agents prevents tab pool exhaustion:
+**Slot Reservation (v0.5.6):**
+- Reservations prevent other agents from stealing freed slots
+- 30-second TTL (configurable via `SLOT_RESERVATION_TTL_MS`)
+- `createWindow` checks for valid reservation and allows reserved agent through
+- Expired reservations are automatically cleaned up
+- `getSlotRequests` response includes `youHaveReservation`, `reservationExpiresInMs`
+
+**Session Cleanup (v0.5.6):**
+When a Claude session ends, its tabs are cleaned up immediately:
+- **Graceful exit**: MCP server sends `goodbye` command on SIGINT/SIGTERM/SIGHUP/beforeExit
+- **Immediate cleanup**: Extension closes all tabs owned by the exiting agent
+- **State cleanup**: Also removes agent's slot reservations and pending requests
+- **Logging**: Cleanup events logged with agent ID (truncated) and tab count
+
+**Orphaned Tab Cleanup (v0.4.5 fallback):**
+For hard crashes (SIGKILL, OOM) where `goodbye` cannot be sent:
 - **Heartbeat tracking**: MCP server tracks agent activity via command timestamps
 - **Timeout threshold**: Agent is orphaned if no commands received in 2 minutes (120s)
 - **Periodic cleanup**: MCP server checks every 60s for orphaned agents
 - **Automatic recovery**: All tabs from orphaned agent are closed and space returned to pool
-- **Logging**: Cleanup events logged to MCP server stderr with agent ID and tab count
-
-How it works:
-1. Each agent command updates heartbeat timestamp in MCP server
-2. Every 60s, MCP server checks for agents with no activity in >120s
-3. For each orphaned agent, MCP server sends `cleanupOrphanedTabs` command to extension
-4. Extension closes all tabs owned by orphaned agent and updates tab pool tracking
-5. Freed tab space becomes immediately available for active agents
 
 This solves the "ghost agent" problem where tabs remain allocated to Claude sessions that have crashed, been killed, or lost connection.
 
 **Screenshot Mutex:**
 - All screenshot requests are serialized via promise chain
 - Prevents tab-switching collisions when multiple agents screenshot simultaneously
-- If mutex held >5s by another agent, returns `MUTEX_BUSY` error:
+- If mutex held >3s by another agent, returns `MUTEX_BUSY` error:
   ```
   MUTEX_BUSY: Screenshot mutex held by another agent.
     Holder: agent_ec2e...
@@ -324,7 +333,7 @@ This solves the "ghost agent" problem where tabs remain allocated to Claude sess
 - Uses XDG_RUNTIME_DIR when available (secure temp path)
 
 **Input Validation:**
-- URL schemes whitelisted: `http:`, `https:`, `about:` only
+- URL schemes whitelisted: `http:`, `https:`, `about:`, `file:` (local files)
 - CSS selectors validated with length limit (1000 chars)
 - Sensitive URL parameters redacted in network monitoring
 

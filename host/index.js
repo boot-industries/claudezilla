@@ -261,13 +261,13 @@ function handleCliCommand(command, params, authToken, callback) {
   // Store callback for when extension responds
   pendingCliRequests.set(id, callback);
 
-  // Set timeout to prevent hanging
+  // Set timeout to prevent hanging (2.5 minutes for long-running operations)
   setTimeout(() => {
     if (pendingCliRequests.has(id)) {
       pendingCliRequests.delete(id);
       callback({ success: false, error: 'Request timed out' });
     }
-  }, 30000);
+  }, 150000);
 
   // Send command to extension via native messaging
   log(`Forwarding CLI command to extension: ${command}`);
@@ -298,10 +298,10 @@ function handleExtensionMessage(message) {
       id,
       success: true,
       result: {
-        host: '0.5.5',
+        host: '0.5.6',
         node: process.version,
         platform: process.platform,
-        features: ['security-hardened', 'focus-loop', 'auto-retry', 'task-detection', 'expression-validation', 'windows-support'],
+        features: ['security-hardened', 'focus-loop', 'auto-retry', 'task-detection', 'expression-validation', 'windows-support', 'autonomous-install'],
       },
     });
   }

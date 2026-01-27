@@ -33,8 +33,8 @@ let reconnectAttempt = 0;
 let reconnectTimer = null;
 let lastDisconnectReason = null;
 
-// Session tracking - single window, max 10 tabs
-const MAX_TABS = 10;
+// Session tracking - single window, max 12 tabs
+const MAX_TABS = 12;
 let claudezillaWindow = null; // { windowId, tabs: [{tabId, ownerId}, ...], createdAt, groupId }
 let activeTabId = null; // Currently active tab in the Claudezilla window
 
@@ -42,10 +42,15 @@ let activeTabId = null; // Currently active tab in the Claudezilla window
 // (captureVisibleTab only works on visible tab, so we must switch tabs sequentially)
 let screenshotLock = Promise.resolve();
 let screenshotMutexHolder = null;    // { agentId, acquiredAt, operation }
-const MUTEX_BUSY_THRESHOLD_MS = 5000; // Return MUTEX_BUSY if held longer than this
+const MUTEX_BUSY_THRESHOLD_MS = 3000; // Return MUTEX_BUSY if held longer than this
 
 // Tab pool coordination - pending slot requests from agents
 const pendingSlotRequests = [];  // [{ agentId, requestedAt }]
+
+// Slot reservations - when a slot is freed for a waiting agent, reserve it
+// Map: agentId -> { reservedAt, expiresAt }
+const slotReservations = new Map();
+const SLOT_RESERVATION_TTL_MS = 30000; // 30 seconds to claim reserved slot
 
 // Tab group colors (Firefox 138+)
 const SESSION_COLORS = ['blue', 'red', 'yellow', 'green', 'pink', 'cyan', 'orange', 'grey'];
@@ -58,7 +63,8 @@ const networkRequests = [];
 const MAX_NETWORK_ENTRIES = 200;
 
 // SECURITY: Allowed URL schemes for navigation
-const ALLOWED_URL_SCHEMES = ['http:', 'https:', 'about:'];
+// file: allowed since Claude Code runs locally with full filesystem access
+const ALLOWED_URL_SCHEMES = ['http:', 'https:', 'about:', 'file:'];
 
 // SECURITY: Sensitive query parameter patterns to redact
 const SENSITIVE_PARAMS = ['password', 'passwd', 'pwd', 'token', 'api_key', 'apikey', 'secret', 'auth', 'key', 'credential'];
@@ -85,7 +91,7 @@ function redactSensitiveUrl(url) {
 
 /**
  * SECURITY: Validate URL scheme before navigation
- * Prevents javascript:, data:, file:// injection attacks
+ * Prevents javascript:, data: injection attacks
  */
 function validateUrlScheme(url) {
   if (!url || url === 'about:blank') return true;
@@ -481,13 +487,13 @@ function sendToHost(command, params = {}) {
 
     pendingRequests.set(id, { resolve, reject });
 
-    // Timeout after 30 seconds
+    // Timeout after 2.5 minutes (150s) to support long-running browser operations
     setTimeout(() => {
       if (pendingRequests.has(id)) {
         pendingRequests.delete(id);
         reject(new Error(`Request ${id} timed out`));
       }
-    }, 30000);
+    }, 150000);
 
     console.log('[claudezilla] Sending to host:', message);
     port.postMessage(message);
@@ -520,7 +526,35 @@ function handleHostMessage(message) {
  * @returns {Promise<object>} Result from content script
  */
 async function executeInTab(tabId, action, params) {
-  return browser.tabs.sendMessage(tabId, { action, params });
+  try {
+    return await browser.tabs.sendMessage(tabId, { action, params });
+  } catch (err) {
+    // Improve cryptic "Receiving end does not exist" error
+    if (err.message?.includes('Receiving end does not exist')) {
+      // Get tab info to provide context
+      let tabInfo = '';
+      try {
+        const tab = await browser.tabs.get(tabId);
+        tabInfo = `\n  URL: ${tab.url}\n  Title: ${tab.title || '(none)'}`;
+
+        // Check for common issues
+        if (tab.title === 'Problem loading page' || tab.title === 'Server Not Found') {
+          throw new Error(`PAGE_LOAD_FAILED: The page failed to load.${tabInfo}\n  Hint: Check if the server is running, or navigate to a different URL.`);
+        }
+        if (tab.url?.startsWith('about:') || tab.url?.startsWith('chrome:') || tab.url?.startsWith('moz-extension:')) {
+          throw new Error(`RESTRICTED_PAGE: Content scripts cannot run on this page.${tabInfo}\n  Hint: Navigate to an http://, https://, or file:// URL.`);
+        }
+      } catch (tabErr) {
+        if (tabErr.message?.startsWith('PAGE_LOAD_FAILED') || tabErr.message?.startsWith('RESTRICTED_PAGE')) {
+          throw tabErr;
+        }
+        tabInfo = `\n  (Could not get tab info: ${tabErr.message})`;
+      }
+
+      throw new Error(`CONTENT_SCRIPT_UNAVAILABLE: Cannot communicate with tab ${tabId}.${tabInfo}\n  Hint: The page may still be loading. Try again in a moment, or reload the tab.`);
+    }
+    throw err;
+  }
 }
 
 /**
@@ -597,9 +631,9 @@ async function handleCliCommand(message) {
 
       case 'version':
         result = {
-          extension: '0.5.5',
+          extension: '0.5.6',
           browser: navigator.userAgent,
-          features: ['devtools', 'network', 'console', 'evaluate', 'focusglow', 'tabgroups', 'security-hardened', 'orphan-cleanup', 'focus-loop', 'auto-retry', 'task-detection', 'expression-validation', 'windows-support'],
+          features: ['devtools', 'network', 'console', 'evaluate', 'focusglow', 'tabgroups', 'security-hardened', 'orphan-cleanup', 'focus-loop', 'auto-retry', 'task-detection', 'expression-validation', 'windows-support', 'autonomous-install'],
         };
         break;
 
@@ -614,7 +648,7 @@ async function handleCliCommand(message) {
         const { url, tabId: targetTabId, agentId } = params;
         if (!url) throw new Error('url is required');
 
-        // SECURITY: Validate URL scheme (blocks javascript:, data:, file://)
+        // SECURITY: Validate URL scheme (blocks javascript:, data:)
         validateUrlScheme(url);
 
         // If tabId provided, navigate that specific Claudezilla tab (with ownership check)
@@ -652,7 +686,7 @@ async function handleCliCommand(message) {
       case 'getTabs': {
         // Return Claudezilla tabs with ownership info
         if (!claudezillaWindow) {
-          result = { tabs: [], message: 'No Claudezilla window active' };
+          result = { tabs: [], tabCount: 0, maxTabs: MAX_TABS, message: 'No Claudezilla window active' };
           break;
         }
         const tabsInfo = await Promise.all(
@@ -682,12 +716,12 @@ async function handleCliCommand(message) {
 
       case 'createWindow': {
         // Single window mode: reuse existing window or create new one
-        // Max 10 tabs - oldest tab closed when limit reached
+        // Max 12 tabs - oldest tab closed when limit reached
         // Tab ownership: each tab tracks its creator agent for close permission
         const { url, agentId } = params;
         const ownerId = agentId || 'unknown';
 
-        // SECURITY: Validate URL scheme (blocks javascript:, data:, file://)
+        // SECURITY: Validate URL scheme (blocks javascript:, data:)
         if (url) {
           validateUrlScheme(url);
         }
@@ -707,44 +741,70 @@ async function handleCliCommand(message) {
 
         if (claudezillaWindow) {
           // Reuse existing window - create new tab
-          // If at max tabs, try to evict ONLY OWN tabs first
+          // If at max tabs, check reservations and try to evict ONLY OWN tabs
           if (claudezillaWindow.tabs.length >= MAX_TABS) {
-            // Find tabs owned by this agent
-            const ownTabs = claudezillaWindow.tabs.filter(t => t.ownerId === ownerId);
+            // Clean up expired reservations first
+            const now = Date.now();
+            for (const [agentId, reservation] of slotReservations.entries()) {
+              if (now > reservation.expiresAt) {
+                slotReservations.delete(agentId);
+                console.log(`[claudezilla] Reservation expired for ${agentId.slice(0, 12)}...`);
+              }
+            }
 
-            if (ownTabs.length > 0) {
-              // Evict oldest of OUR OWN tabs only
-              const oldestOwn = ownTabs[0]; // First = oldest
-              const tabIndex = claudezillaWindow.tabs.findIndex(t => t.tabId === oldestOwn.tabId);
-              if (tabIndex !== -1) {
-                claudezillaWindow.tabs.splice(tabIndex, 1);
-              }
-              closedTabId = oldestOwn.tabId;
-              try {
-                await browser.tabs.remove(closedTabId);
-                console.log(`[claudezilla] Evicted own tab ${closedTabId} (max ${MAX_TABS} tabs)`);
-              } catch (e) {
-                console.log('[claudezilla] Could not close own tab:', e.message);
-              }
+            // Check if THIS agent has a valid reservation (they get priority)
+            const myReservation = slotReservations.get(ownerId);
+            if (myReservation && now <= myReservation.expiresAt) {
+              // Agent has a reservation - consume it and proceed
+              slotReservations.delete(ownerId);
+              console.log(`[claudezilla] Agent ${ownerId.slice(0, 12)}... claimed reserved slot`);
+              // Fall through to create tab - we'll temporarily exceed MAX_TABS by 1
+              // but the waiting agent's slot was freed by closeTab/grantTabSpace
             } else {
-              // Agent has NO tabs in pool - cannot evict others' tabs
-              // Build owner breakdown for error message
-              const ownerCounts = {};
-              for (const t of claudezillaWindow.tabs) {
-                const shortId = t.ownerId ? t.ownerId.slice(0, 12) + '...' : 'unknown';
-                ownerCounts[shortId] = (ownerCounts[shortId] || 0) + 1;
-              }
-              const breakdown = Object.entries(ownerCounts)
-                .map(([id, count]) => `${id}: ${count}`)
-                .join(', ');
+              // No reservation - must evict own tab or fail
+              // Find tabs owned by this agent
+              const ownTabs = claudezillaWindow.tabs.filter(t => t.ownerId === ownerId);
 
-              throw {
-                code: 'POOL_FULL',
-                message: `Tab pool full (${MAX_TABS}/${MAX_TABS}). You have no tabs to evict.`,
-                tabPool: `${claudezillaWindow.tabs.length}/${MAX_TABS}`,
-                ownerBreakdown: breakdown,
-                hint: 'Use firefox_request_tab_space to queue a slot request. Agents with >4 tabs will be notified.'
-              };
+              if (ownTabs.length > 0) {
+                // Evict oldest of OUR OWN tabs only
+                const oldestOwn = ownTabs[0]; // First = oldest
+                const tabIndex = claudezillaWindow.tabs.findIndex(t => t.tabId === oldestOwn.tabId);
+                if (tabIndex !== -1) {
+                  claudezillaWindow.tabs.splice(tabIndex, 1);
+                }
+                closedTabId = oldestOwn.tabId;
+                try {
+                  await browser.tabs.remove(closedTabId);
+                  console.log(`[claudezilla] Evicted own tab ${closedTabId} (max ${MAX_TABS} tabs)`);
+                } catch (e) {
+                  console.log('[claudezilla] Could not close own tab:', e.message);
+                }
+              } else {
+                // Agent has NO tabs in pool - cannot evict others' tabs
+                // Build owner breakdown for error message
+                const ownerCounts = {};
+                for (const t of claudezillaWindow.tabs) {
+                  const shortId = t.ownerId ? t.ownerId.slice(0, 12) + '...' : 'unknown';
+                  ownerCounts[shortId] = (ownerCounts[shortId] || 0) + 1;
+                }
+                const breakdown = Object.entries(ownerCounts)
+                  .map(([id, count]) => `${id}: ${count}`)
+                  .join(', ');
+
+                // Check if there are active reservations blocking this agent
+                const activeReservations = Array.from(slotReservations.entries())
+                  .filter(([_, r]) => now <= r.expiresAt)
+                  .map(([id, r]) => `${id.slice(0, 12)}... (${Math.round((r.expiresAt - now) / 1000)}s left)`);
+
+                throw {
+                  code: 'POOL_FULL',
+                  message: `Tab pool full (${MAX_TABS}/${MAX_TABS}). You have no tabs to evict.`,
+                  tabPool: `${claudezillaWindow.tabs.length}/${MAX_TABS}`,
+                  ownerBreakdown: breakdown,
+                  activeReservations: activeReservations.length > 0 ? activeReservations : undefined,
+                  hint: 'Use firefox_request_tab_space to queue a slot request. Agents with >4 tabs will be notified.'
+                };
+              }
             }
           }
 
@@ -821,7 +881,7 @@ async function handleCliCommand(message) {
       }
 
       case 'closeTab': {
-        // Close a specific tab - use this to free up slots in the shared 10-tab pool
+        // Close a specific tab - use this to free up slots in the shared 12-tab pool
         // OWNERSHIP: Only the agent that created the tab can close it
         const { tabId: closeTabId, agentId } = params;
 
@@ -863,7 +923,16 @@ async function handleCliCommand(message) {
         }
 
         // Check if any pending slot requests can now be fulfilled
+        // If so, create a reservation for that agent so they can claim the slot
         const fulfilledRequest = pendingSlotRequests.shift();
+        if (fulfilledRequest) {
+          const now = Date.now();
+          slotReservations.set(fulfilledRequest.agentId, {
+            reservedAt: now,
+            expiresAt: now + SLOT_RESERVATION_TTL_MS
+          });
+          console.log(`[claudezilla] Reserved slot for ${fulfilledRequest.agentId.slice(0, 12)}... (30s TTL)`);
+        }
 
         result = {
           closed: true,
@@ -871,7 +940,8 @@ async function handleCliCommand(message) {
           tabCount: claudezillaWindow.tabs.length,
           maxTabs: MAX_TABS,
           message: `Tab closed. ${claudezillaWindow.tabs.length}/${MAX_TABS} tabs remaining.`,
-          slotFreed: fulfilledRequest ? fulfilledRequest.agentId : null
+          slotFreed: fulfilledRequest ? fulfilledRequest.agentId : null,
+          reservationCreated: fulfilledRequest ? true : false
         };
         break;
       }
@@ -966,8 +1036,14 @@ async function handleCliCommand(message) {
           console.log('[claudezilla] Could not close tab:', e.message);
         }
 
-        // Notify waiting agent
+        // Create reservation for waiting agent so they can claim the slot
         const grantedTo = pendingSlotRequests.shift();
+        const now = Date.now();
+        slotReservations.set(grantedTo.agentId, {
+          reservedAt: now,
+          expiresAt: now + SLOT_RESERVATION_TTL_MS
+        });
+        console.log(`[claudezilla] Reserved slot for ${grantedTo.agentId.slice(0, 12)}... via grantTabSpace (30s TTL)`);
 
         result = {
           granted: true,
@@ -976,29 +1052,48 @@ async function handleCliCommand(message) {
           tabCount: claudezillaWindow.tabs.length,
           maxTabs: MAX_TABS,
           pendingRequests: pendingSlotRequests.length,
+          reservationCreated: true,
           message: `Released tab ${oldestOwn.tabId}. Slot granted to waiting agent.`
         };
         break;
       }
 
       case 'getSlotRequests': {
-        // Check pending slot requests and your tab count
+        // Check pending slot requests, reservations, and your tab count
         const { agentId } = params;
 
         const ownTabCount = claudezillaWindow
           ? claudezillaWindow.tabs.filter(t => t.ownerId === agentId).length
           : 0;
 
+        // Check if this agent has a reservation
+        const now = Date.now();
+        const myReservation = slotReservations.get(agentId);
+        const hasValidReservation = myReservation && now <= myReservation.expiresAt;
+
+        // List active reservations
+        const activeReservations = Array.from(slotReservations.entries())
+          .filter(([_, r]) => now <= r.expiresAt)
+          .map(([id, r]) => ({
+            agentId: id.slice(0, 20) + '...',
+            expiresInMs: r.expiresAt - now
+          }));
+
         result = {
           pendingRequests: pendingSlotRequests.map(r => ({
             agentId: r.agentId.slice(0, 20) + '...',
             waitingMs: Date.now() - r.requestedAt
           })),
+          activeReservations,
           yourTabCount: ownTabCount,
+          youHaveReservation: hasValidReservation,
+          reservationExpiresInMs: hasValidReservation ? myReservation.expiresAt - now : null,
           shouldGrant: ownTabCount > 4 && pendingSlotRequests.length > 0,
-          hint: ownTabCount > 4 && pendingSlotRequests.length > 0
-            ? 'You have >4 tabs and agents are waiting. Consider using grantTabSpace.'
-            : null
+          hint: hasValidReservation
+            ? 'You have a reserved slot! Call createWindow now to claim it.'
+            : ownTabCount > 4 && pendingSlotRequests.length > 0
+              ? 'You have >4 tabs and agents are waiting. Consider using grantTabSpace.'
+              : null
         };
         break;
       }
@@ -1057,6 +1152,75 @@ async function handleCliCommand(message) {
           tabCount: claudezillaWindow.tabs.length,
           maxTabs: MAX_TABS,
           message: `Cleaned up ${closedTabIds.length} orphaned tab(s) from agent ${agentId.slice(0, 20)}...`
+        };
+        break;
+      }
+
+      case 'goodbye': {
+        // Agent session is ending gracefully - clean up all tabs owned by this agent
+        // Called by MCP server on SIGINT/SIGTERM/SIGHUP or beforeExit
+        const { agentId } = params;
+
+        if (!agentId) {
+          throw new Error('agentId is required');
+        }
+
+        console.log(`[claudezilla] Goodbye from agent ${agentId.slice(0, 12)}... (session ending)`);
+
+        if (!claudezillaWindow) {
+          result = { tabsClosed: 0, message: 'No Claudezilla window active' };
+          break;
+        }
+
+        // Find all tabs owned by this agent
+        const agentTabs = claudezillaWindow.tabs.filter(t => t.ownerId === agentId);
+
+        if (agentTabs.length === 0) {
+          result = { tabsClosed: 0, message: 'Agent had no tabs to clean up' };
+          break;
+        }
+
+        // Close all tabs owned by this agent
+        const closedTabIds = [];
+        for (const tabEntry of agentTabs) {
+          try {
+            await browser.tabs.remove(tabEntry.tabId);
+            closedTabIds.push(tabEntry.tabId);
+
+            // Remove from tracking
+            const tabIndex = claudezillaWindow.tabs.indexOf(tabEntry);
+            if (tabIndex !== -1) {
+              claudezillaWindow.tabs.splice(tabIndex, 1);
+            }
+
+            console.log(`[claudezilla] Closed tab ${tabEntry.tabId} (agent session ended)`);
+          } catch (e) {
+            console.log(`[claudezilla] Could not close tab ${tabEntry.tabId}:`, e.message);
+          }
+        }
+
+        // Update active tab if we closed it
+        if (closedTabIds.includes(activeTabId)) {
+          const lastTab = claudezillaWindow.tabs[claudezillaWindow.tabs.length - 1];
+          activeTabId = lastTab?.tabId || null;
+        }
+
+        // Also clean up any reservations for this agent
+        slotReservations.delete(agentId);
+
+        // Remove from pending slot requests
+        const pendingIndex = pendingSlotRequests.findIndex(r => r.agentId === agentId);
+        if (pendingIndex !== -1) {
+          pendingSlotRequests.splice(pendingIndex, 1);
+        }
+
+        result = {
+          tabsClosed: closedTabIds.length,
+          closedTabIds,
+          agentId: agentId.slice(0, 12) + '...',
+          tabCount: claudezillaWindow.tabs.length,
+          maxTabs: MAX_TABS,
+          message: `Session ended. Closed ${closedTabIds.length} tab(s).`
         };
         break;
       }
@@ -1232,14 +1396,25 @@ async function handleCliCommand(message) {
         const settings = { compressImages: true, ...(stored.claudezilla || {}) };
         const defaultFormat = settings.compressImages ? 'jpeg' : 'png';
 
+        // Purpose presets - suggestive quality/scale based on intent
+        const PURPOSE_PRESETS = {
+          'quick-glance': { quality: 30, scale: 0.25 },  // Layout/navigation confirmation
+          'read-text': { quality: 60, scale: 0.5 },      // Reading content [DEFAULT]
+          'inspect-ui': { quality: 80, scale: 0.75 },    // UI details/small text
+          'full-detail': { quality: 95, scale: 1.0 },    // Pixel-perfect inspection
+        };
+
+        // Get preset if purpose specified, allow explicit quality/scale to override
+        const preset = params.purpose ? PURPOSE_PRESETS[params.purpose] : null;
+
         const {
           windowId,
           tabId: requestedTabId,
           agentId,
-          quality = 60,
-          scale = 0.5,
+          quality = preset?.quality ?? 60,
+          scale = preset?.scale ?? 0.5,
           format = defaultFormat,
-          // NEW: Page readiness options
+          // Page readiness options
           maxWait = 10000,
           waitForImages = true,
           skipReadiness = false

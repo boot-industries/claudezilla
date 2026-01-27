@@ -58,3 +58,74 @@ echo "5. Select manifest.json"
 echo ""
 echo "The extension should now be loaded. Click the Claudezilla icon"
 echo "in the toolbar to test the connection."
+echo ""
+
+# Configure Claude Code permissions for autonomous operation
+CLAUDE_DIR="$HOME/.claude"
+SETTINGS_FILE="$CLAUDE_DIR/settings.json"
+MCP_FILE="$CLAUDE_DIR/mcp.json"
+
+echo "Configuring Claude Code for autonomous Claudezilla operations..."
+
+# Create .claude directory if it doesn't exist
+mkdir -p "$CLAUDE_DIR"
+
+# Update settings.json to allow Claudezilla tools without prompts
+if command -v jq &> /dev/null; then
+    # Use jq for safe JSON manipulation
+    if [ -f "$SETTINGS_FILE" ]; then
+        # Merge with existing settings
+        jq '.permissions.allow = ((.permissions.allow // []) + ["mcp__claudezilla__*"] | unique)' "$SETTINGS_FILE" > "$SETTINGS_FILE.tmp" && mv "$SETTINGS_FILE.tmp" "$SETTINGS_FILE"
+    else
+        # Create new settings file
+        echo '{"permissions":{"allow":["mcp__claudezilla__*"]}}' | jq '.' > "$SETTINGS_FILE"
+    fi
+    echo "Updated Claude Code permissions: $SETTINGS_FILE"
+else
+    # Fallback: create settings if doesn't exist
+    if [ ! -f "$SETTINGS_FILE" ]; then
+        cat > "$SETTINGS_FILE" << 'SETTINGS_EOF'
+{
+  "permissions": {
+    "allow": ["mcp__claudezilla__*"]
+  }
+}
+SETTINGS_EOF
+        echo "Created Claude Code permissions: $SETTINGS_FILE"
+    else
+        echo "[WARN] jq not found. Please manually add 'mcp__claudezilla__*' to permissions.allow in $SETTINGS_FILE"
+    fi
+fi
+
+# Update mcp.json to register Claudezilla MCP server
+if command -v jq &> /dev/null; then
+    MCP_SERVER_CONFIG="{\"command\":\"node\",\"args\":[\"$PROJECT_DIR/mcp/server.js\"]}"
+    if [ -f "$MCP_FILE" ]; then
+        # Merge with existing config
+        jq --argjson cfg "$MCP_SERVER_CONFIG" '.mcpServers.claudezilla = $cfg' "$MCP_FILE" > "$MCP_FILE.tmp" && mv "$MCP_FILE.tmp" "$MCP_FILE"
+    else
+        # Create new mcp.json
+        echo "{\"mcpServers\":{\"claudezilla\":$MCP_SERVER_CONFIG}}" | jq '.' > "$MCP_FILE"
+    fi
+    echo "Updated Claude Code MCP config: $MCP_FILE"
+else
+    if [ ! -f "$MCP_FILE" ]; then
+        cat > "$MCP_FILE" << MCP_EOF
+{
+  "mcpServers": {
+    "claudezilla": {
+      "command": "node",
+      "args": ["$PROJECT_DIR/mcp/server.js"]
+    }
+  }
+}
+MCP_EOF
+        echo "Created Claude Code MCP config: $MCP_FILE"
+    else
+        echo "[WARN] jq not found. Please manually add claudezilla to mcpServers in $MCP_FILE"
+    fi
+fi
+
+echo ""
+echo "Claudezilla is now configured for autonomous operation."
+echo "All mcp__claudezilla__* tools will run without permission prompts."

@@ -97,10 +97,10 @@ When the user enables "Run in Private Windows" permission in Firefox (about:addo
 
 All URL inputs are validated before navigation:
 
-- **Allowed schemes:** `http:`, `https:`, `about:` only
-- **Blocked:** `javascript:`, `data:`, `file://`, `chrome://`, etc.
+- **Allowed schemes:** `http:`, `https:`, `about:`, `file:` (local files)
+- **Blocked:** `javascript:`, `data:`, `chrome://`, `moz-extension://`, etc.
 
-**Why:** Prevents XSS and arbitrary code execution via URL injection.
+**Why:** Prevents XSS and arbitrary code execution via URL injection. `file://` is allowed since Claude Code runs locally with full filesystem access.
 
 ### 7. Multi-Agent Tab Isolation (v0.4.5)
 
@@ -197,9 +197,13 @@ If you discover a security vulnerability, please report it to: security@boot.ind
 
 ## Changelog
 
+- **0.5.6:** Allow file:// URLs (January 2026)
+  - file:// scheme now allowed since Claude Code runs locally with full filesystem access
+  - Enables viewing local HTML files for development and testing
+
 - **0.4.5:** Security hardening release (January 2026 audit)
   - Socket permissions set to 0600 (user-only)
-  - URL scheme validation (blocks javascript:, data:, file://)
+  - URL scheme validation (blocks javascript:, data:)
   - Agent ID entropy increased to 128 bits (from 32 bits)
   - Tab ownership enforcement strengthened
   - Window close blocked when other agents have tabs

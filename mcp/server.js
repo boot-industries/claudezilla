@@ -361,7 +361,7 @@ function sendCommandOnce(command, params = {}) {
       }
     });
 
-    socket.setTimeout(30000);
+    socket.setTimeout(150000); // 2.5 minutes for long-running operations
   });
 }
 
@@ -417,7 +417,7 @@ const TOOLS = [
   // ===== CORE BROWSER CONTROL =====
   {
     name: 'firefox_create_window',
-    description: 'Open a URL in the shared Claudezilla browser. SHARED POOL: One private window with MAX 10 TABS shared across all Claude agents. Each call creates a new tab. When limit reached, oldest tab auto-closed. OWNERSHIP: Each tab tracks its creator - only you can close tabs you created. Returns: windowId, tabId, ownerId, tabCount, maxTabs.',
+    description: 'Open a URL in the shared Claudezilla browser. SHARED POOL: One private window with MAX 12 TABS shared across all Claude agents. Each call creates a new tab. When limit reached, oldest tab auto-closed. OWNERSHIP: Each tab tracks its creator - only you can close tabs you created. Returns: windowId, tabId, ownerId, tabCount, maxTabs.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -563,13 +563,18 @@ const TOOLS = [
           type: 'number',
           description: 'Specific tab to capture (will switch to it). Default: current active tab.',
         },
+        purpose: {
+          type: 'string',
+          enum: ['quick-glance', 'read-text', 'inspect-ui', 'full-detail'],
+          description: 'SUGGESTED quality presets (you can override with explicit quality/scale): quick-glance (q:30,s:0.25) for layout/navigation confirmation, read-text (q:60,s:0.5) for reading content [DEFAULT], inspect-ui (q:80,s:0.75) for UI details/small text, full-detail (q:95,s:1.0) for pixel-perfect inspection.',
+        },
         quality: {
           type: 'number',
-          description: 'JPEG quality 1-100 (default: 60). Lower = smaller file.',
+          description: 'JPEG quality 1-100 (default: 60). Overrides purpose preset if specified.',
         },
         scale: {
           type: 'number',
-          description: 'Resolution scale 0.25-1.0 (default: 0.5). 0.5 = half resolution.',
+          description: 'Resolution scale 0.25-1.0 (default: 0.5). Overrides purpose preset if specified.',
         },
         format: {
           type: 'string',
@@ -593,7 +598,7 @@ const TOOLS = [
   },
   {
     name: 'firefox_get_tabs',
-    description: 'List all Claudezilla tabs with URLs, titles, tabIds, and ownerId. Shows which agent owns each tab. Use to see shared 10-tab pool status.',
+    description: 'List all Claudezilla tabs with URLs, titles, tabIds, and ownerId. Shows which agent owns each tab. Use to see shared 12-tab pool status.',
     inputSchema: {
       type: 'object',
       properties: {},
@@ -623,7 +628,7 @@ const TOOLS = [
   },
   {
     name: 'firefox_request_tab_space',
-    description: 'Request tab space when blocked by POOL_FULL. Queues your request and notifies agents with >4 tabs. They can grant space using firefox_grant_tab_space. Use this when you cannot create tabs because other agents have filled the pool.',
+    description: 'Request tab space when blocked by POOL_FULL. Queues your request. When another agent closes a tab or grants space, you receive a 30-second slot reservation. Call firefox_get_slot_requests to check if you have a reservation, then createWindow to claim it.',
     inputSchema: {
       type: 'object',
       properties: {},
@@ -631,7 +636,7 @@ const TOOLS = [
   },
   {
     name: 'firefox_grant_tab_space',
-    description: 'Voluntarily release your oldest tab to help a waiting agent. Only works if you have >2 tabs and there are pending slot requests. Good citizenship for multi-agent cooperation.',
+    description: 'Voluntarily release your oldest tab to help a waiting agent. Creates a 30-second reservation for the waiting agent so they can claim the freed slot. Only works if you have >2 tabs and there are pending slot requests.',
     inputSchema: {
       type: 'object',
       properties: {},
@@ -639,7 +644,7 @@ const TOOLS = [
   },
   {
     name: 'firefox_get_slot_requests',
-    description: 'Check if other agents are waiting for tab space. Shows pending requests and whether you should grant space (if you have >4 tabs).',
+    description: 'Check pending requests, active reservations, and your tab count. Shows if you have a reserved slot (youHaveReservation) and how long until it expires. If you have a reservation, call createWindow immediately to claim it.',
     inputSchema: {
       type: 'object',
       properties: {},
@@ -997,7 +1002,7 @@ const TOOL_TO_COMMAND = {
 const server = new Server(
   {
     name: 'claudezilla',
-    version: '0.5.5',
+    version: '0.5.6',
   },
   {
     capabilities: {
@@ -1145,10 +1150,45 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 });
 
 // Start the server
+/**
+ * Send goodbye command to clean up agent's tabs on shutdown
+ * Non-blocking - we don't wait for response since we're exiting
+ */
+async function sendGoodbye() {
+  try {
+    await sendCommandOnce('goodbye', { agentId: AGENT_ID });
+    console.error(`[claudezilla] Sent goodbye for ${truncateAgentId(AGENT_ID)}`);
+  } catch (e) {
+    // Ignore errors on shutdown - extension may already be gone
+    console.error(`[claudezilla] Goodbye failed (expected if Firefox closed): ${e.message}`);
+  }
+}
+
+// Register shutdown hooks to clean up tabs when MCP server exits
+let isShuttingDown = false;
+function handleShutdown(signal) {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+  console.error(`[claudezilla] Received ${signal}, cleaning up...`);
+  sendGoodbye().finally(() => process.exit(0));
+}
+
+process.on('SIGINT', () => handleShutdown('SIGINT'));
+process.on('SIGTERM', () => handleShutdown('SIGTERM'));
+process.on('SIGHUP', () => handleShutdown('SIGHUP'));
+
+// Also handle unexpected exits
+process.on('beforeExit', () => {
+  if (!isShuttingDown) {
+    console.error('[claudezilla] beforeExit - sending goodbye');
+    sendGoodbye();
+  }
+});
+
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error('Claudezilla MCP server running');
+  console.error(`Claudezilla MCP server running (agent: ${truncateAgentId(AGENT_ID)})`);
 }
 
 main().catch((error) => {

@@ -1,7 +1,65 @@
 # CLZ002 Changelog
 
 **Project:** Claudezilla
-**Current Version:** 0.5.5
+**Current Version:** 0.5.6
+
+## v0.5.6 (2026-01-26)
+
+**Autonomous installation + timeout fixes + expanded tab pool.**
+
+### Features
+
+- **Autonomous permissions** - Installers now configure Claude Code settings automatically
+  - Adds `mcp__claudezilla__*` to `permissions.allow` in `~/.claude/settings.json`
+  - Auto-configures MCP server in `~/.claude/mcp.json`
+  - Works on macOS, Linux, and Windows
+  - Uses `jq` for safe JSON merging on Unix (with fallback)
+- **Expanded tab pool** - Increased from 10 to 12 tabs shared across agents
+  - Mercy system threshold unchanged (>4 tabs triggers notifications)
+  - More headroom for multi-agent workflows
+- **Screenshot purpose presets** - Suggestive quality settings based on intent
+  - `quick-glance` (q:30, s:0.25) - Layout/navigation confirmation
+  - `read-text` (q:60, s:0.5) - Reading content [DEFAULT]
+  - `inspect-ui` (q:80, s:0.75) - UI details/small text
+  - `full-detail` (q:95, s:1.0) - Pixel-perfect inspection
+  - Agent can still override with explicit quality/scale parameters
+
+### Bug Fixes
+
+- **Allow file:// URLs** - Local file viewing now works
+  - `file://` scheme added to allowed URL schemes
+  - Enables viewing local HTML files for development and testing
+  - Rationale: Claude Code runs locally with full filesystem access anyway
+- **Improved error messages** - "Receiving end does not exist" now shows actionable info
+  - `PAGE_LOAD_FAILED`: Page didn't load (server down, 404, etc.) - includes URL and hint
+  - `RESTRICTED_PAGE`: about:, chrome:, moz-extension: pages can't run content scripts
+  - `CONTENT_SCRIPT_UNAVAILABLE`: Generic fallback with tab info and retry hint
+- **Session cleanup on exit** - MCP server now sends `goodbye` command on shutdown
+  - Handles SIGINT, SIGTERM, SIGHUP, and beforeExit signals
+  - Extension immediately closes all tabs owned by exiting agent
+  - Also cleans up reservations and pending slot requests for that agent
+  - Fallback: 2-minute orphan timeout still applies for hard crashes (SIGKILL)
+- **Mercy system slot reservation** - Fixed critical bug where agents couldn't claim freed slots
+  - Previously: `requestTabSpace` queued requests but freed slots could be stolen by any agent
+  - Now: When a slot is freed (via `closeTab` or `grantTabSpace`), a 30-second reservation is created
+  - Waiting agent can check `firefox_get_slot_requests` to see if they have a reservation
+  - Reserved slots cannot be stolen by other agents during the TTL window
+  - `createWindow` respects reservations (reserved agent bypasses POOL_FULL check)
+- **Mutex timeout mismatch** - Code now matches documentation
+  - `MUTEX_BUSY_THRESHOLD_MS` changed from 5000ms to 3000ms (as documented in v0.5.4 CHANGELOG)
+  - Updated all wireframe and CLAUDE.md references
+- **Request timeouts extended** - Now 150s (2.5 minutes) instead of 30s
+  - `extension/background.js` - native host request timeout
+  - `host/index.js` - CLI request timeout
+  - `mcp/server.js` - socket connection timeout
+  - Prevents timeout errors on long-running browser operations
+
+### Updated
+
+- Version bumped to 0.5.6 across all components
+- Documentation consistency fixes for mutex timeout values
+
+---
 
 ## v0.5.5 (2026-01-25)
 
@@ -315,7 +373,7 @@
 ### Security
 
 - Socket permissions set to 0600 (user-only)
-- URL scheme validation (blocks javascript:, data:, file://)
+- URL scheme validation (blocks javascript:, data:) — file:// allowed in v0.5.6
 - Agent ID entropy increased to 128 bits
 - Tab ownership enforcement for all content commands
 - Window close blocked when other agents have tabs
