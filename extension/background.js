@@ -112,10 +112,11 @@ function validateUrlScheme(url) {
  * Prevents cross-agent tab interference
  */
 function verifyTabOwnership(tabId, agentId, operation) {
+  const numTabId = Number(tabId); // Normalize to Number (JSON may pass string)
   if (!claudezillaWindow) {
     throw new Error('No Claudezilla window active');
   }
-  const tabEntry = claudezillaWindow.tabs.find(t => t.tabId === tabId);
+  const tabEntry = claudezillaWindow.tabs.find(t => t.tabId === numTabId);
   if (!tabEntry) {
     throw new Error(`Tab ${tabId} not found in Claudezilla window`);
   }
@@ -883,9 +884,10 @@ async function handleCliCommand(message) {
       case 'closeTab': {
         // Close a specific tab - use this to free up slots in the shared 12-tab pool
         // OWNERSHIP: Only the agent that created the tab can close it
-        const { tabId: closeTabId, agentId } = params;
+        const { tabId: rawCloseTabId, agentId } = params;
+        const closeTabId = Number(rawCloseTabId); // Normalize to Number (JSON may pass string)
 
-        if (!closeTabId) {
+        if (!rawCloseTabId) {
           throw new Error('tabId is required');
         }
 
@@ -1409,7 +1411,7 @@ async function handleCliCommand(message) {
 
         const {
           windowId,
-          tabId: requestedTabId,
+          tabId: rawRequestedTabId,
           agentId,
           quality = preset?.quality ?? 60,
           scale = preset?.scale ?? 0.5,
@@ -1419,6 +1421,7 @@ async function handleCliCommand(message) {
           waitForImages = true,
           skipReadiness = false
         } = params;
+        const requestedTabId = rawRequestedTabId ? Number(rawRequestedTabId) : null; // Normalize to Number
 
         // SECURITY: Verify agent owns the target tab before queuing screenshot
         if (requestedTabId && agentId) {
