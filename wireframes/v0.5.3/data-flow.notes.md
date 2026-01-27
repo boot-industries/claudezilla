@@ -67,7 +67,7 @@ screenshotLock = screenshotLock.then(async () => {
 ```
 
 **MUTEX_BUSY Error:**
-- Returned if mutex held by another agent for >5 seconds
+- Returned if mutex held by another agent for >3 seconds
 - Includes holder info, wait time, retry hint
 - Suggests using `getPageState` (no mutex needed)
 

@@ -32,7 +32,7 @@ flowchart TB
 
     subgraph EXTENSION_LAYER["Firefox Extension Layer"]
         BG["Background Script<br/>(Persistent)"]
-        SESSION["Session Manager<br/>(10-tab pool)"]
+        SESSION["Session Manager<br/>(12-tab pool)"]
         MUTEX["Screenshot Mutex<br/>(3s timeout)"]
         NETWORK["Network Monitor<br/>(webRequest API)"]
     end
@@ -46,7 +46,7 @@ flowchart TB
 
     subgraph BROWSER["Firefox Browser"]
         PRIVATE["Private Window"]
-        TABS["Tab Pool<br/>(Max 10)"]
+        TABS["Tab Pool<br/>(Max 12)"]
         PAGES["Web Pages"]
     end
 

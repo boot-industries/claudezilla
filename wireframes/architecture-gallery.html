@@ -37,7 +37,7 @@
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             background: #1a1a1a;
             color: #e0e0e0;
-            padding: 1rem 2rem;
+            padding: 0.75rem 1.5rem;
             line-height: 1.5;
             font-size: 0.875rem;
         }
@@ -48,63 +48,63 @@
         }
 
         h1 {
-            font-size: 1.5rem;
+            font-size: 1.25rem;
             font-weight: 600;
-            margin-bottom: 0.25rem;
+            margin-bottom: 0.15rem;
             color: #fff;
         }
 
         h1 .emoji {
-            font-size: 1.25rem;
+            font-size: 1.1rem;
         }
 
         h2 {
             font-size: 1rem;
             font-weight: 600;
             color: #FF9500;
-            margin: 1.5rem 0 0.75rem 0;
-            padding-bottom: 0.5rem;
+            margin: 1rem 0 0.5rem 0;
+            padding-bottom: 0.35rem;
             border-bottom: 1px solid #333;
         }
 
         .subtitle {
             color: #888;
-            margin-bottom: 0.75rem;
-            font-size: 0.75rem;
+            margin-bottom: 0.35rem;
+            font-size: 0.7rem;
         }
 
         .last-updated {
             color: #666;
-            font-size: 0.625rem;
-            margin-bottom: 1rem;
+            font-size: 0.6rem;
+            margin-bottom: 0.5rem;
         }
 
         .info {
             background: #2a2a1a;
             border-left: 3px solid #FF9500;
-            padding: 0.75rem;
-            margin-bottom: 1rem;
+            padding: 0.5rem 0.65rem;
+            margin-bottom: 0.6rem;
             border-radius: 3px;
-            font-size: 0.75rem;
+            font-size: 0.7rem;
         }
 
         .info-title {
             color: #FF9500;
             font-weight: 600;
-            margin-bottom: 0.25rem;
+            margin-bottom: 0.15rem;
         }
 
         .stats {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-            gap: 0.5rem;
-            margin-bottom: 1rem;
+            grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+            gap: 0.35rem;
+            margin-bottom: 0.6rem;
         }
 
         .stat-card {
             background: #242424;
-            padding: 0.75rem;
-            border-radius: 6px;
+            padding: 0.4rem 0.5rem;
+            border-radius: 5px;
             text-align: center;
         }
 
@@ -114,16 +114,16 @@
         }
 
         .stat-value {
-            font-size: 1.25rem;
+            font-size: 1rem;
             font-weight: 600;
             color: #fff;
         }
 
         .stat-label {
-            font-size: 0.625rem;
+            font-size: 0.55rem;
             color: #888;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
+            letter-spacing: 0.03em;
         }
 
         .diagram-grid {
@@ -229,17 +229,17 @@
         .quick-nav {
             display: flex;
             flex-wrap: wrap;
-            gap: 0.5rem;
-            margin-bottom: 1rem;
+            gap: 0.35rem;
+            margin-bottom: 0.6rem;
         }
 
         .quick-nav a {
             background: #2a2a2a;
             color: #FF9500;
-            padding: 0.4rem 0.75rem;
-            border-radius: 4px;
+            padding: 0.25rem 0.5rem;
+            border-radius: 3px;
             text-decoration: none;
-            font-size: 0.7rem;
+            font-size: 0.65rem;
             font-weight: 500;
             transition: background 0.2s;
         }
@@ -258,23 +258,23 @@
         .color-legend {
             display: flex;
             flex-wrap: wrap;
-            gap: 0.75rem;
-            margin-bottom: 1rem;
-            padding: 0.75rem;
+            gap: 0.5rem;
+            margin-bottom: 0.6rem;
+            padding: 0.4rem 0.6rem;
             background: #242424;
-            border-radius: 6px;
+            border-radius: 5px;
         }
 
         .color-item {
             display: flex;
             align-items: center;
-            gap: 0.35rem;
-            font-size: 0.65rem;
+            gap: 0.25rem;
+            font-size: 0.6rem;
         }
 
         .color-swatch {
-            width: 12px;
-            height: 12px;
+            width: 10px;
+            height: 10px;
             border-radius: 2px;
         }
 
@@ -299,13 +299,22 @@
 
         @media (max-width: 768px) {
             body {
-                padding: 0.5rem 1rem;
+                padding: 0.5rem 0.75rem;
+            }
+            h1 {
+                font-size: 1.1rem;
             }
             .diagram-content {
                 padding: 0.5rem;
             }
             .stats {
-                grid-template-columns: repeat(3, 1fr);
+                grid-template-columns: repeat(4, 1fr);
+            }
+            .stat-card {
+                padding: 0.3rem 0.4rem;
+            }
+            .stat-value {
+                font-size: 0.85rem;
             }
         }
     </style>
@@ -314,7 +323,7 @@
     <div class="container">
         <h1><span class="emoji">🦎</span> Claudezilla - Architecture Gallery</h1>
         <p class="subtitle">Firefox Browser Automation for Claude Code CLI - A Google-free Alternative</p>
-        <p class="last-updated">Last updated: 2026-01-25 | Version: 0.5.5</p>
+        <p class="last-updated">Last updated: 2026-01-26 | Version: 0.5.6</p>
 
         <div class="stats">
             <div class="stat-card">
@@ -348,9 +357,9 @@
         </div>
 
         <div class="info">
-            <div class="info-title">Interactive Diagram Collection <span class="new-badge">v0.5.5</span></div>
+            <div class="info-title">Interactive Diagram Collection <span class="new-badge">v0.5.6</span></div>
             7 architectural diagrams covering system architecture, component relationships, data flow, repository structure, entry points, database schema, and deployment infrastructure.
-            <strong>New in v0.5.5:</strong> Windows 10/11 support (named pipes, ACL security), IPC abstraction layer, expression validation, path security.
+            <strong>New in v0.5.6:</strong> Autonomous installation (auto-configure Claude Code permissions), extended timeouts (150s), mutex timeout fix (3s).
             Click headers to expand/collapse. Diagrams render via Mermaid.js. Press <kbd>a</kbd> to expand all, <kbd>Esc</kbd> to collapse all.
         </div>
 
@@ -443,7 +452,7 @@ flowchart TB
 
     subgraph EXTENSION_LAYER["Firefox Extension Layer"]
         BG["Background Script<br/>(Persistent)"]
-        SESSION["Session Manager<br/>(10-tab pool)"]
+        SESSION["Session Manager<br/>(12-tab pool)"]
         MUTEX["Screenshot Mutex<br/>(3s timeout)"]
         NETWORK["Network Monitor<br/>(webRequest API)"]
     end
@@ -457,7 +466,7 @@ flowchart TB
 
     subgraph BROWSER["Firefox Browser"]
         PRIVATE["Private Window"]
-        TABS["Tab Pool<br/>(Max 10)"]
+        TABS["Tab Pool<br/>(Max 12)"]
         PAGES["Web Pages"]
     end
 
@@ -875,7 +884,7 @@ erDiagram
         INTEGER statusCode
     }
 
-    CLAUDEZILLA_WINDOW ||--o{ TAB_ENTRY : "contains max 10"
+    CLAUDEZILLA_WINDOW ||--o{ TAB_ENTRY : "contains max 12"
     TAB_ENTRY }o--|| AGENT_HEARTBEAT : "owned by"
                     </pre>
                 </div>
@@ -952,7 +961,7 @@ flowchart TB
         </div>
 
         <footer>
-            <p><strong>Source:</strong> <code>wireframes/v0.5.5/*.mermaid.md</code></p>
+            <p><strong>Source:</strong> <code>wireframes/v0.5.6/*.mermaid.md</code></p>
             <p>Generated for: <strong>Claudezilla</strong> | Location: <code>~/dev/claudezilla</code></p>
             <p>Stack: Node.js (MCP, Host), JavaScript (Extension), TypeScript (Worker)</p>
             <p>Links: <a href="https://claudezilla.com">Website</a> | <a href="https://github.com/boot-industries/claudezilla">GitHub</a> | <a href="https://addons.mozilla.org/firefox/addon/claudezilla/">Firefox Add-ons</a></p>

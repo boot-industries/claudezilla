@@ -140,7 +140,7 @@ screenshotMutexHolder = {
 
 **Behavior:**
 - Only one screenshot at a time
-- Returns MUTEX_BUSY if held >5 seconds by another agent
+- Returns MUTEX_BUSY if held >3 seconds by another agent
 - Automatically released on completion or error
 
 ### Network Requests (Background Script)

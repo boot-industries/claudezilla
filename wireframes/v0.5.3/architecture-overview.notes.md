@@ -107,7 +107,7 @@ Screenshots require:
 2. Page readiness detection
 3. Capture and optional resize
 
-All screenshot requests are serialized via promise chain to prevent race conditions. `MUTEX_BUSY` error returned if held >5 seconds.
+All screenshot requests are serialized via promise chain to prevent race conditions. `MUTEX_BUSY` error returned if held >3 seconds.
 
 ### 3. Orphaned Tab Cleanup Pattern
 

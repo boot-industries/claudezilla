@@ -37,6 +37,9 @@ host/package-lock.json
 docs/clz/
 docs/tmp/
 
+# Large video source assets (use R2/CDN for delivery)
+marketing/video/
+
 # Setup guides with deployment details
 STRIPE_SETUP.md
 IMPLEMENTATION_SUMMARY.md

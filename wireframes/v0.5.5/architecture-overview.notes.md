@@ -82,7 +82,7 @@ Web Pages
 
 **Responsibilities:**
 - Native messaging connection to host
-- Session management (single window, 10-tab pool)
+- Session management (single window, 12-tab pool)
 - Screenshot mutex for multi-agent coordination
 - Network request monitoring via webRequest API
 

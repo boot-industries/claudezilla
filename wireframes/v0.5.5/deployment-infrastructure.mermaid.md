@@ -6,7 +6,7 @@ flowchart TB
     subgraph USER_MACHINE_UNIX["User's Machine (macOS/Linux)"]
         subgraph FIREFOX_UNIX["Firefox Browser"]
             EXT_UNIX["Claudezilla Extension<br/>(MV2 WebExtension)"]
-            PRIVATE_UNIX["Private Window<br/>(10-tab pool)"]
+            PRIVATE_UNIX["Private Window<br/>(12-tab pool)"]
         end
 
         subgraph NATIVE_UNIX["Native Components"]
@@ -24,7 +24,7 @@ flowchart TB
     subgraph USER_MACHINE_WIN["User's Machine (Windows 10/11) - v0.5.5"]
         subgraph FIREFOX_WIN["Firefox Browser"]
             EXT_WIN["Claudezilla Extension<br/>(MV2 WebExtension)"]
-            PRIVATE_WIN["Private Window<br/>(10-tab pool)"]
+            PRIVATE_WIN["Private Window<br/>(12-tab pool)"]
         end
 
         subgraph NATIVE_WIN["Native Components"]
