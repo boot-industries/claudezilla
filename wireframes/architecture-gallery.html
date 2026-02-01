@@ -146,27 +146,36 @@
             align-items: center;
             gap: 0.5rem;
             border-bottom: 1px solid #333;
+            outline: none;
         }
 
         .diagram-header:hover {
             background: #333;
         }
 
-        .diagram-header::before {
-            content: '\25BC';
-            font-size: 0.625rem;
-            transition: transform 0.2s;
-            color: #888;
+        .diagram-header.focused {
+            background: #333;
+            box-shadow: inset 3px 0 0 #FF9500;
         }
 
-        .diagram-header.collapsed::before {
-            transform: rotate(-90deg);
+        .diagram-header::before {
+            content: '\25B6';
+            font-size: 0.5rem;
+            transition: transform 0.2s;
+            color: #888;
+            flex-shrink: 0;
+        }
+
+        .diagram-header:not(.collapsed)::before {
+            transform: rotate(90deg);
         }
 
         .diagram-title {
             font-weight: 600;
             color: #fff;
             font-size: 0.875rem;
+            flex-shrink: 0;
+            white-space: nowrap;
         }
 
         .diagram-type {
@@ -174,7 +183,7 @@
             padding: 0.2rem 0.5rem;
             border-radius: 3px;
             font-weight: 600;
-            margin-left: auto;
+            flex-shrink: 0;
         }
 
         .diagram-type.flowchart { background: #3a2a1a; color: #FF9500; }
@@ -186,6 +195,11 @@
             font-size: 0.7rem;
             color: #888;
             margin-left: 0.5rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            min-width: 0;
+            flex: 1 1 0;
         }
 
         .diagram-content {
@@ -378,7 +392,7 @@
             <div class="info-title">Interactive Diagram Collection <span class="new-badge">v0.5.6</span></div>
             7 architectural diagrams covering system architecture, component relationships, data flow, repository structure, entry points, database schema, and deployment infrastructure.
             <strong>New in v0.5.6:</strong> Autonomous installation (auto-configure Claude Code permissions), extended timeouts (150s), mutex timeout fix (3s).
-            Click headers to expand/collapse. Diagrams render via Mermaid.js. Press <kbd>a</kbd> to expand all, <kbd>Esc</kbd> to collapse all.
+            Click headers to expand/collapse. Diagrams render via Mermaid.js. <kbd>&uarr;</kbd><kbd>&darr;</kbd> navigate, <kbd>&rarr;</kbd> expand, <kbd>&larr;</kbd> collapse. <kbd>a</kbd> expand all, <kbd>Esc</kbd> collapse all.
         </div>
 
         <div class="color-legend">
@@ -1054,27 +1068,78 @@ flowchart TB
     </div>
 
     <script>
-        function toggleDiagram(header) {
-            header.classList.toggle('collapsed');
-            const content = header.nextElementSibling;
-            content.classList.toggle('hidden');
+        let focusedIndex = -1;
+
+        function getHeaders() {
+            return [...document.querySelectorAll('.diagram-header')];
         }
 
-        // Keyboard navigation
+        function updateFocus(headers) {
+            headers.forEach((h, i) => h.classList.toggle('focused', i === focusedIndex));
+            if (focusedIndex >= 0) {
+                headers[focusedIndex].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            }
+        }
+
+        function expand(header) {
+            header.classList.remove('collapsed');
+            header.nextElementSibling.classList.remove('hidden');
+        }
+
+        function collapse(header) {
+            header.classList.add('collapsed');
+            header.nextElementSibling.classList.add('hidden');
+        }
+
+        function toggleDiagram(header) {
+            const headers = getHeaders();
+            focusedIndex = headers.indexOf(header);
+            header.classList.contains('collapsed') ? expand(header) : collapse(header);
+            updateFocus(headers);
+        }
+
+        // Keyboard navigation — macOS Finder list view style
         document.addEventListener('keydown', (e) => {
+            const headers = getHeaders();
+            const isTyping = document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA';
+
+            if (e.key === 'ArrowDown' && !isTyping) {
+                e.preventDefault();
+                focusedIndex = Math.min(focusedIndex + 1, headers.length - 1);
+                if (focusedIndex < 0) focusedIndex = 0;
+                updateFocus(headers);
+            }
+
+            if (e.key === 'ArrowUp' && !isTyping) {
+                e.preventDefault();
+                focusedIndex = Math.max(focusedIndex - 1, 0);
+                updateFocus(headers);
+            }
+
+            if (e.key === 'ArrowRight' && !isTyping && focusedIndex >= 0) {
+                e.preventDefault();
+                expand(headers[focusedIndex]);
+            }
+
+            if (e.key === 'ArrowLeft' && !isTyping && focusedIndex >= 0) {
+                e.preventDefault();
+                collapse(headers[focusedIndex]);
+            }
+
             if (e.key === 'Escape') {
-                document.querySelectorAll('.diagram-header:not(.collapsed)').forEach(h => {
-                    h.classList.add('collapsed');
-                    h.nextElementSibling.classList.add('hidden');
-                });
+                headers.forEach(h => collapse(h));
+                focusedIndex = -1;
+                updateFocus(headers);
             }
-            // 'a' to expand all
-            if (e.key === 'a' && !e.ctrlKey && !e.metaKey && document.activeElement.tagName !== 'INPUT') {
-                document.querySelectorAll('.diagram-header.collapsed').forEach(h => {
-                    h.classList.remove('collapsed');
-                    h.nextElementSibling.classList.remove('hidden');
-                });
+
+            if (e.key === 'a' && !e.ctrlKey && !e.metaKey && !isTyping) {
+                headers.forEach(h => expand(h));
             }
+        });
+
+        // Start all diagrams expanded
+        document.addEventListener('DOMContentLoaded', () => {
+            getHeaders().forEach(h => expand(h));
         });
     </script>
 </body>
