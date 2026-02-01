@@ -52,6 +52,11 @@
             gap: 0.5rem;
         }
 
+        h2:focus {
+            outline: 2px solid #FF9500;
+            outline-offset: -2px;
+        }
+
         h2::before {
             content: '▼';
             font-size: 0.625rem;
@@ -221,31 +226,31 @@
 
         <!-- Setup Section -->
         <div class="section">
-            <h2 onclick="toggleSection(this)">Setup & Installation</h2>
+            <h2>Setup & Installation</h2>
             <div class="section-content">
                 <div class="command-group">
                     <div class="command-item">
-                        <code class="command-code" onclick="copyCommand(this)">./install/install-macos.sh</code>
+                        <code class="command-code">./install/install-macos.sh</code>
                         <span class="command-desc">Install native messaging host on macOS</span>
                         <span class="command-platform platform-unix">macOS</span>
                     </div>
                     <div class="command-item">
-                        <code class="command-code" onclick="copyCommand(this)">./install/install-linux.sh</code>
+                        <code class="command-code">./install/install-linux.sh</code>
                         <span class="command-desc">Install native messaging host on Linux</span>
                         <span class="command-platform platform-unix">Linux</span>
                     </div>
                     <div class="command-item">
-                        <code class="command-code" onclick="copyCommand(this)">.\install\install-windows.ps1</code>
+                        <code class="command-code">.\install\install-windows.ps1</code>
                         <span class="command-desc">Install native messaging host on Windows (PowerShell)</span>
                         <span class="command-platform platform-win">Windows</span>
                     </div>
                     <div class="command-item">
-                        <code class="command-code" onclick="copyCommand(this)">.\install\uninstall-windows.ps1</code>
+                        <code class="command-code">.\install\uninstall-windows.ps1</code>
                         <span class="command-desc">Uninstall native messaging host on Windows</span>
                         <span class="command-platform platform-win">Windows</span>
                     </div>
                     <div class="command-item">
-                        <code class="command-code" onclick="copyCommand(this)">ln -s "$(pwd)/plugin" ~/.claude/plugins/claudezilla-loop</code>
+                        <code class="command-code">ln -s "$(pwd)/plugin" ~/.claude/plugins/claudezilla-loop</code>
                         <span class="command-desc">Install Claude Code plugin for focus loops</span>
                         <span class="command-platform platform-unix">Unix</span>
                     </div>
@@ -255,26 +260,26 @@
 
         <!-- Development Section -->
         <div class="section">
-            <h2 onclick="toggleSection(this)">Development</h2>
+            <h2>Development</h2>
             <div class="section-content">
                 <div class="command-group">
                     <div class="command-item">
-                        <code class="command-code" onclick="copyCommand(this)">cd host && node index.js</code>
+                        <code class="command-code">cd host && node index.js</code>
                         <span class="command-desc">Run native messaging host directly (for debugging)</span>
                         <span class="command-platform platform-all">All</span>
                     </div>
                     <div class="command-item">
-                        <code class="command-code" onclick="copyCommand(this)">node mcp/server.js</code>
+                        <code class="command-code">node mcp/server.js</code>
                         <span class="command-desc">Run MCP server directly (for debugging)</span>
                         <span class="command-platform platform-all">All</span>
                     </div>
                     <div class="command-item">
-                        <code class="command-code" onclick="copyCommand(this)">web-ext run --source-dir extension/</code>
+                        <code class="command-code">web-ext run --source-dir extension/</code>
                         <span class="command-desc">Load extension in Firefox for development</span>
                         <span class="command-platform platform-all">All</span>
                     </div>
                     <div class="command-item">
-                        <code class="command-code" onclick="copyCommand(this)">web-ext run --source-dir extension/ --firefox-profile dev</code>
+                        <code class="command-code">web-ext run --source-dir extension/ --firefox-profile dev</code>
                         <span class="command-desc">Load extension with named Firefox profile</span>
                         <span class="command-platform platform-all">All</span>
                     </div>
@@ -284,36 +289,36 @@
 
         <!-- Testing Section -->
         <div class="section">
-            <h2 onclick="toggleSection(this)">Testing & Diagnostics</h2>
+            <h2>Testing & Diagnostics</h2>
             <div class="section-content">
                 <div class="command-group">
                     <div class="command-item">
-                        <code class="command-code" onclick="copyCommand(this)">firefox_diagnose</code>
+                        <code class="command-code">firefox_diagnose</code>
                         <span class="command-desc">MCP tool: Check socket, auth token, extension status</span>
                         <span class="command-platform platform-mcp">MCP</span>
                     </div>
                     <div class="command-item">
-                        <code class="command-code" onclick="copyCommand(this)">ls -la $TMPDIR/claudezilla*</code>
+                        <code class="command-code">ls -la $TMPDIR/claudezilla*</code>
                         <span class="command-desc">Check socket and auth token files exist (Unix)</span>
                         <span class="command-platform platform-unix">Unix</span>
                     </div>
                     <div class="command-item">
-                        <code class="command-code" onclick="copyCommand(this)">cat $TMPDIR/claudezilla-auth.token</code>
+                        <code class="command-code">cat $TMPDIR/claudezilla-auth.token</code>
                         <span class="command-desc">View auth token (Unix)</span>
                         <span class="command-platform platform-unix">Unix</span>
                     </div>
                     <div class="command-item">
-                        <code class="command-code" onclick="copyCommand(this)">type %LOCALAPPDATA%\claudezilla\auth.token</code>
+                        <code class="command-code">type %LOCALAPPDATA%\claudezilla\auth.token</code>
                         <span class="command-desc">View auth token (Windows)</span>
                         <span class="command-platform platform-win">Windows</span>
                     </div>
                     <div class="command-item">
-                        <code class="command-code" onclick="copyCommand(this)">ls -la ~/.mozilla/native-messaging-hosts/</code>
+                        <code class="command-code">ls -la ~/.mozilla/native-messaging-hosts/</code>
                         <span class="command-desc">Check native messaging manifest exists</span>
                         <span class="command-platform platform-unix">Unix</span>
                     </div>
                     <div class="command-item">
-                        <code class="command-code" onclick="copyCommand(this)">reg query "HKCU\Software\Mozilla\NativeMessagingHosts\claudezilla"</code>
+                        <code class="command-code">reg query "HKCU\Software\Mozilla\NativeMessagingHosts\claudezilla"</code>
                         <span class="command-desc">Check Windows registry for native messaging</span>
                         <span class="command-platform platform-win">Windows</span>
                     </div>
@@ -323,36 +328,36 @@
 
         <!-- MCP Server Section -->
         <div class="section">
-            <h2 onclick="toggleSection(this)">MCP Server Commands</h2>
+            <h2>MCP Server Commands</h2>
             <div class="section-content">
                 <div class="command-group">
                     <div class="command-item">
-                        <code class="command-code" onclick="copyCommand(this)">firefox_create_window</code>
+                        <code class="command-code">firefox_create_window</code>
                         <span class="command-desc">Open URL in shared 12-tab pool</span>
                         <span class="command-platform platform-mcp">MCP</span>
                     </div>
                     <div class="command-item">
-                        <code class="command-code" onclick="copyCommand(this)">firefox_get_tabs</code>
+                        <code class="command-code">firefox_get_tabs</code>
                         <span class="command-desc">List all tabs with ownership info</span>
                         <span class="command-platform platform-mcp">MCP</span>
                     </div>
                     <div class="command-item">
-                        <code class="command-code" onclick="copyCommand(this)">firefox_screenshot</code>
+                        <code class="command-code">firefox_screenshot</code>
                         <span class="command-desc">Capture viewport (mutex-protected, 3s timeout)</span>
                         <span class="command-platform platform-mcp">MCP</span>
                     </div>
                     <div class="command-item">
-                        <code class="command-code" onclick="copyCommand(this)">firefox_get_page_state</code>
+                        <code class="command-code">firefox_get_page_state</code>
                         <span class="command-desc">Fast structured JSON (headings, links, buttons)</span>
                         <span class="command-platform platform-mcp">MCP</span>
                     </div>
                     <div class="command-item">
-                        <code class="command-code" onclick="copyCommand(this)">firefox_start_loop</code>
+                        <code class="command-code">firefox_start_loop</code>
                         <span class="command-desc">Begin focus loop for iterative development</span>
                         <span class="command-platform platform-mcp">MCP</span>
                     </div>
                     <div class="command-item">
-                        <code class="command-code" onclick="copyCommand(this)">firefox_loop_status</code>
+                        <code class="command-code">firefox_loop_status</code>
                         <span class="command-desc">Check current loop state and iteration</span>
                         <span class="command-platform platform-mcp">MCP</span>
                     </div>
@@ -362,21 +367,21 @@
 
         <!-- Build & Package Section -->
         <div class="section">
-            <h2 onclick="toggleSection(this)">Build & Package</h2>
+            <h2>Build & Package</h2>
             <div class="section-content">
                 <div class="command-group">
                     <div class="command-item">
-                        <code class="command-code" onclick="copyCommand(this)">npm pack</code>
+                        <code class="command-code">npm pack</code>
                         <span class="command-desc">Create npm package (includes host and MCP)</span>
                         <span class="command-platform platform-all">All</span>
                     </div>
                     <div class="command-item">
-                        <code class="command-code" onclick="copyCommand(this)">web-ext build --source-dir extension/</code>
+                        <code class="command-code">web-ext build --source-dir extension/</code>
                         <span class="command-desc">Build extension XPI for distribution</span>
                         <span class="command-platform platform-all">All</span>
                     </div>
                     <div class="command-item">
-                        <code class="command-code" onclick="copyCommand(this)">web-ext sign --source-dir extension/ --api-key=$AMO_KEY --api-secret=$AMO_SECRET</code>
+                        <code class="command-code">web-ext sign --source-dir extension/ --api-key=$AMO_KEY --api-secret=$AMO_SECRET</code>
                         <span class="command-desc">Sign extension for AMO distribution</span>
                         <span class="command-platform platform-all">All</span>
                     </div>
@@ -386,21 +391,21 @@
 
         <!-- Deployment Section -->
         <div class="section">
-            <h2 onclick="toggleSection(this)">Deployment</h2>
+            <h2>Deployment</h2>
             <div class="section-content">
                 <div class="command-group">
                     <div class="command-item">
-                        <code class="command-code" onclick="copyCommand(this)">wrangler pages deploy website --project-name=claudezilla</code>
+                        <code class="command-code">wrangler pages deploy website --project-name=claudezilla</code>
                         <span class="command-desc">Deploy marketing website to Cloudflare Pages</span>
                         <span class="command-platform platform-all">All</span>
                     </div>
                     <div class="command-item">
-                        <code class="command-code" onclick="copyCommand(this)">cd worker && wrangler deploy</code>
+                        <code class="command-code">cd worker && wrangler deploy</code>
                         <span class="command-desc">Deploy Stripe worker to Cloudflare</span>
                         <span class="command-platform platform-all">All</span>
                     </div>
                     <div class="command-item">
-                        <code class="command-code" onclick="copyCommand(this)">wrangler pages deployment list --project-name=claudezilla</code>
+                        <code class="command-code">wrangler pages deployment list --project-name=claudezilla</code>
                         <span class="command-desc">List recent Cloudflare Pages deployments</span>
                         <span class="command-platform platform-all">All</span>
                     </div>
@@ -410,31 +415,31 @@
 
         <!-- Git Section -->
         <div class="section">
-            <h2 onclick="toggleSection(this)">Git Workflow</h2>
+            <h2>Git Workflow</h2>
             <div class="section-content">
                 <div class="command-group">
                     <div class="command-item">
-                        <code class="command-code" onclick="copyCommand(this)">git status</code>
+                        <code class="command-code">git status</code>
                         <span class="command-desc">Show working tree status</span>
                         <span class="command-platform platform-all">All</span>
                     </div>
                     <div class="command-item">
-                        <code class="command-code" onclick="copyCommand(this)">git diff</code>
+                        <code class="command-code">git diff</code>
                         <span class="command-desc">Show unstaged changes</span>
                         <span class="command-platform platform-all">All</span>
                     </div>
                     <div class="command-item">
-                        <code class="command-code" onclick="copyCommand(this)">git log --oneline -10</code>
+                        <code class="command-code">git log --oneline -10</code>
                         <span class="command-desc">Show last 10 commits (one line each)</span>
                         <span class="command-platform platform-all">All</span>
                     </div>
                     <div class="command-item">
-                        <code class="command-code" onclick="copyCommand(this)">git checkout -b feature/my-feature</code>
+                        <code class="command-code">git checkout -b feature/my-feature</code>
                         <span class="command-desc">Create and switch to new feature branch</span>
                         <span class="command-platform platform-all">All</span>
                     </div>
                     <div class="command-item">
-                        <code class="command-code" onclick="copyCommand(this)">git push -u origin HEAD</code>
+                        <code class="command-code">git push -u origin HEAD</code>
                         <span class="command-desc">Push current branch and set upstream</span>
                         <span class="command-platform platform-all">All</span>
                     </div>
@@ -444,36 +449,36 @@
 
         <!-- Troubleshooting Section -->
         <div class="section">
-            <h2 onclick="toggleSection(this)">Troubleshooting</h2>
+            <h2>Troubleshooting</h2>
             <div class="section-content">
                 <div class="command-group">
                     <div class="command-item">
-                        <code class="command-code" onclick="copyCommand(this)">rm -f $TMPDIR/claudezilla.sock</code>
+                        <code class="command-code">rm -f $TMPDIR/claudezilla.sock</code>
                         <span class="command-desc">Remove stale socket file (Unix)</span>
                         <span class="command-platform platform-unix">Unix</span>
                     </div>
                     <div class="command-item">
-                        <code class="command-code" onclick="copyCommand(this)">cat $TMPDIR/claudezilla-debug.log</code>
+                        <code class="command-code">cat $TMPDIR/claudezilla-debug.log</code>
                         <span class="command-desc">View native host debug log (Unix)</span>
                         <span class="command-platform platform-unix">Unix</span>
                     </div>
                     <div class="command-item">
-                        <code class="command-code" onclick="copyCommand(this)">type %LOCALAPPDATA%\claudezilla\debug.log</code>
+                        <code class="command-code">type %LOCALAPPDATA%\claudezilla\debug.log</code>
                         <span class="command-desc">View native host debug log (Windows)</span>
                         <span class="command-platform platform-win">Windows</span>
                     </div>
                     <div class="command-item">
-                        <code class="command-code" onclick="copyCommand(this)">pkill -f "node.*claudezilla"</code>
+                        <code class="command-code">pkill -f "node.*claudezilla"</code>
                         <span class="command-desc">Kill stuck Claudezilla processes (Unix)</span>
                         <span class="command-platform platform-unix">Unix</span>
                     </div>
                     <div class="command-item">
-                        <code class="command-code" onclick="copyCommand(this)">taskkill /F /IM node.exe /FI "WINDOWTITLE eq claudezilla*"</code>
+                        <code class="command-code">taskkill /F /IM node.exe /FI "WINDOWTITLE eq claudezilla*"</code>
                         <span class="command-desc">Kill stuck Claudezilla processes (Windows)</span>
                         <span class="command-platform platform-win">Windows</span>
                     </div>
                     <div class="command-item">
-                        <code class="command-code" onclick="copyCommand(this)">about:debugging#/runtime/this-firefox</code>
+                        <code class="command-code">about:debugging#/runtime/this-firefox</code>
                         <span class="command-desc">Firefox debugging page (paste in address bar)</span>
                         <span class="command-platform platform-all">All</span>
                     </div>
@@ -484,20 +489,37 @@
         <footer>
             <p><strong>Version:</strong> 0.5.6 | <strong>Last Updated:</strong> 2026-01-26</p>
             <p>See also: <a href="../wireframes/architecture-gallery.html">Architecture Gallery</a> | <a href="../CLAUDE.md">CLAUDE.md</a></p>
+            <p style="margin-top: 1rem;">⌨️ <strong>Keyboard Navigation:</strong> ↑↓ navigate | →/← expand/collapse | Space/Enter toggle | Cmd+Click collapse others | A expand all | Esc collapse all</p>
         </footer>
     </div>
 
     <div class="toast" id="toast">Copied to clipboard!</div>
 
     <script>
-        function copyCommand(element) {
-            const text = element.textContent;
-            navigator.clipboard.writeText(text).then(() => {
-                element.classList.add('copied');
-                showToast('Copied: ' + text);
-                setTimeout(() => element.classList.remove('copied'), 1000);
+        // Click-to-copy functionality with clipboard fallback
+        document.querySelectorAll('.command-code').forEach(cmd => {
+            cmd.addEventListener('click', async function(e) {
+                e.stopPropagation();
+                const text = this.textContent.trim();
+                try {
+                    await navigator.clipboard.writeText(text);
+                    this.classList.add('copied');
+                    showToast('Copied: ' + text);
+                    setTimeout(() => this.classList.remove('copied'), 1000);
+                } catch (err) {
+                    // Fallback for older browsers
+                    const textarea = document.createElement('textarea');
+                    textarea.value = text;
+                    document.body.appendChild(textarea);
+                    textarea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textarea);
+                    this.classList.add('copied');
+                    showToast('Copied: ' + text);
+                    setTimeout(() => this.classList.remove('copied'), 1000);
+                }
             });
-        }
+        });
 
         function showToast(message) {
             const toast = document.getElementById('toast');
@@ -506,27 +528,139 @@
             setTimeout(() => toast.classList.remove('show'), 2000);
         }
 
-        function toggleSection(header) {
-            header.classList.toggle('collapsed');
+        // Section toggle functionality
+        const sectionHeaders = document.querySelectorAll('h2');
+
+        function toggleSection(header, collapseOthers = false) {
             const content = header.nextElementSibling;
+
+            if (collapseOthers) {
+                // Collapse all other sections
+                sectionHeaders.forEach(h => {
+                    if (h !== header) {
+                        h.classList.add('collapsed');
+                        h.nextElementSibling.classList.add('hidden');
+                    }
+                });
+            }
+
+            // Toggle current section
+            header.classList.toggle('collapsed');
             content.classList.toggle('hidden');
         }
 
+        function expandAll() {
+            sectionHeaders.forEach(h => {
+                h.classList.remove('collapsed');
+                h.nextElementSibling.classList.remove('hidden');
+            });
+        }
+
+        function collapseAll() {
+            sectionHeaders.forEach(h => {
+                h.classList.add('collapsed');
+                h.nextElementSibling.classList.add('hidden');
+            });
+        }
+
+        // Click to toggle (with Cmd+Click support)
+        sectionHeaders.forEach(header => {
+            header.setAttribute('tabindex', '0');
+            header.addEventListener('click', (e) => {
+                toggleSection(header, e.metaKey || e.ctrlKey);
+            });
+        });
+
         // Keyboard navigation
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                document.querySelectorAll('h2:not(.collapsed)').forEach(h => {
-                    h.classList.add('collapsed');
-                    h.nextElementSibling.classList.add('hidden');
-                });
+        let currentHeaderIndex = -1;
+        const headerArray = Array.from(sectionHeaders);
+
+        function focusHeader(index) {
+            if (index >= 0 && index < headerArray.length) {
+                currentHeaderIndex = index;
+                headerArray[index].focus();
+                headerArray[index].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             }
-            if (e.key === 'a' && !e.ctrlKey && !e.metaKey && document.activeElement.tagName !== 'INPUT') {
-                document.querySelectorAll('h2.collapsed').forEach(h => {
-                    h.classList.remove('collapsed');
-                    h.nextElementSibling.classList.remove('hidden');
-                });
+        }
+
+        document.addEventListener('keydown', (e) => {
+            // Only handle if we're not in an input field
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+                return;
+            }
+
+            // Find currently focused header
+            const focusedHeader = document.activeElement;
+            if (focusedHeader && focusedHeader.tagName === 'H2') {
+                currentHeaderIndex = headerArray.indexOf(focusedHeader);
+            }
+
+            switch(e.key) {
+                case 'ArrowDown':
+                    e.preventDefault();
+                    if (currentHeaderIndex < headerArray.length - 1) {
+                        focusHeader(currentHeaderIndex + 1);
+                    } else if (currentHeaderIndex === -1 && headerArray.length > 0) {
+                        focusHeader(0);
+                    }
+                    break;
+
+                case 'ArrowUp':
+                    e.preventDefault();
+                    if (currentHeaderIndex > 0) {
+                        focusHeader(currentHeaderIndex - 1);
+                    } else if (currentHeaderIndex === -1 && headerArray.length > 0) {
+                        focusHeader(headerArray.length - 1);
+                    }
+                    break;
+
+                case 'ArrowRight':
+                    // Expand current section
+                    if (focusedHeader && focusedHeader.tagName === 'H2') {
+                        e.preventDefault();
+                        if (focusedHeader.classList.contains('collapsed')) {
+                            toggleSection(focusedHeader);
+                        }
+                    }
+                    break;
+
+                case 'ArrowLeft':
+                    // Collapse current section
+                    if (focusedHeader && focusedHeader.tagName === 'H2') {
+                        e.preventDefault();
+                        if (!focusedHeader.classList.contains('collapsed')) {
+                            toggleSection(focusedHeader);
+                        }
+                    }
+                    break;
+
+                case ' ':
+                case 'Enter':
+                    if (focusedHeader && focusedHeader.tagName === 'H2') {
+                        e.preventDefault();
+                        toggleSection(focusedHeader, e.metaKey || e.ctrlKey);
+                    }
+                    break;
+
+                case 'a':
+                    if (!e.ctrlKey && !e.metaKey) {
+                        e.preventDefault();
+                        expandAll();
+                    }
+                    break;
+
+                case 'Escape':
+                    e.preventDefault();
+                    collapseAll();
+                    break;
             }
         });
+
+        // Focus first section on page load for immediate keyboard nav
+        if (headerArray.length > 0) {
+            headerArray[0].focus();
+            currentHeaderIndex = 0;
+        }
     </script>
 </body>
 </html>
