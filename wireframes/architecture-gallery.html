@@ -20,7 +20,14 @@
                 secondaryColor: '#2196F3',
                 tertiaryColor: '#9C27B0'
             },
-            flowchart: { curve: 'basis' },
+            flowchart: {
+                curve: 'basis',
+                padding: 28,
+                nodeSpacing: 60,
+                rankSpacing: 60,
+                subGraphTitleMargin: { top: 14, bottom: 8 },
+                useMaxWidth: false
+            },
             sequence: { mirrorActors: false }
         });
     </script>
@@ -224,8 +231,8 @@
         }
 
         .mermaid svg {
-            min-width: 900px;
-            max-width: 100%;
+            min-width: 1100px;
+            max-width: none;
             height: auto;
         }
 
@@ -259,15 +266,23 @@
             stroke-width: 2px !important;
         }
 
-        /* Node text - prevent clipping */
+        /* Subgraph (cluster) label visibility */
         .mermaid .cluster-label {
             white-space: nowrap;
-            padding: 8px 12px;
         }
         .mermaid .cluster-label .nodeLabel {
             white-space: nowrap;
-            padding: 4px 8px;
+            background: rgba(42, 42, 42, 0.95) !important;
+            padding: 3px 10px !important;
+            border-radius: 3px;
+            font-weight: 600;
+            letter-spacing: 0.02em;
         }
+        .mermaid .cluster-label foreignObject {
+            overflow: visible !important;
+        }
+
+        /* Node text - prevent clipping */
         .mermaid .nodeLabel {
             white-space: nowrap;
         }
@@ -277,9 +292,6 @@
         .mermaid .cluster rect {
             rx: 8px;
             ry: 8px;
-        }
-        .mermaid .cluster .label {
-            margin-bottom: 12px;
         }
         .mermaid .cluster foreignObject {
             overflow: visible;
@@ -802,7 +814,7 @@ sequenceDiagram
                 </div>
                 <div class="diagram-content">
                     <pre class="mermaid">
-graph TB
+flowchart TB
     subgraph ROOT["claudezilla/"]
         CLAUDE["CLAUDE.md<br/>(Project docs)"]
         CHANGELOG["CHANGELOG.md"]
