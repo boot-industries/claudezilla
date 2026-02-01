@@ -4,15 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Claudezilla - Architecture Gallery</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <script type="module">
         import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
         mermaid.initialize({
             startOnLoad: true,
             theme: 'dark',
             themeVariables: {
+                fontFamily: '"InputMono-Regular", "SF Mono", "Fira Code", monospace',
                 darkMode: true,
                 background: '#1a1a1a',
                 primaryColor: '#FF6B00',
@@ -27,6 +25,39 @@
         });
     </script>
     <style>
+        /* Input Sans */
+        @font-face {
+            font-family: 'InputSans-Regular';
+            src: url('../../shared-fonts/input/InputSans/InputSans/InputSans-Regular.ttf') format('truetype');
+            font-weight: 400;
+            font-display: swap;
+        }
+        @font-face {
+            font-family: 'InputSans-Medium';
+            src: url('../../shared-fonts/input/InputSans/InputSans/InputSans-Medium.ttf') format('truetype');
+            font-weight: 500;
+            font-display: swap;
+        }
+        @font-face {
+            font-family: 'InputSans-Bold';
+            src: url('../../shared-fonts/input/InputSans/InputSans/InputSans-Bold.ttf') format('truetype');
+            font-weight: 700;
+            font-display: swap;
+        }
+        @font-face {
+            font-family: 'InputSans-Light';
+            src: url('../../shared-fonts/input/InputSans/InputSans/InputSans-Light.ttf') format('truetype');
+            font-weight: 300;
+            font-display: swap;
+        }
+        /* Input Mono */
+        @font-face {
+            font-family: 'InputMono-Regular';
+            src: url('../../shared-fonts/input/InputMono/InputMono/InputMono-Regular.ttf') format('truetype');
+            font-weight: 400;
+            font-display: swap;
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -34,7 +65,7 @@
         }
 
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-family: 'InputSans-Regular', 'Input Sans', system-ui, sans-serif;
             background: #1a1a1a;
             color: #e0e0e0;
             padding: 0.75rem 1.5rem;
@@ -92,38 +123,6 @@
             color: #FF9500;
             font-weight: 600;
             margin-bottom: 0.15rem;
-        }
-
-        .stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
-            gap: 0.35rem;
-            margin-bottom: 0.6rem;
-        }
-
-        .stat-card {
-            background: #242424;
-            padding: 0.4rem 0.5rem;
-            border-radius: 5px;
-            text-align: center;
-        }
-
-        .stat-card.new {
-            background: linear-gradient(135deg, #2a2a1a, #3a3a2a);
-            border: 1px solid #FF9500;
-        }
-
-        .stat-value {
-            font-size: 1rem;
-            font-weight: 600;
-            color: #fff;
-        }
-
-        .stat-label {
-            font-size: 0.55rem;
-            color: #888;
-            text-transform: uppercase;
-            letter-spacing: 0.03em;
         }
 
         .diagram-grid {
@@ -207,11 +206,69 @@
         .mermaid {
             display: flex;
             justify-content: center;
+            overflow-x: auto;
         }
 
         .mermaid svg {
+            min-width: 900px;
             max-width: 100%;
             height: auto;
+        }
+
+        /* Edge label styling */
+        .mermaid .edgeLabel foreignObject {
+            overflow: visible;
+        }
+        .mermaid .edgeLabel div {
+            padding: 4px 10px;
+            background: #3a2a1a !important;
+            border-radius: 3px;
+        }
+        .mermaid .edgeLabel rect,
+        .mermaid .labelBkg {
+            fill: #3a2a1a !important;
+            rx: 3px;
+            ry: 3px;
+        }
+
+        /* Line and border thickness */
+        .mermaid .flowchart-link,
+        .mermaid .edgePath path,
+        .mermaid .transition path {
+            stroke-width: 2px !important;
+        }
+        .mermaid .node rect,
+        .mermaid .node circle,
+        .mermaid .node polygon,
+        .mermaid .cluster rect,
+        .mermaid .statediagram-state rect {
+            stroke-width: 2px !important;
+        }
+
+        /* Node text - prevent clipping */
+        .mermaid .cluster-label {
+            white-space: nowrap;
+            padding: 8px 12px;
+        }
+        .mermaid .cluster-label .nodeLabel {
+            white-space: nowrap;
+            padding: 4px 8px;
+        }
+        .mermaid .nodeLabel {
+            white-space: nowrap;
+        }
+        .mermaid .label foreignObject {
+            overflow: visible;
+        }
+        .mermaid .cluster rect {
+            rx: 8px;
+            ry: 8px;
+        }
+        .mermaid .cluster .label {
+            margin-bottom: 12px;
+        }
+        .mermaid .cluster foreignObject {
+            overflow: visible;
         }
 
         footer {
@@ -307,15 +364,6 @@
             .diagram-content {
                 padding: 0.5rem;
             }
-            .stats {
-                grid-template-columns: repeat(4, 1fr);
-            }
-            .stat-card {
-                padding: 0.3rem 0.4rem;
-            }
-            .stat-value {
-                font-size: 0.85rem;
-            }
         }
     </style>
 </head>
@@ -323,38 +371,8 @@
     <div class="container">
         <h1><span class="emoji">🦎</span> Claudezilla - Architecture Gallery</h1>
         <p class="subtitle">Firefox Browser Automation for Claude Code CLI - A Google-free Alternative</p>
-        <p class="last-updated">Last updated: 2026-01-26 | Version: 0.5.6</p>
+        <p class="last-updated">Last updated: 2026-02-01 | Version: 0.5.6</p>
 
-        <div class="stats">
-            <div class="stat-card">
-                <div class="stat-value">7</div>
-                <div class="stat-label">Diagrams</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value">30+</div>
-                <div class="stat-label">MCP Tools</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value">10</div>
-                <div class="stat-label">Tab Pool</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value">128</div>
-                <div class="stat-label">Agent ID Bits</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value">2min</div>
-                <div class="stat-label">Orphan Timeout</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value">4</div>
-                <div class="stat-label">Layers</div>
-            </div>
-            <div class="stat-card new">
-                <div class="stat-value">Win</div>
-                <div class="stat-label">Windows Support</div>
-            </div>
-        </div>
 
         <div class="info">
             <div class="info-title">Interactive Diagram Collection <span class="new-badge">v0.5.6</span></div>
@@ -390,7 +408,7 @@
             </div>
             <div class="color-item">
                 <span class="color-swatch" style="background: #ffd; border: 1px solid #f90;"></span>
-                <span>New in v0.5.5</span>
+                <span>New in v0.5.6</span>
             </div>
         </div>
 
@@ -430,7 +448,7 @@ flowchart TB
 
     subgraph MCP_LAYER["MCP Server Layer"]
         MCP_SERVER["MCP Server<br/>(mcp/server.js)"]
-        TOOLS["30+ Browser Tools"]
+        TOOLS["27 Browser Tools"]
         HEARTBEAT["Agent Heartbeat<br/>Tracking"]
         ORPHAN["Orphan Cleanup<br/>(2min timeout)"]
         EXPR_BLOCK["Expression Blocklist<br/>(fetch, eval, cookies)"]
@@ -521,6 +539,7 @@ classDiagram
         +cleanupOrphanedAgents()
         +updateAgentHeartbeat(agentId)
         +truncateAgentId(agentId)
+        +handleShutdown(signal)
         +validateExpression(expression)
     }
 
@@ -554,11 +573,14 @@ classDiagram
         +Number activeTabId
         +Promise screenshotLock
         +Array pendingSlotRequests
+        +Map slotReservations
         +connect()
         +sendToHost(command, params)
         +handleCliCommand(message)
         +verifyTabOwnership(tabId, agentId)
         +waitForPageReady(tabId, options)
+        +handleGoodbye(agentId)
+        +createSlotReservation(agentId)
     }
 
     class ContentScript {
@@ -575,7 +597,10 @@ classDiagram
         firefox_create_window()
         firefox_navigate()
         firefox_close_tab()
+        firefox_close_window()
         firefox_get_tabs()
+        firefox_resize_window()
+        firefox_set_viewport()
     }
 
     class PageTools {
@@ -584,13 +609,30 @@ classDiagram
         firefox_type()
         firefox_press_key()
         firefox_scroll()
+        firefox_wait_for()
     }
 
     class AnalysisTools {
         firefox_screenshot()
         firefox_get_page_state()
         firefox_get_accessibility_snapshot()
+        firefox_get_element()
         firefox_evaluate()
+    }
+
+    class DevTools {
+        firefox_get_console()
+        firefox_get_network()
+    }
+
+    class CoordinationTools {
+        firefox_request_tab_space()
+        firefox_grant_tab_space()
+        firefox_get_slot_requests()
+    }
+
+    class DiagnosticTools {
+        firefox_diagnose()
     }
 
     class LoopTools {
@@ -608,6 +650,9 @@ classDiagram
     MCPServer ..> BrowserTools
     MCPServer ..> PageTools
     MCPServer ..> AnalysisTools
+    MCPServer ..> DevTools
+    MCPServer ..> CoordinationTools
+    MCPServer ..> DiagnosticTools
     MCPServer ..> LoopTools
                     </pre>
                 </div>
@@ -617,7 +662,7 @@ classDiagram
             <div class="diagram-card" id="dataflow">
                 <div class="diagram-header" onclick="toggleDiagram(this)">
                     <span class="diagram-title">Data Flow</span>
-                    <span class="diagram-description">Command flow with IPC layer, screenshot mutex (3s), expression validation</span>
+                    <span class="diagram-description">Command flow, screenshot mutex, expression validation, session cleanup, slot reservation</span>
                     <span class="diagram-type sequence">SEQUENCE</span>
                 </div>
                 <div class="diagram-content">
@@ -669,7 +714,7 @@ sequenceDiagram
         MCP-->>-Claude: {type: "image", data: base64}
     end
 
-    Note over Claude,Page: Expression Validation (v0.5.5)
+    Note over Claude,Page: Expression Validation (v0.5.6)
 
     Claude->>+MCP: firefox_evaluate({expression: "fetch(...)"})
     MCP->>MCP: validateExpression(expression)
@@ -682,6 +727,46 @@ sequenceDiagram
         Host-->>-MCP: Response
         MCP-->>-Claude: Result
     end
+
+    Note over Claude,Page: Session Cleanup (v0.5.6)
+
+    Claude->>MCP: Session ending (SIGINT/SIGTERM)
+    MCP->>MCP: handleShutdown(signal)
+    MCP->>+Host: {command: "goodbye", agentId}
+    Host->>+BG: goodbye message
+    BG->>BG: Close all tabs owned by agentId
+    BG->>BG: Remove slot reservations
+    BG->>BG: Remove pending requests
+    BG-->>-Host: {closed: N, cleaned: true}
+    Host-->>-MCP: Cleanup confirmed
+
+    Note over Claude,Page: Slot Reservation Flow (v0.5.6)
+
+    Claude->>+MCP: firefox_create_window({url})
+    MCP->>+BG: createWindow command
+    BG-->>-MCP: POOL_FULL error (12/12 tabs)
+    MCP-->>-Claude: Error: POOL_FULL
+
+    Claude->>+MCP: firefox_request_tab_space()
+    MCP->>+BG: requestTabSpace
+    BG->>BG: Queue slot request for agentId
+    BG-->>-MCP: {queued: true}
+    MCP-->>-Claude: Request queued
+
+    Note right of BG: Another agent closes tab or grants space
+    BG->>BG: createSlotReservation(agentId, 30s TTL)
+
+    Claude->>+MCP: firefox_get_slot_requests()
+    MCP->>+BG: getSlotRequests
+    BG-->>-MCP: {youHaveReservation: true, reservationExpiresInMs: 28000}
+    MCP-->>-Claude: Reservation ready
+
+    Claude->>+MCP: firefox_create_window({url})
+    MCP->>+BG: createWindow command
+    BG->>BG: Check reservation for agentId
+    BG->>BG: Valid reservation found, bypass POOL_FULL
+    BG-->>-MCP: {tabId: 456, url}
+    MCP-->>-Claude: Tab created
                     </pre>
                 </div>
             </div>
@@ -725,7 +810,7 @@ graph TB
     end
 
     subgraph MCP["mcp/<br/>MCP Server"]
-        MCP_SERVER["server.js<br/>(30+ tools)"]
+        MCP_SERVER["server.js<br/>(27 tools)"]
         MCP_TASK["task-detector.js"]
     end
 
@@ -777,7 +862,7 @@ graph TB
                     <pre class="mermaid">
 flowchart TB
     subgraph CLAUDE_CODE["Claude Code CLI"]
-        MCP_TOOLS["MCP Tools<br/>(30+ firefox_* tools)"]
+        MCP_TOOLS["MCP Tools<br/>(27 firefox_* tools)"]
         SLASH_CMDS["Slash Commands<br/>(/focus, /cancel-focus)"]
     end
 
