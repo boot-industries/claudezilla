@@ -4,34 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Claudezilla - Architecture Gallery</title>
-    <script type="module">
-        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
-        mermaid.initialize({
-            startOnLoad: true,
-            theme: 'dark',
-            themeVariables: {
-                fontFamily: '"InputMono-Regular", "SF Mono", "Fira Code", monospace',
-                darkMode: true,
-                background: '#1a1a1a',
-                primaryColor: '#FF6B00',
-                primaryTextColor: '#e0e0e0',
-                primaryBorderColor: '#FF9500',
-                lineColor: '#4CAF50',
-                secondaryColor: '#2196F3',
-                tertiaryColor: '#9C27B0'
-            },
-            flowchart: {
-                curve: 'basis',
-                padding: 28,
-                nodeSpacing: 60,
-                rankSpacing: 60,
-                subGraphTitleMargin: { top: 14, bottom: 8 },
-                useMaxWidth: false
-            },
-            sequence: { mirrorActors: false }
-        });
-    </script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
     <style>
+        :root {
+            --bg-primary: #1a1a1a;
+            --bg-secondary: #242424;
+            --bg-card: #2a2a2a;
+            --accent: #FF6B00;
+            --accent-secondary: #FF9500;
+            --border: #333;
+        }
+
         /* Input Sans */
         @font-face {
             font-family: 'InputSans-Regular';
@@ -73,7 +56,7 @@
 
         body {
             font-family: 'InputSans-Regular', 'Input Sans', system-ui, sans-serif;
-            background: #1a1a1a;
+            background: var(--bg-primary);
             color: #e0e0e0;
             padding: 0.75rem 1.5rem;
             line-height: 1.5;
@@ -85,24 +68,31 @@
             margin: 0 auto;
         }
 
-        h1 {
+        header {
+            margin-bottom: 0.5rem;
+        }
+
+        header h1 {
             font-size: 1.25rem;
-            font-weight: 600;
+            font-weight: 700;
             margin-bottom: 0.15rem;
-            color: #fff;
+            background: linear-gradient(135deg, var(--accent), var(--accent-secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            display: inline;
         }
 
-        h1 .emoji {
-            font-size: 1.1rem;
-        }
-
-        h2 {
-            font-size: 1rem;
-            font-weight: 600;
-            color: #FF9500;
-            margin: 1rem 0 0.5rem 0;
-            padding-bottom: 0.35rem;
-            border-bottom: 1px solid #333;
+        header .version-badge {
+            display: inline-block;
+            background: var(--accent);
+            color: #000;
+            font-size: 0.55rem;
+            padding: 0.1rem 0.4rem;
+            border-radius: 3px;
+            font-weight: 700;
+            margin-left: 0.5rem;
+            vertical-align: middle;
         }
 
         .subtitle {
@@ -119,7 +109,7 @@
 
         .info {
             background: #2a2a1a;
-            border-left: 3px solid #FF9500;
+            border-left: 3px solid var(--accent-secondary);
             padding: 0.5rem 0.65rem;
             margin-bottom: 0.6rem;
             border-radius: 3px;
@@ -127,9 +117,83 @@
         }
 
         .info-title {
-            color: #FF9500;
+            color: var(--accent-secondary);
             font-weight: 600;
             margin-bottom: 0.15rem;
+        }
+
+        .new-badge {
+            background: var(--accent-secondary);
+            color: #000;
+            font-size: 0.5rem;
+            padding: 0.1rem 0.3rem;
+            border-radius: 2px;
+            font-weight: 600;
+            margin-left: 0.5rem;
+            vertical-align: middle;
+        }
+
+        .nav-legend-row {
+            display: flex;
+            gap: 0.6rem;
+            margin-bottom: 0.6rem;
+            flex-wrap: wrap;
+            align-items: flex-start;
+        }
+
+        .quick-nav {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.35rem;
+            align-items: center;
+        }
+
+        .quick-nav a {
+            background: var(--bg-card);
+            color: var(--accent-secondary);
+            padding: 0.25rem 0.5rem;
+            border-radius: 3px;
+            text-decoration: none;
+            font-size: 0.65rem;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+
+        .quick-nav a:hover {
+            background: #3a3a3a;
+        }
+
+        .quick-nav .section-label {
+            background: transparent;
+            color: #666;
+            padding-left: 0;
+            cursor: default;
+            font-size: 0.65rem;
+        }
+
+        .legend {
+            background: var(--bg-secondary);
+            border-radius: 5px;
+            padding: 0.4rem 0.6rem;
+        }
+
+        .legend-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            font-size: 0.6rem;
+        }
+
+        .legend-item .swatch {
+            width: 10px;
+            height: 10px;
+            border-radius: 2px;
         }
 
         .diagram-grid {
@@ -138,54 +202,56 @@
         }
 
         .diagram-card {
-            background: #242424;
+            background: var(--bg-secondary);
             border-radius: 8px;
             overflow: hidden;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
         }
 
+        .diagram-card.selected {
+            outline: 2px solid var(--accent);
+            outline-offset: -2px;
+        }
+
         .diagram-header {
-            background: #2a2a2a;
+            background: var(--bg-card);
             padding: 0.75rem 1rem;
             cursor: pointer;
             user-select: none;
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            border-bottom: 1px solid #333;
-            outline: none;
+            border-bottom: 1px solid var(--border);
         }
 
         .diagram-header:hover {
             background: #333;
         }
 
-        .diagram-header.focused {
-            background: #333;
-            box-shadow: inset 3px 0 0 #FF9500;
-        }
-
-        .diagram-header::before {
-            content: '\25B6';
-            font-size: 0.5rem;
-            transition: transform 0.2s;
+        .diagram-toggle {
+            font-size: 0.6rem;
             color: #888;
+            transition: transform 0.2s;
             flex-shrink: 0;
+            line-height: 1;
         }
 
-        .diagram-header:not(.collapsed)::before {
-            transform: rotate(90deg);
+        .diagram-card.collapsed .diagram-toggle {
+            transform: rotate(-90deg);
         }
 
-        .diagram-title {
+        .diagram-header h2 {
             font-weight: 600;
             color: #fff;
             font-size: 0.875rem;
             flex-shrink: 0;
             white-space: nowrap;
+            margin: 0;
+            padding: 0;
+            border: none;
         }
 
-        .diagram-type {
+        .diagram-badge {
             font-size: 0.625rem;
             padding: 0.2rem 0.5rem;
             border-radius: 3px;
@@ -193,10 +259,10 @@
             flex-shrink: 0;
         }
 
-        .diagram-type.flowchart { background: #3a2a1a; color: #FF9500; }
-        .diagram-type.sequence { background: #2a3a4a; color: #4CAF50; }
-        .diagram-type.class { background: #3a3a2a; color: #FFB74D; }
-        .diagram-type.er { background: #3a2a3a; color: #CE93D8; }
+        .diagram-badge.flowchart { background: #3a2a1a; color: var(--accent-secondary); }
+        .diagram-badge.sequence { background: #2a3a4a; color: #4CAF50; }
+        .diagram-badge.class { background: #3a3a2a; color: #FFB74D; }
+        .diagram-badge.er { background: #3a2a3a; color: #CE93D8; }
 
         .diagram-description {
             font-size: 0.7rem;
@@ -213,10 +279,16 @@
             padding: 1rem;
             overflow-x: auto;
             background: #1e1e1e;
+            max-height: 5000px;
+            transition: max-height 0.3s ease, padding 0.3s ease, opacity 0.3s ease;
+            opacity: 1;
         }
 
-        .diagram-content.hidden {
-            display: none;
+        .diagram-card.collapsed .diagram-content {
+            max-height: 0;
+            padding: 0 1rem;
+            opacity: 0;
+            overflow: hidden;
         }
 
         .diagram-content pre {
@@ -231,8 +303,8 @@
         }
 
         .mermaid svg {
-            min-width: 1100px;
-            max-width: none;
+            min-width: 900px;
+            max-width: 100%;
             height: auto;
         }
 
@@ -266,23 +338,15 @@
             stroke-width: 2px !important;
         }
 
-        /* Subgraph (cluster) label visibility */
+        /* Node text - prevent clipping */
         .mermaid .cluster-label {
             white-space: nowrap;
+            padding: 8px 12px;
         }
         .mermaid .cluster-label .nodeLabel {
             white-space: nowrap;
-            background: rgba(42, 42, 42, 0.95) !important;
-            padding: 3px 10px !important;
-            border-radius: 3px;
-            font-weight: 600;
-            letter-spacing: 0.02em;
+            padding: 4px 8px;
         }
-        .mermaid .cluster-label foreignObject {
-            overflow: visible !important;
-        }
-
-        /* Node text - prevent clipping */
         .mermaid .nodeLabel {
             white-space: nowrap;
         }
@@ -293,6 +357,9 @@
             rx: 8px;
             ry: 8px;
         }
+        .mermaid .cluster .label {
+            margin-bottom: 12px;
+        }
         .mermaid .cluster foreignObject {
             overflow: visible;
         }
@@ -300,65 +367,13 @@
         footer {
             margin-top: 1.5rem;
             padding-top: 1rem;
-            border-top: 1px solid #333;
+            border-top: 1px solid var(--border);
             color: #666;
             font-size: 0.625rem;
         }
 
         footer a {
-            color: #FF9500;
-        }
-
-        .quick-nav {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.35rem;
-            margin-bottom: 0.6rem;
-        }
-
-        .quick-nav a {
-            background: #2a2a2a;
-            color: #FF9500;
-            padding: 0.25rem 0.5rem;
-            border-radius: 3px;
-            text-decoration: none;
-            font-size: 0.65rem;
-            font-weight: 500;
-            transition: background 0.2s;
-        }
-
-        .quick-nav a:hover {
-            background: #3a3a3a;
-        }
-
-        .quick-nav a.section-label {
-            background: transparent;
-            color: #666;
-            padding-left: 0;
-            cursor: default;
-        }
-
-        .color-legend {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.5rem;
-            margin-bottom: 0.6rem;
-            padding: 0.4rem 0.6rem;
-            background: #242424;
-            border-radius: 5px;
-        }
-
-        .color-item {
-            display: flex;
-            align-items: center;
-            gap: 0.25rem;
-            font-size: 0.6rem;
-        }
-
-        .color-swatch {
-            width: 10px;
-            height: 10px;
-            border-radius: 2px;
+            color: var(--accent-secondary);
         }
 
         kbd {
@@ -367,38 +382,75 @@
             border-radius: 3px;
             font-size: 0.65rem;
             border: 1px solid #444;
+            font-family: 'InputMono-Regular', monospace;
         }
 
-        .new-badge {
-            background: #FF9500;
-            color: #000;
-            font-size: 0.5rem;
-            padding: 0.1rem 0.3rem;
-            border-radius: 2px;
-            font-weight: 600;
-            margin-left: 0.5rem;
-            vertical-align: middle;
+        .keyboard-hints {
+            position: fixed;
+            bottom: 1rem;
+            right: 1rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 0.5rem 0.75rem;
+            font-size: 0.6rem;
+            color: #888;
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+            z-index: 100;
+            opacity: 0.8;
         }
 
-        @media (max-width: 768px) {
+        .keyboard-hints:hover {
+            opacity: 1;
+        }
+
+        .keyboard-hints div {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
+        @media (max-width: 900px) {
+            body {
+                padding: 0.5rem 1rem;
+            }
+            .nav-legend-row {
+                flex-direction: column;
+            }
+            .mermaid svg {
+                min-width: 600px;
+            }
+        }
+
+        @media (max-width: 600px) {
             body {
                 padding: 0.5rem 0.75rem;
             }
-            h1 {
+            header h1 {
                 font-size: 1.1rem;
             }
             .diagram-content {
                 padding: 0.5rem;
+            }
+            .mermaid svg {
+                min-width: 100%;
+            }
+            .keyboard-hints {
+                display: none;
             }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1><span class="emoji">🦎</span> Claudezilla - Architecture Gallery</h1>
-        <p class="subtitle">Firefox Browser Automation for Claude Code CLI - A Google-free Alternative</p>
-        <p class="last-updated">Last updated: 2026-02-01 | Version: 0.5.6</p>
-
+        <header>
+            <h1>Claudezilla - Architecture Gallery</h1>
+            <span class="version-badge">v0.5.6</span>
+            <p class="subtitle">Firefox Browser Automation for Claude Code CLI - A Google-free Alternative</p>
+            <p class="last-updated">Last updated: 2026-02-01 | Version: 0.5.6</p>
+        </header>
 
         <div class="info">
             <div class="info-title">Interactive Diagram Collection <span class="new-badge">v0.5.6</span></div>
@@ -407,62 +459,60 @@
             Click headers to expand/collapse. Diagrams render via Mermaid.js. <kbd>&uarr;</kbd><kbd>&darr;</kbd> navigate, <kbd>&rarr;</kbd> expand, <kbd>&larr;</kbd> collapse. <kbd>a</kbd> expand all, <kbd>Esc</kbd> collapse all.
         </div>
 
-        <div class="color-legend">
-            <div class="color-item">
-                <span class="color-swatch" style="background: #bbdefb;"></span>
-                <span>MCP Layer</span>
-            </div>
-            <div class="color-item">
-                <span class="color-swatch" style="background: #c8e6c9;"></span>
-                <span>Extension</span>
-            </div>
-            <div class="color-item">
-                <span class="color-swatch" style="background: #fff9c4;"></span>
-                <span>Native Host</span>
-            </div>
-            <div class="color-item">
-                <span class="color-swatch" style="background: #f8bbd0;"></span>
-                <span>Security</span>
-            </div>
-            <div class="color-item">
-                <span class="color-swatch" style="background: #e1bee7;"></span>
-                <span>Plugin</span>
-            </div>
-            <div class="color-item">
-                <span class="color-swatch" style="background: #ffe0b2;"></span>
-                <span>Cloud Services</span>
-            </div>
-            <div class="color-item">
-                <span class="color-swatch" style="background: #ffd; border: 1px solid #f90;"></span>
-                <span>New in v0.5.6</span>
+        <div class="nav-legend-row">
+            <nav class="quick-nav">
+                <span class="section-label">System:</span>
+                <a href="#architecture">Architecture</a>
+                <a href="#components">Components</a>
+                <a href="#dataflow">Data Flow</a>
+                <span class="section-label">Structure:</span>
+                <a href="#repo">Repository</a>
+                <a href="#entry">Entry Points</a>
+                <a href="#database">Database</a>
+                <a href="#deployment">Deployment</a>
+            </nav>
+            <div class="legend">
+                <div class="legend-grid">
+                    <div class="legend-item">
+                        <span class="swatch" style="background: #bbdefb;"></span>
+                        <span>MCP Layer</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="swatch" style="background: #c8e6c9;"></span>
+                        <span>Extension</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="swatch" style="background: #fff9c4;"></span>
+                        <span>Native Host</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="swatch" style="background: #f8bbd0;"></span>
+                        <span>Security</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="swatch" style="background: #e1bee7;"></span>
+                        <span>Plugin</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="swatch" style="background: #ffe0b2;"></span>
+                        <span>Cloud Services</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="swatch" style="background: #ffd; border: 1px solid #f90;"></span>
+                        <span>New in v0.5.6</span>
+                    </div>
+                </div>
             </div>
         </div>
-
-        <nav class="quick-nav">
-            <span class="section-label">System:</span>
-            <a href="#architecture">Architecture</a>
-            <a href="#components">Components</a>
-            <a href="#dataflow">Data Flow</a>
-            <span class="section-label">Structure:</span>
-            <a href="#repo">Repository</a>
-            <a href="#entry">Entry Points</a>
-            <a href="#database">Database</a>
-            <a href="#deployment">Deployment</a>
-        </nav>
-
-        <!-- ================================================================== -->
-        <!-- SYSTEM OVERVIEW SECTION -->
-        <!-- ================================================================== -->
-
-        <h2>System Overview</h2>
 
         <div class="diagram-grid">
             <!-- Architecture Overview -->
             <div class="diagram-card" id="architecture">
                 <div class="diagram-header" onclick="toggleDiagram(this)">
-                    <span class="diagram-title">System Architecture</span>
+                    <div class="diagram-toggle">&#9660;</div>
+                    <h2>System Architecture</h2>
+                    <span class="diagram-badge flowchart">FLOWCHART</span>
                     <span class="diagram-description">4-layer architecture with IPC abstraction for cross-platform support</span>
-                    <span class="diagram-type flowchart">FLOWCHART</span>
                 </div>
                 <div class="diagram-content">
                     <pre class="mermaid">
@@ -548,9 +598,10 @@ flowchart TB
             <!-- Component Map -->
             <div class="diagram-card" id="components">
                 <div class="diagram-header" onclick="toggleDiagram(this)">
-                    <span class="diagram-title">Component Map</span>
+                    <div class="diagram-toggle">&#9660;</div>
+                    <h2>Component Map</h2>
+                    <span class="diagram-badge class">CLASS</span>
                     <span class="diagram-description">Modules with APIs, IPC abstraction, and tool categories</span>
-                    <span class="diagram-type class">CLASS</span>
                 </div>
                 <div class="diagram-content">
                     <pre class="mermaid">
@@ -687,9 +738,10 @@ classDiagram
             <!-- Data Flow -->
             <div class="diagram-card" id="dataflow">
                 <div class="diagram-header" onclick="toggleDiagram(this)">
-                    <span class="diagram-title">Data Flow</span>
+                    <div class="diagram-toggle">&#9660;</div>
+                    <h2>Data Flow</h2>
+                    <span class="diagram-badge sequence">SEQUENCE</span>
                     <span class="diagram-description">Command flow, screenshot mutex, expression validation, session cleanup, slot reservation</span>
-                    <span class="diagram-type sequence">SEQUENCE</span>
                 </div>
                 <div class="diagram-content">
                     <pre class="mermaid">
@@ -796,25 +848,18 @@ sequenceDiagram
                     </pre>
                 </div>
             </div>
-        </div>
 
-        <!-- ================================================================== -->
-        <!-- STRUCTURE SECTION -->
-        <!-- ================================================================== -->
-
-        <h2>Repository Structure</h2>
-
-        <div class="diagram-grid">
             <!-- Repository Structure -->
             <div class="diagram-card" id="repo">
                 <div class="diagram-header" onclick="toggleDiagram(this)">
-                    <span class="diagram-title">Repository Structure</span>
+                    <div class="diagram-toggle">&#9660;</div>
+                    <h2>Repository Structure</h2>
+                    <span class="diagram-badge flowchart">FLOWCHART</span>
                     <span class="diagram-description">Extension + Host + IPC + MCP + Plugin + Website + Worker</span>
-                    <span class="diagram-type flowchart">FLOWCHART</span>
                 </div>
                 <div class="diagram-content">
                     <pre class="mermaid">
-flowchart TB
+graph TB
     subgraph ROOT["claudezilla/"]
         CLAUDE["CLAUDE.md<br/>(Project docs)"]
         CHANGELOG["CHANGELOG.md"]
@@ -880,9 +925,10 @@ flowchart TB
             <!-- Entry Points -->
             <div class="diagram-card" id="entry">
                 <div class="diagram-header" onclick="toggleDiagram(this)">
-                    <span class="diagram-title">Entry Points</span>
+                    <div class="diagram-toggle">&#9660;</div>
+                    <h2>Entry Points</h2>
+                    <span class="diagram-badge flowchart">FLOWCHART</span>
                     <span class="diagram-description">MCP tools, slash commands, popup, APIs, Windows installer</span>
-                    <span class="diagram-type flowchart">FLOWCHART</span>
                 </div>
                 <div class="diagram-content">
                     <pre class="mermaid">
@@ -941,9 +987,10 @@ flowchart TB
             <!-- Database Schema -->
             <div class="diagram-card" id="database">
                 <div class="diagram-header" onclick="toggleDiagram(this)">
-                    <span class="diagram-title">Database Schema</span>
+                    <div class="diagram-toggle">&#9660;</div>
+                    <h2>Database Schema</h2>
+                    <span class="diagram-badge er">ER DIAGRAM</span>
                     <span class="diagram-description">D1 database + in-memory state structures</span>
-                    <span class="diagram-type er">ER DIAGRAM</span>
                 </div>
                 <div class="diagram-content">
                     <pre class="mermaid">
@@ -1004,9 +1051,10 @@ erDiagram
             <!-- Deployment Infrastructure -->
             <div class="diagram-card" id="deployment">
                 <div class="diagram-header" onclick="toggleDiagram(this)">
-                    <span class="diagram-title">Deployment Infrastructure</span>
+                    <div class="diagram-toggle">&#9660;</div>
+                    <h2>Deployment Infrastructure</h2>
+                    <span class="diagram-badge flowchart">FLOWCHART</span>
                     <span class="diagram-description">Unix + Windows machines, Cloudflare Edge, External services</span>
-                    <span class="diagram-type flowchart">FLOWCHART</span>
                 </div>
                 <div class="diagram-content">
                     <pre class="mermaid">
@@ -1079,79 +1127,116 @@ flowchart TB
         </footer>
     </div>
 
+    <div class="keyboard-hints">
+        <div><kbd>&uarr;</kbd><kbd>&darr;</kbd> Navigate</div>
+        <div><kbd>&larr;</kbd> Collapse</div>
+        <div><kbd>&rarr;</kbd> Expand</div>
+        <div><kbd>Esc</kbd> Collapse all</div>
+        <div><kbd>A</kbd> Expand all</div>
+    </div>
+
     <script>
-        let focusedIndex = -1;
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'dark',
+            themeVariables: {
+                fontFamily: '"InputMono-Regular", "SF Mono", "Fira Code", monospace',
+                darkMode: true,
+                background: '#1a1a1a',
+                primaryColor: '#2a2a2a',
+                primaryTextColor: '#e0e0e0',
+                primaryBorderColor: '#FF9500',
+                lineColor: '#FF6B00',
+                secondaryColor: '#1a1a1a',
+                tertiaryColor: '#9C27B0',
+                edgeLabelBackground: '#3a2a1a'
+            },
+            flowchart: { curve: 'basis' },
+            sequence: { mirrorActors: false }
+        });
 
-        function getHeaders() {
-            return [...document.querySelectorAll('.diagram-header')];
+        let selectedIndex = -1;
+
+        function getCards() {
+            return Array.from(document.querySelectorAll('.diagram-card'));
         }
 
-        function updateFocus(headers) {
-            headers.forEach((h, i) => h.classList.toggle('focused', i === focusedIndex));
-            if (focusedIndex >= 0) {
-                headers[focusedIndex].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-            }
-        }
+        function selectCard(index) {
+            const cards = getCards();
+            if (cards.length === 0) return;
 
-        function expand(header) {
-            header.classList.remove('collapsed');
-            header.nextElementSibling.classList.remove('hidden');
-        }
+            // Remove previous selection
+            cards.forEach(c => c.classList.remove('selected'));
 
-        function collapse(header) {
-            header.classList.add('collapsed');
-            header.nextElementSibling.classList.add('hidden');
+            // Clamp index
+            if (index < 0) index = 0;
+            if (index >= cards.length) index = cards.length - 1;
+            selectedIndex = index;
+
+            // Apply selection
+            cards[selectedIndex].classList.add('selected');
+            cards[selectedIndex].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
 
         function toggleDiagram(header) {
-            const headers = getHeaders();
-            focusedIndex = headers.indexOf(header);
-            header.classList.contains('collapsed') ? expand(header) : collapse(header);
-            updateFocus(headers);
+            const card = header.closest('.diagram-card');
+            card.classList.toggle('collapsed');
         }
 
-        // Keyboard navigation — macOS Finder list view style
+        // Keyboard navigation
         document.addEventListener('keydown', (e) => {
-            const headers = getHeaders();
-            const isTyping = document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA';
+            const tag = document.activeElement.tagName;
+            if (tag === 'INPUT' || tag === 'TEXTAREA') return;
 
-            if (e.key === 'ArrowDown' && !isTyping) {
-                e.preventDefault();
-                focusedIndex = Math.min(focusedIndex + 1, headers.length - 1);
-                if (focusedIndex < 0) focusedIndex = 0;
-                updateFocus(headers);
-            }
+            const cards = getCards();
 
-            if (e.key === 'ArrowUp' && !isTyping) {
-                e.preventDefault();
-                focusedIndex = Math.max(focusedIndex - 1, 0);
-                updateFocus(headers);
-            }
-
-            if (e.key === 'ArrowRight' && !isTyping && focusedIndex >= 0) {
-                e.preventDefault();
-                expand(headers[focusedIndex]);
-            }
-
-            if (e.key === 'ArrowLeft' && !isTyping && focusedIndex >= 0) {
-                e.preventDefault();
-                collapse(headers[focusedIndex]);
-            }
-
-            if (e.key === 'Escape') {
-                headers.forEach(h => collapse(h));
-                focusedIndex = -1;
-                updateFocus(headers);
-            }
-
-            if (e.key === 'a' && !e.ctrlKey && !e.metaKey && !isTyping) {
-                headers.forEach(h => expand(h));
+            switch (e.key) {
+                case 'ArrowDown':
+                    e.preventDefault();
+                    selectCard(selectedIndex + 1);
+                    break;
+                case 'ArrowUp':
+                    e.preventDefault();
+                    selectCard(selectedIndex - 1);
+                    break;
+                case 'ArrowRight':
+                    e.preventDefault();
+                    if (selectedIndex >= 0 && selectedIndex < cards.length) {
+                        cards[selectedIndex].classList.remove('collapsed');
+                    }
+                    break;
+                case 'ArrowLeft':
+                    e.preventDefault();
+                    if (selectedIndex >= 0 && selectedIndex < cards.length) {
+                        cards[selectedIndex].classList.add('collapsed');
+                    }
+                    break;
+                case 'Escape':
+                    cards.forEach(c => c.classList.add('collapsed'));
+                    break;
+                case 'a':
+                    if (!e.ctrlKey && !e.metaKey) {
+                        cards.forEach(c => c.classList.remove('collapsed'));
+                    }
+                    break;
             }
         });
 
-        // Start all diagrams expanded
-        document.addEventListener('DOMContentLoaded', () => {
-            getHeaders().forEach(h => expand(h));
+        // Quick-nav smooth scroll with card selection
+        document.querySelectorAll('.quick-nav a[href^="#"]').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const targetId = link.getAttribute('href').slice(1);
+                const target = document.getElementById(targetId);
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    const cards = getCards();
+                    const index = cards.indexOf(target);
+                    if (index !== -1) {
+                        selectCard(index);
+                    }
+                }
+            });
         });
     </script>
 </body>
