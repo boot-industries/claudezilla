@@ -3,6 +3,7 @@ node_modules/
 
 # Build artifacts
 *.xpi
+*.zip
 web-ext-artifacts/
 
 # OS files
