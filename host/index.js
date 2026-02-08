@@ -261,13 +261,16 @@ function handleCliCommand(command, params, authToken, callback) {
   // Store callback for when extension responds
   pendingCliRequests.set(id, callback);
 
-  // Set timeout to prevent hanging (2.5 minutes for long-running operations)
+  // Per-operation timeout support (default: 150s, range: 5s-300s)
+  const timeoutMs = (params._timeout && params._timeout >= 5000 && params._timeout <= 300000)
+    ? params._timeout
+    : 150000;
   setTimeout(() => {
     if (pendingCliRequests.has(id)) {
       pendingCliRequests.delete(id);
-      callback({ success: false, error: 'Request timed out' });
+      callback({ success: false, error: `Request timed out after ${timeoutMs}ms (command: ${command})`, command, timeoutMs });
     }
-  }, 150000);
+  }, timeoutMs);
 
   // Send command to extension via native messaging
   log(`Forwarding CLI command to extension: ${command}`);
@@ -298,7 +301,7 @@ function handleExtensionMessage(message) {
       id,
       success: true,
       result: {
-        host: '0.5.6',
+        host: '0.5.7',
         node: process.version,
         platform: process.platform,
         features: ['security-hardened', 'focus-loop', 'auto-retry', 'task-detection', 'expression-validation', 'windows-support', 'autonomous-install'],

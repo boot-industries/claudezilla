@@ -357,11 +357,15 @@ function sendCommandOnce(command, params = {}) {
     socket.on('timeout', () => {
       socket.end();
       if (!resolved) {
-        reject(new Error('Connection timed out'));
+        reject(new Error(`Connection timed out after ${socketTimeoutMs}ms (command: ${command})`));
       }
     });
 
-    socket.setTimeout(150000); // 2.5 minutes for long-running operations
+    // Per-operation timeout support (default: 150s)
+    const socketTimeoutMs = (params._timeout && params._timeout >= 5000 && params._timeout <= 300000)
+      ? params._timeout + 5000 // Add 5s buffer above the operation timeout
+      : 155000;
+    socket.setTimeout(socketTimeoutMs);
   });
 }
 
@@ -962,6 +966,16 @@ const TOOLS = [
   },
 ];
 
+// Add optional 'timeout' parameter to all tool schemas (except diagnose which runs locally)
+for (const tool of TOOLS) {
+  if (tool.name !== 'firefox_diagnose') {
+    tool.inputSchema.properties.timeout = {
+      type: 'number',
+      description: 'Request timeout in milliseconds (default: 150000, range: 5000-300000)',
+    };
+  }
+}
+
 // Map MCP tool names to Claudezilla commands
 const TOOL_TO_COMMAND = {
   // Core browser control
@@ -1002,7 +1016,7 @@ const TOOL_TO_COMMAND = {
 const server = new Server(
   {
     name: 'claudezilla',
-    version: '0.5.6',
+    version: '0.5.7',
   },
   {
     capabilities: {
@@ -1059,6 +1073,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     // SECURITY: Inject agent ID for tab ownership tracking
     // All tab-targeting commands now require ownership verification
     const commandParams = { ...(args || {}) };
+
+    // Per-operation timeout: map 'timeout' from tool args to '_timeout' internal param
+    if (commandParams.timeout && typeof commandParams.timeout === 'number') {
+      commandParams._timeout = Math.max(5000, Math.min(300000, commandParams.timeout));
+      delete commandParams.timeout; // Don't forward the schema param to extension
+    }
     const OWNERSHIP_COMMANDS = [
       'firefox_create_window',
       'firefox_close_tab',

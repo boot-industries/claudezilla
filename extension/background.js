@@ -19,7 +19,6 @@
 const NATIVE_HOST = 'claudezilla';
 
 let port = null;
-let messageId = 0;
 const pendingRequests = new Map();
 
 // Auto-reconnect configuration
@@ -468,6 +467,11 @@ function getConnectionStatus() {
 }
 
 /**
+ * Default timeout for operations (150s)
+ */
+const DEFAULT_TIMEOUT_MS = 150000;
+
+/**
  * Send command to native host
  * @param {string} command - Command name
  * @param {object} params - Command parameters
@@ -483,18 +487,22 @@ function sendToHost(command, params = {}) {
       }
     }
 
-    const id = ++messageId;
+    // Use UUID for collision-resistant message IDs (replaces numeric overflow risk)
+    const id = crypto.randomUUID();
     const message = { id, command, params };
 
     pendingRequests.set(id, { resolve, reject });
 
-    // Timeout after 2.5 minutes (150s) to support long-running browser operations
+    // Per-operation timeout support (default: 150s)
+    const timeoutMs = (params._timeout && params._timeout >= 5000 && params._timeout <= 300000)
+      ? params._timeout
+      : DEFAULT_TIMEOUT_MS;
     setTimeout(() => {
       if (pendingRequests.has(id)) {
         pendingRequests.delete(id);
-        reject(new Error(`Request ${id} timed out`));
+        reject(new Error(`Request timed out after ${timeoutMs}ms (command: ${command})`));
       }
-    }, 150000);
+    }, timeoutMs);
 
     console.log('[claudezilla] Sending to host:', message);
     port.postMessage(message);
@@ -632,7 +640,7 @@ async function handleCliCommand(message) {
 
       case 'version':
         result = {
-          extension: '0.5.6',
+          extension: '0.5.7',
           browser: navigator.userAgent,
           features: ['devtools', 'network', 'console', 'evaluate', 'focusglow', 'tabgroups', 'security-hardened', 'orphan-cleanup', 'focus-loop', 'auto-retry', 'task-detection', 'expression-validation', 'windows-support', 'autonomous-install'],
         };
@@ -756,9 +764,10 @@ async function handleCliCommand(message) {
             // Check if THIS agent has a valid reservation (they get priority)
             const myReservation = slotReservations.get(ownerId);
             if (myReservation && now <= myReservation.expiresAt) {
-              // Agent has a reservation - consume it and proceed
+              // ATOMIC: Consume reservation BEFORE proceeding
               slotReservations.delete(ownerId);
-              console.log(`[claudezilla] Agent ${ownerId.slice(0, 12)}... claimed reserved slot`);
+              const expiresInMs = myReservation.expiresAt - now;
+              console.log(`[claudezilla] Agent ${ownerId.slice(0, 12)}... claimed reserved slot (${expiresInMs}ms remaining)`);
               // Fall through to create tab - we'll temporarily exceed MAX_TABS by 1
               // but the waiting agent's slot was freed by closeTab/grantTabSpace
             } else {
@@ -1533,8 +1542,12 @@ async function handleCliCommand(message) {
           }
         });
 
-        // Chain this request to the lock (error handling keeps chain alive)
-        screenshotLock = screenshotPromise.catch(() => {});
+        // Chain this request to the lock (preserve errors for debugging but don't break chain)
+        screenshotLock = screenshotPromise.catch((err) => {
+          console.error('[claudezilla] Screenshot chain error:', err);
+          // Re-throw to propagate error to caller while maintaining chain
+          throw err;
+        });
         result = await screenshotPromise;
         break;
       }

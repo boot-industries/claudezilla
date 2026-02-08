@@ -1,12 +1,12 @@
 # Claudezilla - Claude Code Firefox Extension
 
-**Version:** 0.5.6
+**Version:** 0.5.7
 
 ## Overview
 
 Firefox extension providing browser automation for Claude Code CLI. A Google-free alternative to the official Chrome extension.
 
-**Key Features (v0.5.6):**
+**Key Features (v0.5.7):**
 - **NEW: Autonomous installation** - Installers auto-configure Claude Code permissions and MCP settings
 - **NEW: Extended timeouts** - 150s request timeout for long-running browser operations
 - Windows 10/11 support - Named pipes, ACL security, platform-independent IPC abstraction
@@ -116,6 +116,7 @@ claudezilla@boot.industries
 - Protocol: JSON over stdin/stdout with 4-byte length header
 - Host location: `~/.mozilla/native-messaging-hosts/claudezilla.json`
 - Max message: 1MB (host→extension), 4GB (extension→host)
+- **Per-operation timeouts (v0.5.7):** All tools support optional `timeout` parameter (5000-300000 ms, default: 150000)
 
 ## Commands
 

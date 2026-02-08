@@ -1,7 +1,41 @@
 # CLZ002 Changelog
 
 **Project:** Claudezilla
-**Current Version:** 0.5.6
+**Current Version:** 0.5.7
+
+## v0.5.7 (2026-02-08)
+
+**Critical bug fixes + timeout flexibility.**
+
+### Bug Fixes
+
+- **Screenshot error propagation** - Errors during capture now properly propagate to Claude
+  - Fixed `.catch(() => {})` silently swallowing screenshot chain errors
+  - Screenshot failures include full error context for debugging
+  - Subsequent screenshots still function correctly after failures
+- **Slot reservation race condition** - Atomic reservation consumption prevents double-claims
+  - Reservation deleted immediately before agent proceeds to create tab
+  - Defensive logging tracks reservation expiry timing
+- **Message ID overflow protection** - Replaced numeric `++messageId` with `crypto.randomUUID()`
+  - Eliminates theoretical collision after 2^53 requests
+  - Consistent with host/index.js UUID usage
+
+### Features
+
+- **Per-operation timeouts** - Tools can now specify custom timeout values
+  - Optional `timeout` parameter added to all tool schemas (except `firefox_diagnose`)
+  - Default remains 150s for backward compatibility
+  - Range: 5s to 300s (5 minutes)
+  - Timeout propagates through MCP server → host → extension pipeline
+- **Improved timeout errors** - Timeout messages now include operation name and duration
+  - Example: `Request timed out after 150000ms (command: screenshot)`
+  - Host and extension both provide contextual error messages
+
+### Updated
+
+- Version bumped to 0.5.7 across all components (extension, host, MCP server)
+
+---
 
 ## v0.5.6 (2026-01-26)
 

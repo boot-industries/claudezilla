@@ -197,6 +197,12 @@ If you discover a security vulnerability, please report it to: security@boot.ind
 
 ## Changelog
 
+- **0.5.7:** Bug fixes and timeout flexibility (February 2026)
+  - Screenshot errors now propagate correctly (was silently swallowed by `.catch(() => {})`)
+  - Slot reservation consumption is atomic (prevents double-claim race condition)
+  - Message IDs use `crypto.randomUUID()` (replaces `++messageId` overflow risk)
+  - Per-operation timeout parameter added to all tool schemas (5s-300s range)
+
 - **0.5.6:** Allow file:// URLs (January 2026)
   - file:// scheme now allowed since Claude Code runs locally with full filesystem access
   - Enables viewing local HTML files for development and testing
