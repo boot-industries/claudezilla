@@ -1,6 +1,6 @@
 /**
  * Claudezilla Popup Script
- * v0.5.6 - Autonomous install, timeout fixes
+ * v0.5.7 - Bug fixes, timeout flexibility
  */
 
 // Elements
