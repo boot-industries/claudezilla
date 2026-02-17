@@ -1,16 +1,20 @@
 # Claudezilla
 
-**Firefox browser automation for Claude Code.** A privacy-friendly alternative to Chrome-based solutions.
+**Browser automation for Claude Code that runs on Firefox** — for systems where Chrome is unavailable, unwelcome, or policy-prohibited.
 
 [![Version](https://img.shields.io/badge/version-0.5.7-blue.svg)](./CHANGELOG.md)
 
-Give Claude the ability to browse the web, fill out forms, take screenshots, and extract data — all through Firefox.
+The only Firefox-native MCP server for Claude Code. Navigate, automate, screenshot, and extract data on any system that runs Firefox — no Chrome dependency, no Google infrastructure.
 
 ## Why Claudezilla?
 
-- **No Google account required** — Works with Firefox, no Chrome sign-in needed
-- **Privacy-conscious** — Use private browsing, control what Claude can access
-- **Multi-agent safe** — Multiple Claude sessions can share the browser without conflicts
+Anthropic's official browser tool requires Chrome. If you're on a system where Chrome is not available — or not acceptable — Claudezilla gives Claude Code the same browser automation capabilities through Firefox.
+
+- **Linux-native** — Works with the Firefox that ships on Debian, Fedora, RHEL, Ubuntu, and every major distro. No Google repository required.
+- **Zero telemetry** — All communication runs through a local Unix socket. No data leaves your machine. No Google account, no Chrome sync, no phone-home.
+- **Hardened environments** — Built for Tails, Whonix, Qubes OS, air-gapped networks, and enterprise Linux where package policy prohibits Chrome.
+- **Multi-agent safe** — 12-tab shared pool with 128-bit agent IDs, ownership tracking, and screenshot mutex. Multiple Claude sessions coexist safely.
+- **Full feature parity** — Click, type, scroll, screenshot, evaluate JS, access DevTools console and network. Same capabilities, different browser.
 
 ## Quick Start
 

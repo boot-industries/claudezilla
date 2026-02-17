@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Claudezilla - Firefox Browser Automation for Claude Code</title>
-  <meta name="description" content="Privacy-first Firefox extension for Claude Code. Browser automation without Chrome. Navigate, automate, extract data through natural language.">
+  <title>Claudezilla - Browser Automation for Claude Code Without Chrome</title>
+  <meta name="description" content="The only browser automation for Claude Code that runs on Firefox. Built for Linux, air-gapped networks, and systems where Chrome is not an option. Zero telemetry. Fully local.">
 
   <!-- Open Graph -->
   <meta property="og:title" content="CLAUDEZILLA">
-  <meta property="og:description" content="Firefox browser automation for Claude Code. Privacy-first, multi-agent safe.">
+  <meta property="og:description" content="Browser automation for Claude Code — no Chrome, no telemetry, no Google account. The Firefox-native MCP server.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://claudezilla.com">
   <meta property="og:image" content="https://claudezilla.com/assets/images/og-image.png">
@@ -18,16 +18,11 @@
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="CLAUDEZILLA">
-  <meta name="twitter:description" content="Firefox browser automation for Claude Code">
+  <meta name="twitter:description" content="Claude Code browser automation that works where Chrome can't. Firefox-native. Zero telemetry.">
   <meta name="twitter:image" content="https://claudezilla.com/assets/images/og-image.png">
 
-  <!-- Fonts (preconnect for speed) -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
-
-  <!-- Styles -->
-  <link rel="stylesheet" href="/assets/styles.css?v=8">
+  <!-- Styles (fonts self-hosted, no Google dependency) -->
+  <link rel="stylesheet" href="/assets/styles.css?v=9">
 </head>
 <body>
   <!-- Navigation -->
@@ -50,10 +45,11 @@
     <section class="hero">
       <div class="hero-content">
         <h1>Claudezilla</h1>
-        <p class="tagline">Browser automation awakens</p>
+        <p class="tagline">Browser automation without Google</p>
         <p class="description">
-          Give Claude Code full control of Mozilla Firefox. Navigate, automate, extract data, and take screenshots
-          through natural language. No Chrome required. Privacy-first. Multi-agent safe.
+          Give Claude Code full browser automation through Firefox. Navigate, interact, screenshot, and extract data
+          on systems where Chrome doesn't belong — Debian, Fedora, Tails, air-gapped networks, and anywhere you've
+          made the deliberate choice to exclude Google's surveillance infrastructure.
         </p>
         <div class="cta-grid">
           <a href="https://addons.mozilla.org/firefox/addon/claudezilla/" class="firefox-badge" target="_blank" rel="noopener">
@@ -164,26 +160,52 @@
 
     <!-- Features Grid -->
     <section class="features-section">
-      <h2 class="section-title">Why Claudezilla?</h2>
+      <h2 class="section-title">Why Firefox?</h2>
       <p class="section-subtitle">
-        A privacy-friendly alternative to Chrome-based browser automation. Built for developers who value control.
+        Chrome requires a Google account, phones home to Google servers, and ships with telemetry you cannot fully disable. Claudezilla gives Claude Code browser capabilities without any of that.
       </p>
 
       <div class="features-grid">
         <div class="feature-card">
           <div class="feature-icon">🔒</div>
-          <h3>Privacy-First</h3>
-          <p>No Google account required. Works with Firefox's private browsing. Communication via local Unix socket only.</p>
+          <h3>Zero Telemetry</h3>
+          <p>No usage data leaves your machine. No Google account. No Chrome sync. Communication runs through a local Unix socket — the browser never contacts an external server on Claudezilla's behalf.</p>
         </div>
         <div class="feature-card">
           <div class="feature-icon">🤝</div>
           <h3>Multi-Agent Safe</h3>
-          <p>12-tab shared pool with ownership tracking. Screenshot mutex prevents collisions. Multiple Claude sessions coexist safely.</p>
+          <p>12-tab shared pool with 128-bit agent IDs and ownership tracking. Screenshot mutex prevents collisions. Multiple Claude Code sessions coexist on the same Firefox instance without interference.</p>
         </div>
         <div class="feature-card">
           <div class="feature-icon">🎮</div>
           <h3>Full Browser Control</h3>
-          <p>Click, type, scroll, screenshot. Access DevTools console and network. Extract structured data from any page.</p>
+          <p>Click, type, scroll, screenshot, evaluate JavaScript. Access DevTools console and network. Extract structured data from any page — same capabilities as the Chrome extension, built entirely on Firefox's WebExtension API.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Built For -->
+    <section class="built-for-section">
+      <h2 class="section-title">Built For</h2>
+      <p class="section-subtitle">
+        Claudezilla exists for the systems and environments where Chrome is not available — or not acceptable.
+      </p>
+
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon">🐧</div>
+          <h3>Linux-First Distros</h3>
+          <p>Debian stable, Fedora, RHEL, Ubuntu — Firefox ships by default. Chrome requires adding Google's third-party repository. Claudezilla works with the browser you already have.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🔐</div>
+          <h3>Hardened & Air-Gapped</h3>
+          <p>Tails, Whonix, Qubes OS, and government/enterprise Linux lock packages to official repos only. Chrome's telemetry is a non-starter. Firefox ESR is the sanctioned browser.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🛡️</div>
+          <h3>Privacy by Architecture</h3>
+          <p>All communication runs through a local Unix socket. No network exposure, no cloud dependency, no data exfiltration surface. The entire stack is auditable — MIT-licensed, 4 files deep.</p>
         </div>
       </div>
     </section>
