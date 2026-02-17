@@ -84,6 +84,8 @@ const ALLOWED_COMMANDS = new Set([
   'grantTabSpace',
   'getSlotRequests',
   'cleanupOrphanedTabs',
+  // Settings
+  'setPrivateMode',
 ]);
 
 /**

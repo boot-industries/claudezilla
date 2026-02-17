@@ -21,6 +21,20 @@ const NATIVE_HOST = 'claudezilla';
 let port = null;
 const pendingRequests = new Map();
 
+/**
+ * Check if private-only mode is enabled (default: true for backward compat)
+ * Set via browser.storage.local: { claudezilla: { privateMode: false } }
+ */
+async function isPrivateModeRequired() {
+  try {
+    const stored = await browser.storage.local.get('claudezilla');
+    const settings = stored.claudezilla || {};
+    return settings.privateMode !== false; // default true
+  } catch {
+    return true;
+  }
+}
+
 // Auto-reconnect configuration
 const RECONNECT_CONFIG = {
   maxAttempts: 10,
@@ -587,10 +601,10 @@ async function getSession(windowId) {
   // Verify window still exists
   try {
     const win = await browser.windows.get(claudezillaWindow.windowId);
-    if (!win.incognito) {
+    if (!win.incognito && await isPrivateModeRequired()) {
       claudezillaWindow = null;
       activeTabId = null;
-      throw new Error('Claudezilla window is not private.');
+      throw new Error('Claudezilla window is not private. Set privateMode: false in storage to allow non-private windows.');
     }
 
     // Get active tab
@@ -637,6 +651,17 @@ async function handleCliCommand(message) {
       case 'ping':
         result = { pong: true, timestamp: Date.now() };
         break;
+
+      case 'setPrivateMode': {
+        const { enabled } = params;
+        if (typeof enabled !== 'boolean') throw new Error('enabled (boolean) is required');
+        const current = await browser.storage.local.get('claudezilla');
+        const settings = current.claudezilla || {};
+        settings.privateMode = enabled;
+        await browser.storage.local.set({ claudezilla: settings });
+        result = { privateMode: enabled, message: enabled ? 'Private mode enabled (default). New windows will be incognito.' : 'Private mode disabled. New windows will use regular browsing with persistent cookies.' };
+        break;
+      }
 
       case 'version':
         result = {
@@ -829,10 +854,11 @@ async function handleCliCommand(message) {
           activeTabId = tabId;
 
         } else {
-          // No window - create new private window
+          // No window - create new window (private by default)
           isNewWindow = true;
+          const usePrivate = await isPrivateModeRequired();
           const win = await browser.windows.create({
-            incognito: true,
+            incognito: usePrivate,
             focused: false,
             url: url || 'about:blank'
           });

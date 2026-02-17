@@ -955,6 +955,22 @@ const TOOLS = [
     },
   },
 
+  // ===== SETTINGS =====
+  {
+    name: 'firefox_set_private_mode',
+    description: 'Enable or disable private (incognito) browsing mode. When disabled, new windows use regular browsing with persistent cookies — useful for sites requiring login (e.g., X.com). Default: enabled (private).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        enabled: {
+          type: 'boolean',
+          description: 'true = private/incognito windows (default), false = regular windows with persistent cookies',
+        },
+      },
+      required: ['enabled'],
+    },
+  },
+
   // ===== DIAGNOSTICS =====
   {
     name: 'firefox_diagnose',
@@ -1010,6 +1026,8 @@ const TOOL_TO_COMMAND = {
   firefox_request_tab_space: 'requestTabSpace',
   firefox_grant_tab_space: 'grantTabSpace',
   firefox_get_slot_requests: 'getSlotRequests',
+  // Settings
+  firefox_set_private_mode: 'setPrivateMode',
 };
 
 // Create MCP server
