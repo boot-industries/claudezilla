@@ -197,6 +197,11 @@ If you discover a security vulnerability, please report it to: security@boot.ind
 
 ## Changelog
 
+- **0.5.8:** Community install fixes (February 2026)
+  - macOS native messaging host path corrected (Linux path was used by mistake)
+  - `install-macos.sh` now runs `npm install` in `mcp/` for fresh clone support
+  - `tabId` normalized to `Number()` in all 12 tab-targeting cases (JSON string coercion fix)
+
 - **0.5.7:** Bug fixes and timeout flexibility (February 2026)
   - Screenshot errors now propagate correctly (was silently swallowed by `.catch(() => {})`)
   - Slot reservation consumption is atomic (prevents double-claim race condition)

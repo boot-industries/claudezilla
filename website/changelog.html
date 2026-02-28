@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Changelog - Claudezilla</title>
+  <meta name="description" content="Version history and release notes for Claudezilla Firefox browser automation.">
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="Claudezilla Changelog">
+  <meta property="og:description" content="Version history and release notes for Claudezilla">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://claudezilla.com/changelog.html">
+
+  <!-- Styles (fonts self-hosted, no Google dependency) -->
+  <link rel="stylesheet" href="/assets/styles.css?v=9">
+
+  <style>
+    /* ── Changelog page styles ─────────────────────────────────── */
+    .changelog-hero {
+      padding: 5rem 0 3rem;
+      text-align: center;
+    }
+
+    .changelog-hero h1 {
+      font-family: 'Orbitron', monospace;
+      font-size: clamp(2rem, 5vw, 3.5rem);
+      font-weight: 900;
+      color: var(--terracotta);
+      letter-spacing: 0.05em;
+      margin-bottom: 0.75rem;
+    }
+
+    .changelog-hero p {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+    }
+
+    /* ── Release blocks ─────────────────────────────────────────── */
+    .releases {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 0 1.5rem 6rem;
+    }
+
+    .release {
+      border-left: 2px solid var(--bg-card);
+      padding-left: 2rem;
+      margin-bottom: 4rem;
+      position: relative;
+    }
+
+    .release.latest {
+      border-left-color: var(--terracotta);
+    }
+
+    .release::before {
+      content: '';
+      position: absolute;
+      left: -5px;
+      top: 8px;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--bg-card);
+      border: 2px solid var(--text-secondary);
+    }
+
+    .release.latest::before {
+      background: var(--terracotta);
+      border-color: var(--terracotta);
+      box-shadow: 0 0 8px var(--terracotta-glow);
+    }
+
+    .release-header {
+      display: flex;
+      align-items: baseline;
+      gap: 1rem;
+      margin-bottom: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .release-version {
+      font-family: 'Orbitron', monospace;
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .release.latest .release-version {
+      color: var(--terracotta);
+    }
+
+    .release-date {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+    }
+
+    .release-badge {
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      padding: 0.2rem 0.6rem;
+      border-radius: 3px;
+      text-transform: uppercase;
+      background: var(--terracotta);
+      color: white;
+    }
+
+    .release-tagline {
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+      margin-bottom: 1.5rem;
+      font-style: italic;
+    }
+
+    /* ── Change sections ────────────────────────────────────────── */
+    .change-section {
+      margin-bottom: 1.5rem;
+    }
+
+    .change-section h3 {
+      font-family: 'Orbitron', monospace;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--terracotta);
+      margin-bottom: 0.75rem;
+    }
+
+    .change-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .change-item {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 0.75rem;
+      align-items: start;
+    }
+
+    .change-tag {
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      padding: 0.2rem 0.5rem;
+      border-radius: 3px;
+      text-transform: uppercase;
+      white-space: nowrap;
+      margin-top: 1px;
+    }
+
+    .tag-fix {
+      background: rgba(239, 68, 68, 0.15);
+      color: #f87171;
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    .tag-feat {
+      background: rgba(34, 197, 94, 0.12);
+      color: #4ade80;
+      border: 1px solid rgba(34, 197, 94, 0.25);
+    }
+
+    .tag-chore {
+      background: rgba(100, 116, 139, 0.15);
+      color: #94a3b8;
+      border: 1px solid rgba(100, 116, 139, 0.25);
+    }
+
+    .change-text {
+      font-size: 0.85rem;
+      line-height: 1.6;
+      color: var(--text-primary);
+    }
+
+    .change-text strong {
+      color: var(--text-primary);
+    }
+
+    .change-text .detail {
+      display: block;
+      color: var(--text-secondary);
+      font-size: 0.8rem;
+      margin-top: 0.2rem;
+    }
+
+    /* ── Code inline ────────────────────────────────────────────── */
+    code {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.78rem;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 3px;
+      padding: 0.1em 0.35em;
+      color: #e2e8f0;
+    }
+
+    /* ── Commit hash ────────────────────────────────────────────── */
+    .commit-ref {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      margin-top: 1.25rem;
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+    }
+
+    .commit-ref a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-family: 'Space Mono', monospace;
+    }
+
+    .commit-ref a:hover {
+      color: var(--terracotta);
+    }
+
+    /* ── Divider ────────────────────────────────────────────────── */
+    .release-divider {
+      border: none;
+      border-top: 1px solid rgba(255,255,255,0.06);
+      margin: 0 0 4rem;
+    }
+  </style>
+</head>
+<body>
+  <!-- Navigation -->
+  <nav class="main-nav">
+    <a href="/" class="nav-logo">Claudezilla</a>
+    <div class="nav-links">
+      <a href="/">Home</a>
+      <a href="/extension.html">Setup</a>
+      <a href="/docs.html">Docs</a>
+      <a href="/support.html">Support</a>
+      <a href="https://github.com/boot-industries/claudezilla" class="nav-github" target="_blank" rel="noopener" title="View on GitHub">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+      </a>
+      <a href="https://addons.mozilla.org/firefox/addon/claudezilla/" class="nav-install" target="_blank" rel="noopener">Install</a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <!-- Hero -->
+    <section class="changelog-hero">
+      <h1>Changelog</h1>
+      <p>Version history for Claudezilla</p>
+    </section>
+
+    <!-- Releases -->
+    <div class="releases">
+
+      <!-- v0.5.8 -->
+      <div class="release latest">
+        <div class="release-header">
+          <span class="release-version">v0.5.8</span>
+          <span class="release-date">2026-02-28</span>
+          <span class="release-badge">Latest</span>
+        </div>
+        <p class="release-tagline">Community-reported install and runtime fixes</p>
+
+        <div class="change-section">
+          <h3>Bug Fixes</h3>
+          <ul class="change-list">
+            <li class="change-item">
+              <span class="change-tag tag-fix">fix</span>
+              <div class="change-text">
+                <strong>macOS native host path</strong>
+                <span class="detail">Installer was writing the manifest to <code>~/.mozilla/native-messaging-hosts/</code> (Linux path). Firefox on macOS expects <code>~/Library/Application Support/Mozilla/NativeMessagingHosts/</code>. Resolves "No such native application" error on fresh macOS installs.</span>
+              </div>
+            </li>
+            <li class="change-item">
+              <span class="change-tag tag-fix">fix</span>
+              <div class="change-text">
+                <strong>MCP dependencies missing after fresh clone</strong>
+                <span class="detail"><code>install-macos.sh</code> now runs <code>npm install</code> in the <code>mcp/</code> directory. Previously, a fresh <code>git clone</code> had no <code>node_modules/</code>, causing the MCP server to fail on first launch.</span>
+              </div>
+            </li>
+            <li class="change-item">
+              <span class="change-tag tag-fix">fix</span>
+              <div class="change-text">
+                <strong>tabId string coercion</strong>
+                <span class="detail">MCP params can deliver <code>tabId</code> as a JSON string (<code>"6"</code>) rather than a number (<code>6</code>). Firefox's <code>browser.tabs</code> API requires a number — passing a string throws <code>"Incorrect argument types"</code>. All 12 tab-targeting tool handlers now normalize via <code>Number()</code>, consistent with the existing <code>closeTab</code> and <code>screenshot</code> pattern.</span>
+              </div>
+            </li>
+          </ul>
+        </div>
+
+        <div class="commit-ref">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+          <a href="https://github.com/boot-industries/claudezilla/commit/7b9c6b4" target="_blank" rel="noopener">7b9c6b4</a>
+        </div>
+      </div>
+
+      <hr class="release-divider">
+
+      <!-- v0.5.7 -->
+      <div class="release">
+        <div class="release-header">
+          <span class="release-version">v0.5.7</span>
+          <span class="release-date">2026-02-08</span>
+        </div>
+        <p class="release-tagline">Critical bug fixes + timeout flexibility</p>
+
+        <div class="change-section">
+          <h3>Bug Fixes</h3>
+          <ul class="change-list">
+            <li class="change-item">
+              <span class="change-tag tag-fix">fix</span>
+              <div class="change-text">
+                <strong>Screenshot error propagation</strong>
+                <span class="detail">Errors during capture now properly propagate instead of being silently swallowed.</span>
+              </div>
+            </li>
+            <li class="change-item">
+              <span class="change-tag tag-fix">fix</span>
+              <div class="change-text">
+                <strong>Slot reservation race condition</strong>
+                <span class="detail">Atomic reservation consumption prevents two agents from claiming the same slot.</span>
+              </div>
+            </li>
+            <li class="change-item">
+              <span class="change-tag tag-fix">fix</span>
+              <div class="change-text">
+                <strong>Message ID overflow</strong>
+                <span class="detail">Replaced <code>++messageId</code> with <code>crypto.randomUUID()</code>.</span>
+              </div>
+            </li>
+          </ul>
+        </div>
+
+        <div class="change-section">
+          <h3>Features</h3>
+          <ul class="change-list">
+            <li class="change-item">
+              <span class="change-tag tag-feat">feat</span>
+              <div class="change-text">
+                <strong>Per-operation timeouts</strong>
+                <span class="detail">Optional <code>timeout</code> parameter added to all tool schemas. Range: 5s–300s. Default: 150s.</span>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <hr class="release-divider">
+
+      <!-- v0.5.6 -->
+      <div class="release">
+        <div class="release-header">
+          <span class="release-version">v0.5.6</span>
+          <span class="release-date">2026-01-26</span>
+        </div>
+        <p class="release-tagline">Autonomous installation + slot reservation system</p>
+
+        <div class="change-section">
+          <h3>Features</h3>
+          <ul class="change-list">
+            <li class="change-item">
+              <span class="change-tag tag-feat">feat</span>
+              <div class="change-text">
+                <strong>Autonomous install</strong>
+                <span class="detail">Installers auto-configure Claude Code permissions and MCP settings on macOS, Linux, and Windows.</span>
+              </div>
+            </li>
+            <li class="change-item">
+              <span class="change-tag tag-feat">feat</span>
+              <div class="change-text">
+                <strong>Slot reservation system</strong>
+                <span class="detail">30-second guaranteed slot reservations for agents waiting on a full tab pool. Prevents slot theft between competing agents.</span>
+              </div>
+            </li>
+            <li class="change-item">
+              <span class="change-tag tag-feat">feat</span>
+              <div class="change-text">
+                <strong>Graceful session cleanup</strong>
+                <span class="detail">MCP server sends <code>goodbye</code> on exit, immediately freeing all owned tabs.</span>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <hr class="release-divider">
+
+      <!-- v0.5.0 -->
+      <div class="release">
+        <div class="release-header">
+          <span class="release-version">v0.5.0</span>
+          <span class="release-date">2025-12-15</span>
+        </div>
+        <p class="release-tagline">Windows support + auto-loop detection</p>
+
+        <div class="change-section">
+          <h3>Features</h3>
+          <ul class="change-list">
+            <li class="change-item">
+              <span class="change-tag tag-feat">feat</span>
+              <div class="change-text">
+                <strong>Windows 10/11 support</strong>
+                <span class="detail">Named pipes, ACL security, platform-independent IPC abstraction.</span>
+              </div>
+            </li>
+            <li class="change-item">
+              <span class="change-tag tag-feat">feat</span>
+              <div class="change-text">
+                <strong>Auto-loop detection</strong>
+                <span class="detail">Automatically detects iterative tasks and suggests focus loop activation.</span>
+              </div>
+            </li>
+            <li class="change-item">
+              <span class="change-tag tag-feat">feat</span>
+              <div class="change-text">
+                <strong>Path security hardening</strong>
+                <span class="detail">Blocks null bytes, path traversal, and UNC injection in file paths.</span>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <hr class="release-divider">
+
+      <!-- v0.4.0 -->
+      <div class="release">
+        <div class="release-header">
+          <span class="release-version">v0.4.0</span>
+          <span class="release-date">2025-10-20</span>
+        </div>
+        <p class="release-tagline">Multi-agent coordination + focus loops</p>
+
+        <div class="change-section">
+          <h3>Features</h3>
+          <ul class="change-list">
+            <li class="change-item">
+              <span class="change-tag tag-feat">feat</span>
+              <div class="change-text">
+                <strong>Focus loops</strong>
+                <span class="detail">Persistent iterative development — Claude works on a prompt until a completion signal is detected or max iterations reached.</span>
+              </div>
+            </li>
+            <li class="change-item">
+              <span class="change-tag tag-feat">feat</span>
+              <div class="change-text">
+                <strong>Multi-agent tab ownership</strong>
+                <span class="detail">128-bit agent IDs, per-tab ownership tracking, screenshot mutex, and POOL_FULL / MUTEX_BUSY error codes.</span>
+              </div>
+            </li>
+            <li class="change-item">
+              <span class="change-tag tag-feat">feat</span>
+              <div class="change-text">
+                <strong>Dynamic screenshot readiness</strong>
+                <span class="detail">Replaces hardcoded delays with network-idle + visual-idle + render-settlement detection.</span>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+    </div><!-- /releases -->
+  </div>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    <div class="footer-content">
+      <div class="footer-links">
+        <a href="https://github.com/boot-industries/claudezilla" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/boot-industries/claudezilla/blob/main/SECURITY.md" target="_blank" rel="noopener">Security</a>
+        <a href="/support.html">Support</a>
+      </div>
+      <p class="footer-copyright">Claudezilla &mdash; Firefox browser automation for Claude Code</p>
+    </div>
+  </footer>
+</body>
+</html>

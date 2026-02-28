@@ -1,6 +1,6 @@
 {
   "name": "claudezilla",
-  "version": "0.5.6",
+  "version": "0.5.8",
   "description": "Firefox extension for Claude Code browser automation",
   "private": true,
   "scripts": {

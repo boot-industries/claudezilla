@@ -1,7 +1,32 @@
 # CLZ002 Changelog
 
 **Project:** Claudezilla
-**Current Version:** 0.5.7
+**Current Version:** 0.5.8
+
+## v0.5.8 (2026-02-28)
+
+**Community-reported install and runtime fixes.**
+
+### Bug Fixes
+
+- **macOS native host path** — Fixed wrong directory for Firefox native messaging manifest
+  - Was: `~/.mozilla/native-messaging-hosts/` (Linux path)
+  - Now: `~/Library/Application Support/Mozilla/NativeMessagingHosts/` (correct macOS path)
+  - Resolves "No such native application" error on fresh macOS installs
+- **MCP dependencies missing after fresh clone** — `install-macos.sh` now runs `npm install` in `mcp/`
+  - Fresh `git clone` no longer requires a manual `npm install` step
+  - Install is idempotent (safe to re-run on existing installs)
+- **`tabId` string coercion** — All tab-targeting tools now normalize `tabId` to `Number()`
+  - Affects 12 cases: `getContent`, `click`, `type`, `scroll`, `waitFor`, `evaluate`, `getElementInfo`, `getPageState`, `getAccessibilitySnapshot`, `pressKey`, `getConsoleLogs`, `getNetworkRequests`
+  - Also fixes `navigate` case
+  - Resolves `"Incorrect argument types"` when MCP passes `tabId` as a JSON string
+  - Consistent with existing `closeTab` and `screenshot` coercion pattern
+
+### Updated
+
+- Version bumped to 0.5.8 across extension, MCP server, and popup
+
+---
 
 ## v0.5.7 (2026-02-08)
 
