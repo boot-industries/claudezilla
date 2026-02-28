@@ -1,6 +1,6 @@
 /**
  * Claudezilla Popup Script
- * v0.5.7 - Bug fixes, timeout flexibility
+ * v0.5.8 - Fix macOS install path, npm install step, tabId string coercion
  */
 
 // Elements

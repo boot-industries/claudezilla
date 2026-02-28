@@ -9,8 +9,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 HOST_PATH="$PROJECT_DIR/host/index.js"
 
-# Firefox native messaging hosts directory
-NATIVE_HOSTS_DIR="$HOME/.mozilla/native-messaging-hosts"
+# Firefox native messaging hosts directory (macOS path)
+NATIVE_HOSTS_DIR="$HOME/Library/Application Support/Mozilla/NativeMessagingHosts"
 
 echo "Claudezilla Native Host Installer"
 echo "=================================="
@@ -25,6 +25,14 @@ fi
 # SECURITY: Make host script executable with explicit permissions
 chmod 755 "$HOST_PATH"
 echo "Set host script permissions to 755: $HOST_PATH"
+
+# Install MCP server dependencies
+MCP_DIR="$PROJECT_DIR/mcp"
+if [ -f "$MCP_DIR/package.json" ]; then
+    echo "Installing MCP dependencies..."
+    cd "$MCP_DIR" && npm install --quiet
+    echo "MCP dependencies installed."
+fi
 
 # Create native messaging hosts directory if it doesn't exist
 mkdir -p "$NATIVE_HOSTS_DIR"

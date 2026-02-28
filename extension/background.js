@@ -679,7 +679,8 @@ async function handleCliCommand(message) {
       }
 
       case 'navigate': {
-        const { url, tabId: targetTabId, agentId } = params;
+        const { url, tabId: rawNavTabId, agentId } = params;
+        const targetTabId = rawNavTabId ? Number(rawNavTabId) : null;
         if (!url) throw new Error('url is required');
 
         // SECURITY: Validate URL scheme (blocks javascript:, data:)
@@ -1380,10 +1381,10 @@ async function handleCliCommand(message) {
       case 'getContent': {
         const { windowId, tabId: targetTab, agentId, ...contentParams } = params;
         const session = await getSession(windowId);
-        const tabId = targetTab || session.tabId;
+        const tabId = Number(targetTab) || session.tabId;
         // SECURITY: Verify agent owns the target tab (if specific tab requested)
         if (targetTab && agentId) {
-          verifyTabOwnership(targetTab, agentId, 'read content from');
+          verifyTabOwnership(tabId, agentId, 'read content from');
         }
         const response = await executeInTab(tabId, 'getContent', contentParams);
         if (!response.success) {
@@ -1396,10 +1397,10 @@ async function handleCliCommand(message) {
       case 'click': {
         const { windowId, tabId: targetTab, agentId, ...clickParams } = params;
         const session = await getSession(windowId);
-        const tabId = targetTab || session.tabId;
+        const tabId = Number(targetTab) || session.tabId;
         // SECURITY: Verify agent owns the target tab
         if (targetTab && agentId) {
-          verifyTabOwnership(targetTab, agentId, 'click in');
+          verifyTabOwnership(tabId, agentId, 'click in');
         }
         const response = await executeInTab(tabId, 'click', clickParams);
         if (!response.success) {
@@ -1412,10 +1413,10 @@ async function handleCliCommand(message) {
       case 'type': {
         const { windowId, tabId: targetTab, agentId, ...typeParams } = params;
         const session = await getSession(windowId);
-        const tabId = targetTab || session.tabId;
+        const tabId = Number(targetTab) || session.tabId;
         // SECURITY: Verify agent owns the target tab
         if (targetTab && agentId) {
-          verifyTabOwnership(targetTab, agentId, 'type in');
+          verifyTabOwnership(tabId, agentId, 'type in');
         }
         const response = await executeInTab(tabId, 'type', typeParams);
         if (!response.success) {
@@ -1584,10 +1585,10 @@ async function handleCliCommand(message) {
       case 'getConsoleLogs': {
         const { windowId, tabId: targetTab, agentId, ...consoleParams } = params;
         const session = await getSession(windowId);
-        const tabId = targetTab || session.tabId;
+        const tabId = Number(targetTab) || session.tabId;
         // SECURITY: Verify agent owns the target tab
         if (targetTab && agentId) {
-          verifyTabOwnership(targetTab, agentId, 'read console from');
+          verifyTabOwnership(tabId, agentId, 'read console from');
         }
         const response = await executeInTab(tabId, 'getConsoleLogs', consoleParams);
         if (!response.success) {
@@ -1600,10 +1601,10 @@ async function handleCliCommand(message) {
       case 'getNetworkRequests': {
         const { windowId, tabId: targetTab, agentId, ...networkParams } = params;
         const session = await getSession(windowId);
-        const tabId = targetTab || session.tabId;
+        const tabId = Number(targetTab) || session.tabId;
         // SECURITY: Verify agent owns the target tab
         if (targetTab && agentId) {
-          verifyTabOwnership(targetTab, agentId, 'read network from');
+          verifyTabOwnership(tabId, agentId, 'read network from');
         }
         result = { tabId, ...getNetworkRequests({ ...networkParams, tabId }) };
         break;
@@ -1612,10 +1613,10 @@ async function handleCliCommand(message) {
       case 'scroll': {
         const { windowId, tabId: targetTab, agentId, ...scrollParams } = params;
         const session = await getSession(windowId);
-        const tabId = targetTab || session.tabId;
+        const tabId = Number(targetTab) || session.tabId;
         // SECURITY: Verify agent owns the target tab
         if (targetTab && agentId) {
-          verifyTabOwnership(targetTab, agentId, 'scroll in');
+          verifyTabOwnership(tabId, agentId, 'scroll in');
         }
         const response = await executeInTab(tabId, 'scroll', scrollParams);
         if (!response.success) {
@@ -1628,10 +1629,10 @@ async function handleCliCommand(message) {
       case 'waitFor': {
         const { windowId, tabId: targetTab, agentId, ...waitParams } = params;
         const session = await getSession(windowId);
-        const tabId = targetTab || session.tabId;
+        const tabId = Number(targetTab) || session.tabId;
         // SECURITY: Verify agent owns the target tab
         if (targetTab && agentId) {
-          verifyTabOwnership(targetTab, agentId, 'wait in');
+          verifyTabOwnership(tabId, agentId, 'wait in');
         }
         const response = await executeInTab(tabId, 'waitFor', waitParams);
         if (!response.success) {
@@ -1644,10 +1645,10 @@ async function handleCliCommand(message) {
       case 'evaluate': {
         const { windowId, tabId: targetTab, agentId, ...evalParams } = params;
         const session = await getSession(windowId);
-        const tabId = targetTab || session.tabId;
+        const tabId = Number(targetTab) || session.tabId;
         // SECURITY: Verify agent owns the target tab (evaluate is high-privilege)
         if (targetTab && agentId) {
-          verifyTabOwnership(targetTab, agentId, 'evaluate in');
+          verifyTabOwnership(tabId, agentId, 'evaluate in');
         }
         const response = await executeInTab(tabId, 'evaluate', evalParams);
         if (!response.success) {
@@ -1660,10 +1661,10 @@ async function handleCliCommand(message) {
       case 'getElementInfo': {
         const { windowId, tabId: targetTab, agentId, ...elementParams } = params;
         const session = await getSession(windowId);
-        const tabId = targetTab || session.tabId;
+        const tabId = Number(targetTab) || session.tabId;
         // SECURITY: Verify agent owns the target tab
         if (targetTab && agentId) {
-          verifyTabOwnership(targetTab, agentId, 'inspect element in');
+          verifyTabOwnership(tabId, agentId, 'inspect element in');
         }
         const response = await executeInTab(tabId, 'getElementInfo', elementParams);
         if (!response.success) {
@@ -1676,10 +1677,10 @@ async function handleCliCommand(message) {
       case 'getPageState': {
         const { windowId, tabId: targetTab, agentId } = params;
         const session = await getSession(windowId);
-        const tabId = targetTab || session.tabId;
+        const tabId = Number(targetTab) || session.tabId;
         // SECURITY: Verify agent owns the target tab
         if (targetTab && agentId) {
-          verifyTabOwnership(targetTab, agentId, 'read page state from');
+          verifyTabOwnership(tabId, agentId, 'read page state from');
         }
         const response = await executeInTab(tabId, 'getPageState', {});
         if (!response.success) {
@@ -1692,10 +1693,10 @@ async function handleCliCommand(message) {
       case 'getAccessibilitySnapshot': {
         const { windowId, tabId: targetTab, agentId, ...a11yParams } = params;
         const session = await getSession(windowId);
-        const tabId = targetTab || session.tabId;
+        const tabId = Number(targetTab) || session.tabId;
         // SECURITY: Verify agent owns the target tab
         if (targetTab && agentId) {
-          verifyTabOwnership(targetTab, agentId, 'read accessibility from');
+          verifyTabOwnership(tabId, agentId, 'read accessibility from');
         }
         const response = await executeInTab(tabId, 'getAccessibilitySnapshot', a11yParams);
         if (!response.success) {
@@ -1708,10 +1709,10 @@ async function handleCliCommand(message) {
       case 'pressKey': {
         const { windowId, tabId: targetTab, agentId, ...keyParams } = params;
         const session = await getSession(windowId);
-        const tabId = targetTab || session.tabId;
+        const tabId = Number(targetTab) || session.tabId;
         // SECURITY: Verify agent owns the target tab
         if (targetTab && agentId) {
-          verifyTabOwnership(targetTab, agentId, 'send keys to');
+          verifyTabOwnership(tabId, agentId, 'send keys to');
         }
         const response = await executeInTab(tabId, 'pressKey', keyParams);
         if (!response.success) {
