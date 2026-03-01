@@ -2,7 +2,7 @@
 
 **Browser automation for Claude Code that runs on Firefox** — for systems where Chrome is unavailable, unwelcome, or policy-prohibited.
 
-[![Version](https://img.shields.io/badge/version-0.5.7-blue.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.5.8-blue.svg)](./CHANGELOG.md)
 
 The only Firefox-native MCP server for Claude Code. Navigate, automate, screenshot, and extract data on any system that runs Firefox — no Chrome dependency, no Google infrastructure.
 
@@ -35,26 +35,12 @@ cd claudezilla
 ./install/install-linux.sh
 ```
 
-### 3. Connect to Claude Code
+The installer automatically:
+- Installs the native messaging host
+- Runs `npm install` for MCP dependencies
+- Configures Claude Code MCP settings (`~/.claude/mcp.json`)
 
-Add to your Claude Code config (`~/.claude/mcp.json`):
-
-```json
-{
-  "mcpServers": {
-    "claudezilla": {
-      "command": "node",
-      "args": ["/path/to/claudezilla/mcp/server.js"]
-    }
-  }
-}
-```
-
-Then install dependencies and restart Claude Code:
-
-```bash
-cd claudezilla/mcp && npm install
-```
+No manual config required — restart Claude Code and you're ready.
 
 ## What Can Claude Do?
 
