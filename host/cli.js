@@ -16,16 +16,34 @@
  */
 
 import { connect } from 'net';
+import { readFileSync } from 'fs';
+import { getSocketPath, getAuthTokenPath } from './ipc.js';
 
-const SOCKET_PATH = '/tmp/claudezilla.sock';
+const SOCKET_PATH = getSocketPath();
+const AUTH_TOKEN_PATH = getAuthTokenPath();
+
+function readAuthToken() {
+  try {
+    return readFileSync(AUTH_TOKEN_PATH, 'utf8').trim();
+  } catch (e) {
+    throw new Error(`Cannot read auth token from ${AUTH_TOKEN_PATH}. Is the Claudezilla host running?`);
+  }
+}
 
 function sendCommand(command, params = {}) {
   return new Promise((resolve, reject) => {
+    let authToken;
+    try {
+      authToken = readAuthToken();
+    } catch (e) {
+      return reject(e);
+    }
+
     const socket = connect(SOCKET_PATH);
     let buffer = '';
 
     socket.on('connect', () => {
-      const message = JSON.stringify({ command, params }) + '\n';
+      const message = JSON.stringify({ command, params, authToken }) + '\n';
       socket.write(message);
     });
 

@@ -3,7 +3,7 @@
  *
  * Provides platform-independent IPC paths and utilities.
  * Supports:
- *   - macOS/Linux: Unix sockets (e.g., /tmp/claudezilla.sock)
+ *   - macOS/Linux: Unix sockets (e.g., $TMPDIR/claudezilla.sock or $XDG_RUNTIME_DIR/claudezilla.sock)
  *   - Windows: Named pipes (e.g., \\.\pipe\claudezilla)
  */
 
