@@ -6,6 +6,8 @@
 
 The only Firefox-native MCP server for Claude Code. Navigate, automate, screenshot, and extract data on any system that runs Firefox — no Chrome dependency, no Google infrastructure.
 
+**[Claudezilla.com](https://claudezilla.com)**
+
 ## Why Claudezilla?
 
 Anthropic's official browser tool requires Chrome. If you're on a system where Chrome is not available — or not acceptable — Claudezilla gives Claude Code the same browser automation capabilities through Firefox.
