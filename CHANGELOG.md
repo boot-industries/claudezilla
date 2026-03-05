@@ -1,7 +1,24 @@
 # CLZ002 Changelog
 
 **Project:** Claudezilla
-**Current Version:** 0.5.8
+**Current Version:** 0.5.9
+
+## v0.5.9 (2026-03-04)
+
+**Tab state bug fixes — eliminates stale-tab loops and session nukes.**
+
+### Bug Fixes
+
+- **`getSession()` no longer nukes window state on empty tabs** (CRITICAL) — When the last tab is externally closed, `getSession()` now throws `NO_TABS` without nulling `claudezillaWindow`. Previously, an empty tabs array caused `browser.tabs.get(undefined)` to throw, which wiped the entire session requiring a full extension reload.
+- **`executeInTab()` now detects closed tabs** (SERIOUS) — When a tab is closed mid-operation, `browser.tabs.sendMessage()` throws "Receiving end does not exist". Previously this returned `CONTENT_SCRIPT_UNAVAILABLE` causing agents to retry forever. Now checks if the tab is still tracked; if not, throws `TAB_CLOSED` with actionable guidance.
+- **Heartbeat refreshed before long operations** (MODERATE) — Heartbeat was only updated at command arrival. Long operations (screenshots, `waitFor`) could exceed the 120s orphan timeout during execution, causing the agent's tabs to be deleted mid-operation. Heartbeat now also refreshes immediately before `sendCommand()`.
+- **`getSession()` catch-all scope narrowed** (MODERATE) — The single try/catch previously wrapped both `windows.get()` and `tabs.get()`, with both paths nulling `claudezillaWindow`. Now split into two scopes: window-level failure resets session state; tab-level failure throws `TAB_UNAVAILABLE` without destroying the window.
+
+### Updated
+
+- Version bumped to 0.5.9 across extension, host, MCP server, and popup
+
+---
 
 ## v0.5.8 (2026-02-28)
 

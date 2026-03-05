@@ -255,12 +255,55 @@
     <!-- Releases -->
     <div class="releases">
 
-      <!-- v0.5.8 -->
+      <!-- v0.5.9 -->
       <div class="release latest">
+        <div class="release-header">
+          <span class="release-version">v0.5.9</span>
+          <span class="release-date">2026-03-04</span>
+          <span class="release-badge">Latest</span>
+        </div>
+        <p class="release-tagline">Tab state bug fixes — eliminates stale-tab loops and session nukes</p>
+
+        <div class="change-section">
+          <h3>Bug Fixes</h3>
+          <ul class="change-list">
+            <li class="change-item">
+              <span class="change-tag tag-fix">fix</span>
+              <div class="change-text">
+                <strong>Session nuke on empty tabs (CRITICAL)</strong>
+                <span class="detail">When the last Claudezilla tab was externally closed, <code>getSession()</code> would null the entire session state, requiring a full extension reload to recover. Now throws a targeted <code>NO_TABS</code> error without destroying window state.</span>
+              </div>
+            </li>
+            <li class="change-item">
+              <span class="change-tag tag-fix">fix</span>
+              <div class="change-text">
+                <strong>Stale-tab infinite loop (SERIOUS)</strong>
+                <span class="detail">When a tab was closed while a command was in-flight, agents received <code>CONTENT_SCRIPT_UNAVAILABLE</code> and retried forever. Now detects the closed tab and returns <code>TAB_CLOSED</code> with actionable guidance.</span>
+              </div>
+            </li>
+            <li class="change-item">
+              <span class="change-tag tag-fix">fix</span>
+              <div class="change-text">
+                <strong>Heartbeat timeout during long operations (MODERATE)</strong>
+                <span class="detail">Heartbeats were only updated at command arrival. Long operations like screenshots or <code>waitFor</code> could exceed the 120s orphan timeout, deleting the agent's tabs mid-operation. Heartbeat now also refreshes immediately before the async operation.</span>
+              </div>
+            </li>
+            <li class="change-item">
+              <span class="change-tag tag-fix">fix</span>
+              <div class="change-text">
+                <strong>Catch-all scope too broad in getSession (MODERATE)</strong>
+                <span class="detail">A single try/catch wrapped both window-level and tab-level failures, with both paths resetting session state. Now split: window failure resets state; tab failure throws <code>TAB_UNAVAILABLE</code> without destroying the window.</span>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- v0.5.8 -->
+      <div class="release">
         <div class="release-header">
           <span class="release-version">v0.5.8</span>
           <span class="release-date">2026-02-28</span>
-          <span class="release-badge">Latest</span>
         </div>
         <p class="release-tagline">Community-reported install and runtime fixes</p>
 

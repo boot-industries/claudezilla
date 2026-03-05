@@ -556,6 +556,12 @@ async function executeInTab(tabId, action, params) {
     if (err.message?.includes('Receiving end does not exist')) {
       // Get tab info to provide context
       let tabInfo = '';
+      // Bug 2: Check if tab still exists before assuming it's a transient error
+      const tabStillTracked = claudezillaWindow?.tabs.some(t => t.tabId === tabId);
+      if (!tabStillTracked) {
+        throw new Error(`TAB_CLOSED: Tab ${tabId} no longer exists. It may have been closed by another agent or by the user. Call firefox_create_window to open a new tab.`);
+      }
+
       try {
         const tab = await browser.tabs.get(tabId);
         tabInfo = `\n  URL: ${tab.url}\n  Title: ${tab.title || '(none)'}`;
@@ -568,7 +574,8 @@ async function executeInTab(tabId, action, params) {
           throw new Error(`RESTRICTED_PAGE: Content scripts cannot run on this page.${tabInfo}\n  Hint: Navigate to an http://, https://, or file:// URL.`);
         }
       } catch (tabErr) {
-        if (tabErr.message?.startsWith('PAGE_LOAD_FAILED') || tabErr.message?.startsWith('RESTRICTED_PAGE')) {
+        if (tabErr.message?.startsWith('PAGE_LOAD_FAILED') || tabErr.message?.startsWith('RESTRICTED_PAGE') ||
+            tabErr.message?.startsWith('TAB_CLOSED')) {
           throw tabErr;
         }
         tabInfo = `\n  (Could not get tab info: ${tabErr.message})`;
@@ -614,12 +621,29 @@ async function getSession(windowId) {
       activeTabId = lastTab?.tabId;
     }
 
-    const tab = await browser.tabs.get(activeTabId);
-    return { windowId: claudezillaWindow.windowId, tabId: activeTabId, tab };
+    // Bug 1: Don't nuke claudezillaWindow when tabs array is empty
+    if (claudezillaWindow.tabs.length === 0) {
+      activeTabId = null;
+      throw new Error('NO_TABS: All tabs have been closed. Call firefox_create_window to open a new tab.');
+    }
+
+    // Bug 4: Scope tab-level errors separately — don't null claudezillaWindow
+    try {
+      const tab = await browser.tabs.get(activeTabId);
+      return { windowId: claudezillaWindow.windowId, tabId: activeTabId, tab };
+    } catch (tabErr) {
+      activeTabId = null;
+      throw new Error(`TAB_UNAVAILABLE: Could not retrieve active tab. It may have been closed. Call firefox_create_window to open a new tab. (${tabErr.message})`);
+    }
   } catch (e) {
-    claudezillaWindow = null;
-    activeTabId = null;
-    throw new Error('Claudezilla window expired. Call firefox_create_window.');
+    // Only null claudezillaWindow for window-level failures (NO_TABS and TAB_UNAVAILABLE propagate up)
+    if (!e.message?.startsWith('NO_TABS') && !e.message?.startsWith('TAB_UNAVAILABLE') &&
+        !e.message?.startsWith('Claudezilla window is not private')) {
+      claudezillaWindow = null;
+      activeTabId = null;
+      throw new Error('Claudezilla window expired. Call firefox_create_window.');
+    }
+    throw e;
   }
 }
 

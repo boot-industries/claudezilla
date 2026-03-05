@@ -1034,7 +1034,7 @@ const TOOL_TO_COMMAND = {
 const server = new Server(
   {
     name: 'claudezilla',
-    version: '0.5.8',
+    version: '0.5.9',
   },
   {
     capabilities: {
@@ -1125,6 +1125,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       updateAgentHeartbeat(AGENT_ID);
     }
 
+    // Bug 3: Refresh heartbeat before the async wait to prevent orphan timeout during long operations
+    updateAgentHeartbeat(AGENT_ID);
     const response = await sendCommand(command, commandParams);
 
     if (response.success) {

@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "Claudezilla",
-  "version": "0.5.8",
+  "version": "0.5.9",
   "description": "Browser automation for Claude Code via Firefox. No Chrome, no telemetry. Navigate, screenshot, click, type, extract data via MCP.",
   "author": "Chris Lyons <support@boot.industries>",
 
