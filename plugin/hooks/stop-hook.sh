@@ -11,8 +11,14 @@
 set -euo pipefail
 
 # Socket path (must match Claudezilla host)
-# On macOS, TMPDIR points to /var/folders/.../T, on Linux it's usually /tmp
-SOCKET_PATH="${TMPDIR:-/tmp}/claudezilla.sock"
+# Mirrors ipc.js getSafeTempDir() logic:
+# - Linux: prefer XDG_RUNTIME_DIR if set and exists
+# - macOS/fallback: use TMPDIR (points to /var/folders/.../T on macOS)
+if [[ -n "${XDG_RUNTIME_DIR:-}" ]] && [[ -d "$XDG_RUNTIME_DIR" ]]; then
+  SOCKET_PATH="$XDG_RUNTIME_DIR/claudezilla.sock"
+else
+  SOCKET_PATH="${TMPDIR:-/tmp}/claudezilla.sock"
+fi
 
 # If socket doesn't exist, Claudezilla isn't running - allow exit
 if [[ ! -S "$SOCKET_PATH" ]]; then
