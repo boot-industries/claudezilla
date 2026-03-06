@@ -53,6 +53,65 @@ function truncateAgentId(id) {
   return id.length > 15 ? id.slice(0, 12) + '...' : id;
 }
 
+// Per-agent configuration (allowedDomains, etc.)
+const agentConfig = new Map(); // agentId -> { allowedDomains: [...] }
+
+/**
+ * Check if a URL is allowed for the given agent based on their allowedDomains config
+ * Returns null if allowed, error string if blocked
+ */
+function checkDomainAllowed(agentId, url) {
+  const config = agentConfig.get(agentId);
+  if (!config || !config.allowedDomains || config.allowedDomains.length === 0) return null;
+  
+  let hostname;
+  try {
+    hostname = new URL(url).hostname;
+  } catch {
+    return null; // Let invalid URLs fail normally
+  }
+  
+  // about: URLs always allowed
+  if (url.startsWith('about:')) return null;
+  
+  const allowed = config.allowedDomains.some(pattern => {
+    if (pattern.startsWith('*.')) {
+      const base = pattern.slice(2).replace(/\./g, '\.');
+      return new RegExp(`^[^.]+\.${base}$`).test(hostname) || hostname === pattern.slice(2);
+    }
+    return hostname === pattern;
+  });
+  
+  if (!allowed) {
+    return `DOMAIN_BLOCKED: Navigation to "${hostname}" not allowed. Allowed: [${config.allowedDomains.map(d => `"${d}"`).join(', ')}]`;
+  }
+  return null;
+}
+
+/**
+ * Diff two getPageState snapshots
+ */
+function diffPageState(before, after) {
+  const diff = { added: {}, removed: {}, changed: {} };
+  const keys = ['headings', 'links', 'buttons', 'inputs'];
+
+  for (const key of keys) {
+    const bItems = before[key] || [];
+    const aItems = after[key] || [];
+
+    const bTexts = new Set(bItems.map(i => JSON.stringify(i)));
+    const aTexts = new Set(aItems.map(i => JSON.stringify(i)));
+
+    const added = aItems.filter(i => !bTexts.has(JSON.stringify(i)));
+    const removed = bItems.filter(i => !aTexts.has(JSON.stringify(i)));
+
+    if (added.length) diff.added[key] = added;
+    if (removed.length) diff.removed[key] = removed;
+  }
+
+  return diff;
+}
+
 // Agent heartbeat tracking for orphaned tab cleanup
 const agentHeartbeats = new Map(); // agentId -> lastSeenTimestamp
 const AGENT_TIMEOUT_MS = 600000; // 10 minutes - agent is considered dead after this
@@ -597,6 +656,10 @@ const TOOLS = [
           type: 'boolean',
           description: 'Skip all readiness detection (instant capture). Use when page is known to be ready.',
         },
+        annotate: {
+          type: 'boolean',
+          description: 'Overlay numbered badges on interactive elements (buttons, links, inputs) before capture. Returns labels map {index: {selector, text, role}} alongside screenshot. Useful for vision models to identify and reference elements.',
+        },
       },
     },
   },
@@ -787,7 +850,7 @@ const TOOLS = [
   },
   {
     name: 'firefox_wait_for',
-    description: 'Wait for an element to appear on the page. Useful for SPAs and dynamic content. Works on background tabs.',
+    description: 'Wait for a condition on the page. Supports: selector (CSS element), text (body text contains string), or url (location matches glob). Useful for SPAs, redirects, and dynamic content.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -797,14 +860,21 @@ const TOOLS = [
         },
         selector: {
           type: 'string',
-          description: 'CSS selector to wait for',
+          description: 'CSS selector to wait for (mutually exclusive with text/url)',
+        },
+        text: {
+          type: 'string',
+          description: 'Wait until document.body.innerText includes this string (mutually exclusive with selector/url)',
+        },
+        url: {
+          type: 'string',
+          description: 'Wait until window.location.href matches this glob pattern, e.g. "**/dashboard" (mutually exclusive with selector/text)',
         },
         timeout: {
           type: 'number',
           description: 'Maximum time to wait in milliseconds (default: 10000)',
         },
       },
-      required: ['selector'],
     },
   },
   {
@@ -955,6 +1025,42 @@ const TOOLS = [
     },
   },
 
+  // ===== CONFIG =====
+  {
+    name: 'firefox_set_config',
+    description: 'Set per-session configuration for this agent. Currently supports allowedDomains to restrict navigation to specific domains (security sandboxing).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        allowedDomains: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'List of allowed domains for navigation. Supports wildcards: "*.example.com". When set, firefox_navigate and firefox_create_window will block requests to unlisted domains. Pass empty array to clear restriction.',
+        },
+      },
+    },
+  },
+
+  // ===== PAGE STATE DIFF =====
+  {
+    name: 'firefox_diff_page_state',
+    description: 'Diff two getPageState snapshots to see what changed: added/removed/changed headings, links, buttons, inputs. Useful for verifying form submissions, navigation effects, and regression detection.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        before: {
+          type: 'object',
+          description: 'First getPageState snapshot (the "before" state)',
+        },
+        after: {
+          type: 'object',
+          description: 'Second getPageState snapshot (the "after" state)',
+        },
+      },
+      required: ['before', 'after'],
+    },
+  },
+
   // ===== SETTINGS =====
   {
     name: 'firefox_set_private_mode',
@@ -1028,13 +1134,17 @@ const TOOL_TO_COMMAND = {
   firefox_get_slot_requests: 'getSlotRequests',
   // Settings
   firefox_set_private_mode: 'setPrivateMode',
+  // Config (handled locally)
+  firefox_set_config: 'setConfig',
+  // Diff (handled locally)
+  firefox_diff_page_state: 'diffPageState',
 };
 
 // Create MCP server
 const server = new Server(
   {
     name: 'claudezilla',
-    version: '0.5.9',
+    version: '0.6.0',
   },
   {
     capabilities: {
@@ -1060,6 +1170,37 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 // Handle tool calls
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
+
+  // Special case: firefox_set_config runs locally (updates in-memory agent config)
+  if (name === 'firefox_set_config') {
+    try {
+      const agentId = AGENT_ID;
+      const existing = agentConfig.get(agentId) || {};
+      if (args.allowedDomains !== undefined) {
+        existing.allowedDomains = args.allowedDomains;
+      }
+      agentConfig.set(agentId, existing);
+      return {
+        content: [{ type: 'text', text: JSON.stringify({ success: true, config: existing }) }],
+      };
+    } catch (error) {
+      return { content: [{ type: 'text', text: `Config error: ${error.message}` }], isError: true };
+    }
+  }
+
+  // Special case: firefox_diff_page_state runs locally (pure JS diff)
+  if (name === 'firefox_diff_page_state') {
+    try {
+      const { before, after } = args || {};
+      if (!before || !after) throw new Error('Both "before" and "after" snapshots are required');
+      const diff = diffPageState(before, after);
+      return {
+        content: [{ type: 'text', text: JSON.stringify(diff, null, 2) }],
+      };
+    } catch (error) {
+      return { content: [{ type: 'text', text: `Diff error: ${error.message}` }], isError: true };
+    }
+  }
 
   // Special case: firefox_diagnose runs locally, not through sendCommand
   if (name === 'firefox_diagnose') {
@@ -1125,6 +1266,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       updateAgentHeartbeat(AGENT_ID);
     }
 
+    // Domain allowlist check for navigate/createWindow
+    if (name === 'firefox_navigate' || name === 'firefox_create_window') {
+      const url = commandParams.url;
+      if (url) {
+        const blocked = checkDomainAllowed(AGENT_ID, url);
+        if (blocked) {
+          return { content: [{ type: 'text', text: blocked }], isError: true };
+        }
+      }
+    }
+
     // Bug 3: Refresh heartbeat before the async wait to prevent orphan timeout during long operations
     updateAgentHeartbeat(AGENT_ID);
     const response = await sendCommand(command, commandParams);
@@ -1136,15 +1288,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const isJpeg = response.result.dataUrl.startsWith('data:image/jpeg');
         const mimeType = isJpeg ? 'image/jpeg' : 'image/png';
         const base64Data = response.result.dataUrl.replace(/^data:image\/(jpeg|png);base64,/, '');
-        return {
-          content: [
-            {
-              type: 'image',
-              data: base64Data,
-              mimeType,
-            },
-          ],
-        };
+        const content = [{ type: 'image', data: base64Data, mimeType }];
+        // If annotate was requested, append labels as text
+        if (response.result.labels) {
+          content.push({ type: 'text', text: JSON.stringify({ labels: response.result.labels }) });
+        }
+        return { content };
       }
 
       // Handle undefined/null results - ensure text is always a string

@@ -1555,7 +1555,19 @@ async function handleCliCommand(message) {
           if (captureFormat === 'jpeg') {
             captureOpts.quality = Math.min(100, Math.max(1, quality));
           }
+          // Annotate elements if requested
+          let annotationLabels = null;
+          if (params.annotate) {
+            const annResp = await executeInTab(targetTabId, 'annotateElements', { maxElements: 30 });
+            if (annResp.success) annotationLabels = annResp.result.labels;
+          }
+
           const rawDataUrl = await browser.tabs.captureVisibleTab(session.windowId, captureOpts);
+
+          // Remove annotations after capture
+          if (params.annotate) {
+            await executeInTab(targetTabId, 'removeAnnotations', {});
+          }
 
           // Build base response with readiness data
           const baseResponse = {
@@ -1583,9 +1595,10 @@ async function handleCliCommand(message) {
               originalSize: response.result.originalSize,
               scaledSize: response.result.scaledSize,
               scale,
+              ...(annotationLabels ? { labels: annotationLabels } : {}),
             };
           } else {
-            return { ...baseResponse, dataUrl: rawDataUrl, scale: 1 };
+            return { ...baseResponse, dataUrl: rawDataUrl, scale: 1, ...(annotationLabels ? { labels: annotationLabels } : {}) };
           }
           } finally {
             // Release mutex

@@ -991,12 +991,37 @@ function scroll(params = {}) {
  * @returns {Promise<object>} Result
  */
 async function waitFor(params) {
-  const { selector, timeout = 10000, interval = 100 } = params;
-
-  // SECURITY: Validate selector before use
-  validateSelector(selector);
+  const { selector, text, url, timeout = 10000, interval = 100 } = params;
 
   const startTime = Date.now();
+
+  // text mode: wait for body text to include string
+  if (text !== undefined) {
+    while (Date.now() - startTime < timeout) {
+      if (document.body && document.body.innerText.includes(text)) {
+        return { text, found: true, elapsed: Date.now() - startTime };
+      }
+      await new Promise(resolve => setTimeout(resolve, interval));
+    }
+    throw new Error(`Timeout waiting for text: "${text}"`);
+  }
+
+  // url mode: wait for location to match glob
+  if (url !== undefined) {
+    const globToRegex = g => new RegExp('^' + g.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*\*/g, '.*').replace(/\*/g, '[^/]*') + '$');
+    const re = globToRegex(url);
+    while (Date.now() - startTime < timeout) {
+      if (re.test(window.location.href)) {
+        return { url, matched: window.location.href, found: true, elapsed: Date.now() - startTime };
+      }
+      await new Promise(resolve => setTimeout(resolve, interval));
+    }
+    throw new Error(`Timeout waiting for URL matching: "${url}"`);
+  }
+
+  // selector mode (default)
+  // SECURITY: Validate selector before use
+  validateSelector(selector);
 
   while (Date.now() - startTime < timeout) {
     const element = document.querySelector(selector);
@@ -1826,6 +1851,87 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
           result = getConsoleLogs(params);
           break;
 
+
+/**
+ * Annotate interactive elements with numbered badges for vision models
+ * Uses Shadow DOM to avoid polluting page CSS
+ * @param {object} params
+ * @param {number} params.maxElements - Max elements to annotate (default: 30)
+ * @returns {object} labels map {index: {selector, text, role}}
+ */
+function annotateElements(params = {}) {
+  const { maxElements = 30 } = params;
+  const SELECTORS = ['button', 'a[href]', 'input', 'select', 'textarea', '[role="button"]', '[role="link"]'];
+  const seen = new Set();
+  const elements = [];
+
+  for (const sel of SELECTORS) {
+    for (const el of document.querySelectorAll(sel)) {
+      if (!seen.has(el) && elements.length < maxElements) {
+        seen.add(el);
+        elements.push(el);
+      }
+    }
+  }
+
+  const labels = {};
+  const host = document.createElement('div');
+  host.id = '__clz_annotations__';
+  document.body.appendChild(host);
+  const shadow = host.attachShadow({ mode: 'closed' });
+
+  elements.forEach((el, i) => {
+    const idx = i + 1;
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0 && rect.height === 0) return;
+
+    const badge = document.createElement('div');
+    badge.textContent = String(idx);
+    Object.assign(badge.style, {
+      position: 'fixed',
+      top: `${rect.top + window.scrollY}px`,
+      left: `${rect.left + window.scrollX}px`,
+      background: '#e53e3e',
+      color: '#fff',
+      borderRadius: '50%',
+      width: '18px',
+      height: '18px',
+      fontSize: '11px',
+      fontWeight: 'bold',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: '2147483647',
+      pointerEvents: 'none',
+      fontFamily: 'monospace',
+      lineHeight: '1',
+    });
+    shadow.appendChild(badge);
+
+    // Build a reasonable selector for the element
+    let selector = el.tagName.toLowerCase();
+    if (el.id) selector = `#${el.id}`;
+    else if (el.className && typeof el.className === 'string') selector += '.' + el.className.trim().split(/\s+/).join('.');
+
+    labels[String(idx)] = {
+      selector,
+      text: (el.textContent || el.value || el.placeholder || el.getAttribute('aria-label') || '').trim().slice(0, 80),
+      role: el.getAttribute('role') || el.tagName.toLowerCase(),
+    };
+  });
+
+  return { labels, count: Object.keys(labels).length };
+}
+
+/**
+ * Remove annotation badges injected by annotateElements
+ */
+function removeAnnotations() {
+  const host = document.getElementById('__clz_annotations__');
+  if (host) host.remove();
+  return { removed: true };
+}
+
         case 'scroll':
           result = scroll(params);
           break;
@@ -1852,6 +1958,14 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
         case 'getAccessibilitySnapshot':
           result = getAccessibilitySnapshot(params);
+          break;
+
+        case 'annotateElements':
+          result = annotateElements(params);
+          break;
+
+        case 'removeAnnotations':
+          result = removeAnnotations();
           break;
 
         case 'resizeImage':
