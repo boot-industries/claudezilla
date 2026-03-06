@@ -1555,6 +1555,9 @@ async function handleCliCommand(message) {
           if (captureFormat === 'jpeg') {
             captureOpts.quality = Math.min(100, Math.max(1, quality));
           }
+          // Hide watermark during capture (opacity:0 covers character + glow)
+          await executeInTab(targetTabId, 'hideWatermark', {});
+
           // Annotate elements if requested
           let annotationLabels = null;
           if (params.annotate) {
@@ -1564,7 +1567,8 @@ async function handleCliCommand(message) {
 
           const rawDataUrl = await browser.tabs.captureVisibleTab(session.windowId, captureOpts);
 
-          // Remove annotations after capture
+          // Restore watermark and remove annotations after capture
+          await executeInTab(targetTabId, 'showWatermark', {});
           if (params.annotate) {
             await executeInTab(targetTabId, 'removeAnnotations', {});
           }

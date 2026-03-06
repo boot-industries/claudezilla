@@ -201,7 +201,7 @@ function initWatermark() {
         transform: scale(1.05);
       }
       @keyframes claudezilla-glow-throb {
-        0%, 100% {
+        0% {
           box-shadow:
             0 0 20px 4px rgba(209, 77, 50, 0.5),
             0 0 40px 8px rgba(209, 77, 50, 0.25),
@@ -209,13 +209,21 @@ function initWatermark() {
             0 4px 16px rgba(0, 0, 0, 0.5),
             inset 0 0 0 1px rgba(209, 77, 50, 0.3);
         }
-        50% {
+        25% {
           box-shadow:
             0 0 28px 6px rgba(209, 77, 50, 0.6),
             0 0 52px 12px rgba(209, 77, 50, 0.35),
             0 0 80px 18px rgba(209, 77, 50, 0.15),
             0 4px 16px rgba(0, 0, 0, 0.5),
             inset 0 0 0 1px rgba(209, 77, 50, 0.4);
+        }
+        100% {
+          box-shadow:
+            0 0 20px 4px rgba(209, 77, 50, 0.5),
+            0 0 40px 8px rgba(209, 77, 50, 0.25),
+            0 0 60px 12px rgba(209, 77, 50, 0.1),
+            0 4px 16px rgba(0, 0, 0, 0.5),
+            inset 0 0 0 1px rgba(209, 77, 50, 0.3);
         }
       }
       /* Speech bubble styles */
@@ -1931,6 +1939,16 @@ function removeAnnotations() {
   if (host) host.remove();
   return { removed: true };
 }
+
+        case 'hideWatermark':
+          if (watermarkElement) watermarkElement.style.opacity = '0';
+          result = { hidden: true };
+          break;
+
+        case 'showWatermark':
+          if (watermarkElement) watermarkElement.style.opacity = '';
+          result = { hidden: false };
+          break;
 
         case 'scroll':
           result = scroll(params);
