@@ -1,13 +1,13 @@
 # Claudezilla - Claude Code Firefox Extension
 
-**Version:** 0.5.9
+**Version:** 0.6.0
 
 ## Overview
 
 Firefox extension providing browser automation for Claude Code CLI. A Google-free alternative to the official Chrome extension.
 
-**Key Features (v0.5.9):**
-- **NEW: Tab state bug fixes** - Eliminates stale-tab loops and session nukes (NO_TABS, TAB_CLOSED errors)
+**Key Features (v0.6.0):**
+- **NEW: Annotated screenshots, domain allowlist, expanded waitFor, page state diff, QA fixes**
 - Autonomous installation - Installers auto-configure Claude Code permissions and MCP settings
 - Extended timeouts - 150s request timeout for long-running browser operations
 - Windows 10/11 support - Named pipes, ACL security, platform-independent IPC abstraction
