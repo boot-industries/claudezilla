@@ -827,6 +827,10 @@ const TOOLS = [
           type: 'number',
           description: 'Maximum requests to return (default: 50)',
         },
+        includeHeaders: {
+          type: 'boolean',
+          description: 'Include response headers in output (default: false — headers are stripped to reduce payload size)',
+        },
       },
     },
   },

@@ -1016,7 +1016,7 @@ async function waitFor(params) {
 
   // url mode: wait for location to match glob
   if (url !== undefined) {
-    const globToRegex = g => new RegExp('^' + g.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*\*/g, '.*').replace(/\*/g, '[^/]*') + '$');
+    const globToRegex = g => new RegExp('^' + g.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*') + '$');
     const re = globToRegex(url);
     while (Date.now() - startTime < timeout) {
       if (re.test(window.location.href)) {
@@ -1897,8 +1897,8 @@ function annotateElements(params = {}) {
     badge.textContent = String(idx);
     Object.assign(badge.style, {
       position: 'fixed',
-      top: `${rect.top + window.scrollY}px`,
-      left: `${rect.left + window.scrollX}px`,
+      top: `${rect.top + window.scrollY - 9}px`,
+      left: `${rect.left + window.scrollX - 9}px`,
       background: '#e53e3e',
       color: '#fff',
       borderRadius: '50%',

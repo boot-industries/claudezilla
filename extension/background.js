@@ -204,7 +204,7 @@ browser.webRequest.onErrorOccurred.addListener(
  * @returns {object} Network requests
  */
 function getNetworkRequests(params = {}) {
-  const { tabId, type, status, clear = false, limit = 50 } = params;
+  const { tabId, type, status, clear = false, limit = 50, includeHeaders = false } = params;
 
   let requests = [...networkRequests];
 
@@ -219,6 +219,10 @@ function getNetworkRequests(params = {}) {
   }
 
   requests = requests.slice(-limit);
+
+  if (!includeHeaders) {
+    requests = requests.map(({ responseHeaders, ...r }) => r);
+  }
 
   if (clear) {
     networkRequests.length = 0;
@@ -572,6 +576,10 @@ async function executeInTab(tabId, action, params) {
         }
         if (tab.url?.startsWith('about:') || tab.url?.startsWith('chrome:') || tab.url?.startsWith('moz-extension:')) {
           throw new Error(`RESTRICTED_PAGE: Content scripts cannot run on this page.${tabInfo}\n  Hint: Navigate to an http://, https://, or file:// URL.`);
+        }
+        // Non-HTML responses (JSON, binary, downloads) cannot be scripted
+        if (tab.url && !tab.title) {
+          throw new Error(`CONTENT_SCRIPT_ERROR: Cannot interact with this tab — page may be a non-HTML response (JSON, PDF, download).${tabInfo}\n  Hint: Use firefox_navigate to load an HTML page first.`);
         }
       } catch (tabErr) {
         if (tabErr.message?.startsWith('PAGE_LOAD_FAILED') || tabErr.message?.startsWith('RESTRICTED_PAGE') ||
@@ -1659,11 +1667,16 @@ async function handleCliCommand(message) {
         if (targetTab && agentId) {
           verifyTabOwnership(tabId, agentId, 'scroll in');
         }
+        const isActiveTab = tabId === activeTabId;
         const response = await executeInTab(tabId, 'scroll', scrollParams);
         if (!response.success) {
           throw new Error(response.error);
         }
         result = { tabId, ...response.result };
+        if (!isActiveTab) {
+          result.backgroundTab = true;
+          result.hint = 'Scroll has no effect on background tabs. Switch tab to active first.';
+        }
         break;
       }
 
