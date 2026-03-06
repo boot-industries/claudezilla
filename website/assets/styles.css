@@ -539,7 +539,7 @@ body::before {
 .section-subtitle {
   font-size: 18px;
   color: var(--text-secondary);
-  margin-bottom: 48px;
+  margin: 0 auto 48px;
   line-height: 1.6;
   max-width: 720px;
 }
