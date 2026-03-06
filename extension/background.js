@@ -578,12 +578,16 @@ async function executeInTab(tabId, action, params) {
           throw new Error(`RESTRICTED_PAGE: Content scripts cannot run on this page.${tabInfo}\n  Hint: Navigate to an http://, https://, or file:// URL.`);
         }
         // Non-HTML responses (JSON, binary, downloads) cannot be scripted
-        if (tab.url && !tab.title) {
-          throw new Error(`CONTENT_SCRIPT_ERROR: Cannot interact with this tab — page may be a non-HTML response (JSON, PDF, download).${tabInfo}\n  Hint: Use firefox_navigate to load an HTML page first.`);
+        // Firefox JSON viewer sets title to the URL path (e.g. "httpbin.org/get"), so check URL pattern too
+        const nonHtmlExtensions = /\.(json|xml|pdf|csv|txt|bin|zip|gz|tar|woff|woff2|ttf|otf|eot)(\?|$)/i;
+        const isLikelyNonHtml = nonHtmlExtensions.test(tab.url || '') ||
+          (tab.title && tab.url && tab.title === new URL(tab.url).host + new URL(tab.url).pathname);
+        if (isLikelyNonHtml) {
+          throw new Error(`CONTENT_SCRIPT_ERROR: Cannot interact with this tab — page is likely a non-HTML response (JSON, PDF, download).${tabInfo}\n  Hint: Use firefox_navigate to load an HTML page first.`);
         }
       } catch (tabErr) {
         if (tabErr.message?.startsWith('PAGE_LOAD_FAILED') || tabErr.message?.startsWith('RESTRICTED_PAGE') ||
-            tabErr.message?.startsWith('TAB_CLOSED')) {
+            tabErr.message?.startsWith('TAB_CLOSED') || tabErr.message?.startsWith('CONTENT_SCRIPT_ERROR')) {
           throw tabErr;
         }
         tabInfo = `\n  (Could not get tab info: ${tabErr.message})`;
