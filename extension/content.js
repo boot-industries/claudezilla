@@ -957,14 +957,20 @@ function scroll(params = {}) {
   }
 
   if (x !== undefined || y !== undefined) {
+    const beforeX = window.scrollX;
+    const beforeY = window.scrollY;
     window.scrollTo({
       left: x ?? window.scrollX,
       top: y ?? window.scrollY,
       behavior,
     });
+    const afterX = window.scrollX;
+    const afterY = window.scrollY;
+    const noEffect = afterX === beforeX && afterY === beforeY;
     return {
       scrolledTo: true,
-      position: { x: window.scrollX, y: window.scrollY },
+      noEffect,
+      position: { x: afterX, y: afterY },
     };
   }
 

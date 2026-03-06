@@ -55,7 +55,7 @@ function truncateAgentId(id) {
 
 // Agent heartbeat tracking for orphaned tab cleanup
 const agentHeartbeats = new Map(); // agentId -> lastSeenTimestamp
-const AGENT_TIMEOUT_MS = 120000; // 2 minutes - agent is considered dead after this
+const AGENT_TIMEOUT_MS = 600000; // 10 minutes - agent is considered dead after this
 const CLEANUP_INTERVAL_MS = 60000; // 1 minute - check for orphaned agents every minute
 
 /**

@@ -602,7 +602,7 @@ async function canRunInPrivateWindows() {
  */
 async function getSession(windowId) {
   if (!claudezillaWindow) {
-    throw new Error('No active Claudezilla window. Call firefox_create_window first.');
+    throw new Error('Tab session lost — call firefox_create_window to start a new tab.');
   }
 
   // Verify window still exists
