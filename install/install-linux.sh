@@ -1,38 +1,42 @@
 #!/bin/bash
 
-# Claudezilla Native Messaging Host Installer for Linux
-# Installs the native manifest for Firefox
+# Claudezilla Installer for Linux
+# - Native messaging host + manifest
+# - MCP dependencies
+# - Claude Code permissions + MCP config
+# - Firefox permanent extension install (headless profile)
+# - systemd user service + launch script
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 HOST_PATH="$PROJECT_DIR/host/index.js"
-
-# Firefox native messaging hosts directory (user-level)
 NATIVE_HOSTS_DIR="$HOME/.mozilla/native-messaging-hosts"
 
-echo "Claudezilla Native Host Installer (Linux)"
-echo "=========================================="
+echo "Claudezilla Installer (Linux)"
+echo "=============================="
 echo ""
 
-# Check if host script exists
+# ---------------------------------------------------------------------------
+# 1. Preflight
+# ---------------------------------------------------------------------------
+
 if [ ! -f "$HOST_PATH" ]; then
     echo "Error: Host script not found at $HOST_PATH"
     exit 1
 fi
 
-# SECURITY: Make host script executable with explicit permissions
+# ---------------------------------------------------------------------------
+# 2. Native messaging host
+# ---------------------------------------------------------------------------
+
 chmod 755 "$HOST_PATH"
-echo "Set host script permissions to 755: $HOST_PATH"
+echo "Set host permissions to 755: $HOST_PATH"
 
-# Create native messaging hosts directory if it doesn't exist
 mkdir -p "$NATIVE_HOSTS_DIR"
-echo "Created native hosts directory: $NATIVE_HOSTS_DIR"
 
-# Create native manifest with correct path
 MANIFEST_PATH="$NATIVE_HOSTS_DIR/claudezilla.json"
-
 cat > "$MANIFEST_PATH" << EOF
 {
   "name": "claudezilla",
@@ -42,47 +46,50 @@ cat > "$MANIFEST_PATH" << EOF
   "allowed_extensions": ["claudezilla@boot.industries"]
 }
 EOF
-
-# SECURITY: Set manifest file permissions explicitly
 chmod 644 "$MANIFEST_PATH"
-echo "Created native manifest with permissions 644: $MANIFEST_PATH"
-echo ""
-echo "Installation complete!"
-echo ""
-echo "Next steps:"
-echo "1. Open Firefox and go to about:debugging"
-echo "2. Click 'This Firefox' in the sidebar"
-echo "3. Click 'Load Temporary Add-on'"
-echo "4. Navigate to: $PROJECT_DIR/extension/"
-echo "5. Select manifest.json"
-echo ""
-echo "The extension should now be loaded. Click the Claudezilla icon"
-echo "in the toolbar to test the connection."
-echo ""
+echo "Native manifest: $MANIFEST_PATH"
 
-# Configure Claude Code permissions for autonomous operation
+# ---------------------------------------------------------------------------
+# 3. MCP dependencies
+# ---------------------------------------------------------------------------
+
+MCP_DIR="$PROJECT_DIR/mcp"
+if [ -f "$MCP_DIR/package.json" ]; then
+    echo "Installing MCP dependencies..."
+    cd "$MCP_DIR" && npm install --quiet
+    cd "$PROJECT_DIR"
+    echo "MCP dependencies installed."
+fi
+
+# ---------------------------------------------------------------------------
+# 4. Claude Code permissions + MCP config
+# ---------------------------------------------------------------------------
+
 CLAUDE_DIR="$HOME/.claude"
 SETTINGS_FILE="$CLAUDE_DIR/settings.json"
 MCP_FILE="$CLAUDE_DIR/mcp.json"
-
-echo "Configuring Claude Code for autonomous Claudezilla operations..."
-
-# Create .claude directory if it doesn't exist
 mkdir -p "$CLAUDE_DIR"
 
-# Update settings.json to allow Claudezilla tools without prompts
+echo "Configuring Claude Code..."
+
 if command -v jq &> /dev/null; then
-    # Use jq for safe JSON manipulation
     if [ -f "$SETTINGS_FILE" ]; then
-        # Merge with existing settings
-        jq '.permissions.allow = ((.permissions.allow // []) + ["mcp__claudezilla__*"] | unique)' "$SETTINGS_FILE" > "$SETTINGS_FILE.tmp" && mv "$SETTINGS_FILE.tmp" "$SETTINGS_FILE"
+        jq '.permissions.allow = ((.permissions.allow // []) + ["mcp__claudezilla__*"] | unique)' \
+            "$SETTINGS_FILE" > "$SETTINGS_FILE.tmp" && mv "$SETTINGS_FILE.tmp" "$SETTINGS_FILE"
     else
-        # Create new settings file
         echo '{"permissions":{"allow":["mcp__claudezilla__*"]}}' | jq '.' > "$SETTINGS_FILE"
     fi
-    echo "Updated Claude Code permissions: $SETTINGS_FILE"
+    echo "  Permissions: $SETTINGS_FILE"
+
+    MCP_SERVER_CONFIG="{\"command\":\"node\",\"args\":[\"$PROJECT_DIR/mcp/server.js\"]}"
+    if [ -f "$MCP_FILE" ]; then
+        jq --argjson cfg "$MCP_SERVER_CONFIG" '.mcpServers.claudezilla = $cfg' \
+            "$MCP_FILE" > "$MCP_FILE.tmp" && mv "$MCP_FILE.tmp" "$MCP_FILE"
+    else
+        echo "{\"mcpServers\":{\"claudezilla\":$MCP_SERVER_CONFIG}}" | jq '.' > "$MCP_FILE"
+    fi
+    echo "  MCP config: $MCP_FILE"
 else
-    # Fallback: create settings if doesn't exist
     if [ ! -f "$SETTINGS_FILE" ]; then
         cat > "$SETTINGS_FILE" << 'SETTINGS_EOF'
 {
@@ -91,24 +98,11 @@ else
   }
 }
 SETTINGS_EOF
-        echo "Created Claude Code permissions: $SETTINGS_FILE"
+        echo "  Permissions: $SETTINGS_FILE"
     else
-        echo "[WARN] jq not found. Please manually add 'mcp__claudezilla__*' to permissions.allow in $SETTINGS_FILE"
+        echo "  [WARN] jq not found — manually add 'mcp__claudezilla__*' to permissions.allow in $SETTINGS_FILE"
     fi
-fi
 
-# Update mcp.json to register Claudezilla MCP server
-if command -v jq &> /dev/null; then
-    MCP_SERVER_CONFIG="{\"command\":\"node\",\"args\":[\"$PROJECT_DIR/mcp/server.js\"]}"
-    if [ -f "$MCP_FILE" ]; then
-        # Merge with existing config
-        jq --argjson cfg "$MCP_SERVER_CONFIG" '.mcpServers.claudezilla = $cfg' "$MCP_FILE" > "$MCP_FILE.tmp" && mv "$MCP_FILE.tmp" "$MCP_FILE"
-    else
-        # Create new mcp.json
-        echo "{\"mcpServers\":{\"claudezilla\":$MCP_SERVER_CONFIG}}" | jq '.' > "$MCP_FILE"
-    fi
-    echo "Updated Claude Code MCP config: $MCP_FILE"
-else
     if [ ! -f "$MCP_FILE" ]; then
         cat > "$MCP_FILE" << MCP_EOF
 {
@@ -120,19 +114,155 @@ else
   }
 }
 MCP_EOF
-        echo "Created Claude Code MCP config: $MCP_FILE"
+        echo "  MCP config: $MCP_FILE"
     else
-        echo "[WARN] jq not found. Please manually add claudezilla to mcpServers in $MCP_FILE"
+        echo "  [WARN] jq not found — manually add claudezilla to mcpServers in $MCP_FILE"
     fi
 fi
 
-MCP_DIR="$PROJECT_DIR/mcp"
-if [ -f "$MCP_DIR/package.json" ]; then
-    echo "Installing MCP dependencies..."
-    cd "$MCP_DIR" && npm install --quiet
-    echo "MCP dependencies installed."
-fi
+# ---------------------------------------------------------------------------
+# 5. Firefox permanent extension install
+# ---------------------------------------------------------------------------
 
 echo ""
-echo "Claudezilla is now configured for autonomous operation."
+echo "Setting up Firefox headless profile..."
+
+# Detect Firefox binary (prefer ESR)
+FIREFOX_BIN=""
+for candidate in firefox-esr firefox; do
+    if command -v "$candidate" &> /dev/null; then
+        FIREFOX_BIN="$candidate"
+        break
+    fi
+done
+
+if [ -z "$FIREFOX_BIN" ]; then
+    echo ""
+    echo "[WARN] Firefox not found — skipping extension install."
+    echo "       Install firefox-esr then re-run:"
+    echo "         sudo apt install firefox-esr   # Debian/Ubuntu"
+    echo "         sudo dnf install firefox       # Fedora"
+    echo "       Then re-run: $0"
+else
+    # Warn if not ESR — signature enforcement can't be disabled on release Firefox
+    if ! "$FIREFOX_BIN" --version 2>/dev/null | grep -qi "esr"; then
+        echo ""
+        echo "  [WARN] firefox-esr is recommended for headless/unsigned extension use."
+        echo "         Release Firefox may block unsigned extensions regardless of profile settings."
+        echo "         sudo apt install firefox-esr"
+        echo "  Continuing anyway..."
+    fi
+
+    # Build XPI (zip the extension directory)
+    XPI_DIR="$PROJECT_DIR/web-ext-artifacts"
+    XPI_PATH="$XPI_DIR/claudezilla.xpi"
+    mkdir -p "$XPI_DIR"
+
+    if command -v web-ext &> /dev/null; then
+        web-ext build --source-dir="$PROJECT_DIR/extension" \
+            --artifacts-dir="$XPI_DIR" --overwrite-dest --quiet
+        # web-ext names it with the version; normalise to stable filename
+        find "$XPI_DIR" -name "claudezilla-*.xpi" -exec mv {} "$XPI_PATH" \; 2>/dev/null || true
+    elif command -v zip &> /dev/null; then
+        cd "$PROJECT_DIR/extension" && zip -r "$XPI_PATH" . -q && cd "$PROJECT_DIR"
+    else
+        echo "  [ERROR] Neither web-ext nor zip found. Install zip and re-run."
+        exit 1
+    fi
+    echo "  Built XPI: $XPI_PATH"
+
+    # Create dedicated headless profile
+    PROFILE_DIR="$HOME/.mozilla/firefox/claudezilla-headless"
+    mkdir -p "$PROFILE_DIR/extensions"
+
+    cat > "$PROFILE_DIR/user.js" << 'USERJS_EOF'
+// Claudezilla headless profile — disable extension signature enforcement
+user_pref("xpinstall.signatures.required", false);
+user_pref("extensions.autoDisableScopes", 0);
+user_pref("extensions.enabledScopes", 15);
+user_pref("extensions.update.enabled", false);
+user_pref("app.update.enabled", false);
+user_pref("browser.shell.checkDefaultBrowser", false);
+user_pref("datareporting.healthreport.uploadEnabled", false);
+user_pref("datareporting.policy.dataSubmissionEnabled", false);
+USERJS_EOF
+
+    # Sideload extension into profile
+    cp "$XPI_PATH" "$PROFILE_DIR/extensions/claudezilla@boot.industries.xpi"
+    echo "  Extension sideloaded into profile: $PROFILE_DIR"
+
+    # Register profile in profiles.ini
+    PROFILES_INI="$HOME/.mozilla/firefox/profiles.ini"
+    mkdir -p "$(dirname "$PROFILES_INI")"
+    if [ ! -f "$PROFILES_INI" ]; then
+        cat > "$PROFILES_INI" << PROFILES_EOF
+[General]
+StartWithLastProfile=0
+
+[Profile0]
+Name=claudezilla-headless
+IsRelative=0
+Path=$PROFILE_DIR
+PROFILES_EOF
+        echo "  Created profiles.ini"
+    elif ! grep -q "claudezilla-headless" "$PROFILES_INI"; then
+        # Find next available profile index
+        NEXT_IDX=$(grep -c '^\[Profile' "$PROFILES_INI" 2>/dev/null || echo 0)
+        cat >> "$PROFILES_INI" << PROFILES_EOF
+
+[Profile${NEXT_IDX}]
+Name=claudezilla-headless
+IsRelative=0
+Path=$PROFILE_DIR
+PROFILES_EOF
+        echo "  Registered profile in $PROFILES_INI"
+    else
+        echo "  Profile already registered in $PROFILES_INI"
+    fi
+
+    # Launch script
+    LAUNCH_SCRIPT="$PROJECT_DIR/start-browser.sh"
+    cat > "$LAUNCH_SCRIPT" << LAUNCH_EOF
+#!/bin/bash
+# Start Firefox headless with the Claudezilla profile.
+# Usage: ./start-browser.sh
+exec $FIREFOX_BIN --headless --no-remote --profile "$PROFILE_DIR" "\$@"
+LAUNCH_EOF
+    chmod 755 "$LAUNCH_SCRIPT"
+    echo "  Launch script: $LAUNCH_SCRIPT"
+
+    # systemd user service
+    SYSTEMD_DIR="$HOME/.config/systemd/user"
+    mkdir -p "$SYSTEMD_DIR"
+    cat > "$SYSTEMD_DIR/claudezilla-browser.service" << SERVICE_EOF
+[Unit]
+Description=Claudezilla Firefox Headless Browser
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=$FIREFOX_BIN --headless --no-remote --profile $PROFILE_DIR
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=default.target
+SERVICE_EOF
+
+    systemctl --user daemon-reload 2>/dev/null || true
+    echo "  systemd service written: claudezilla-browser.service"
+    echo "  Enable with: systemctl --user enable --now claudezilla-browser"
+fi
+
+# ---------------------------------------------------------------------------
+# Done
+# ---------------------------------------------------------------------------
+
+echo ""
+echo "Claudezilla installation complete."
+echo ""
+echo "To start the browser:"
+echo "  Manually:  $PROJECT_DIR/start-browser.sh"
+echo "  Service:   systemctl --user enable --now claudezilla-browser"
+echo ""
 echo "All mcp__claudezilla__* tools will run without permission prompts."
