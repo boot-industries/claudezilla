@@ -1,4 +1,4 @@
-#!/opt/homebrew/bin/node
+#!/usr/bin/env node
 
 /**
  * Claudezilla Native Messaging Host

@@ -126,6 +126,13 @@ MCP_EOF
     fi
 fi
 
+MCP_DIR="$PROJECT_DIR/mcp"
+if [ -f "$MCP_DIR/package.json" ]; then
+    echo "Installing MCP dependencies..."
+    cd "$MCP_DIR" && npm install --quiet
+    echo "MCP dependencies installed."
+fi
+
 echo ""
 echo "Claudezilla is now configured for autonomous operation."
 echo "All mcp__claudezilla__* tools will run without permission prompts."
