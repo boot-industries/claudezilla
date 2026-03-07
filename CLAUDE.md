@@ -303,7 +303,7 @@ When a Claude session ends, its tabs are cleaned up immediately:
 **Orphaned Tab Cleanup (v0.4.5 fallback):**
 For hard crashes (SIGKILL, OOM) where `goodbye` cannot be sent:
 - **Heartbeat tracking**: MCP server tracks agent activity via command timestamps
-- **Timeout threshold**: Agent is orphaned if no commands received in 2 minutes (120s)
+- **Timeout threshold**: Agent is orphaned if no commands received in 10 minutes (600s)
 - **Periodic cleanup**: MCP server checks every 60s for orphaned agents
 - **Automatic recovery**: All tabs from orphaned agent are closed and space returned to pool
 
