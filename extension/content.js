@@ -307,6 +307,7 @@ function initWatermark() {
  */
 function initFocusglow() {
   if (focusglowElement) return;
+  if (document.head.querySelector('#claudezilla-focusglow-styles')) return;
 
   // Inject CSS animation
   const style = document.createElement('style');
@@ -537,7 +538,7 @@ function initVisuals() {
 // Console log capture state
 const capturedLogs = [];
 const MAX_LOGS = 500;
-let consoleCapureEnabled = false;
+let consoleCaptureEnabled = false;
 
 const originalConsole = {
   log: console.log.bind(console),
@@ -549,7 +550,7 @@ const originalConsole = {
 
 function captureLog(level, args) {
   // Only capture if enabled
-  if (!consoleCapureEnabled) return;
+  if (!consoleCaptureEnabled) return;
 
   const entry = {
     level,
@@ -576,8 +577,8 @@ function captureLog(level, args) {
  * Only captures logs after this is called
  */
 function enableConsoleCapture() {
-  if (consoleCapureEnabled) return;
-  consoleCapureEnabled = true;
+  if (consoleCaptureEnabled) return;
+  consoleCaptureEnabled = true;
 
   // Override console methods
   console.log = (...args) => { captureLog('log', args); originalConsole.log(...args); };
@@ -610,7 +611,7 @@ function enableConsoleCapture() {
 function getConsoleLogs(params = {}) {
   // SECURITY: Auto-enable capture on first request
   // This makes capture opt-in - logs are only captured after first getConsoleLogs call
-  if (!consoleCapureEnabled) {
+  if (!consoleCaptureEnabled) {
     enableConsoleCapture();
   }
 
@@ -632,7 +633,7 @@ function getConsoleLogs(params = {}) {
     logs,
     total: capturedLogs.length,
     filtered: logs.length,
-    captureEnabled: consoleCapureEnabled,
+    captureEnabled: consoleCaptureEnabled,
   };
 }
 

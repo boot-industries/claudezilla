@@ -1525,97 +1525,97 @@ async function handleCliCommand(message) {
           screenshotMutexHolder = { agentId, acquiredAt: Date.now(), requestId: screenshotRequestId };
 
           try {
-          const session = await getSession(windowId);
-          let screenshotReadiness = null;
+            const session = await getSession(windowId);
+            let screenshotReadiness = null;
 
-          // Determine which tab to capture
-          const tabIds = claudezillaWindow?.tabs.map(t => t.tabId) || [];
-          let targetTabId = requestedTabId || activeTabId;
-          if (requestedTabId && claudezillaWindow && !tabIds.includes(requestedTabId)) {
-            throw new Error(`Tab ${requestedTabId} not found in Claudezilla window. Available tabs: ${tabIds.join(', ')}`);
-          }
+            // Determine which tab to capture
+            const tabIds = claudezillaWindow?.tabs.map(t => t.tabId) || [];
+            let targetTabId = requestedTabId || activeTabId;
+            if (requestedTabId && claudezillaWindow && !tabIds.includes(requestedTabId)) {
+              throw new Error(`Tab ${requestedTabId} not found in Claudezilla window. Available tabs: ${tabIds.join(', ')}`);
+            }
 
-          // If specific tab requested and it's not visible, switch to it first
-          if (targetTabId && targetTabId !== activeTabId) {
-            await browser.tabs.update(targetTabId, { active: true });
-            activeTabId = targetTabId;
+            // If specific tab requested and it's not visible, switch to it first
+            if (targetTabId && targetTabId !== activeTabId) {
+              await browser.tabs.update(targetTabId, { active: true });
+              activeTabId = targetTabId;
 
-            // Dynamic page readiness detection (replaces hardcoded 150ms)
-            if (!skipReadiness) {
+              // Dynamic page readiness detection (replaces hardcoded 150ms)
+              if (!skipReadiness) {
+                screenshotReadiness = await waitForPageReady(targetTabId, {
+                  maxWait,
+                  requireVisualIdle: waitForImages
+                });
+              }
+
+              // Verify the tab is still active after wait (prevents race)
+              const [currentActive] = await browser.tabs.query({ active: true, windowId: session.windowId });
+              if (currentActive?.id !== targetTabId) {
+                throw new Error(`Screenshot race: tab ${targetTabId} was switched away during capture`);
+              }
+            } else if (!skipReadiness) {
+              // Even without tab switch, do quick render check for current tab
               screenshotReadiness = await waitForPageReady(targetTabId, {
-                maxWait,
+                maxWait: Math.min(maxWait, 2000), // Shorter wait for already-visible tab
                 requireVisualIdle: waitForImages
               });
             }
 
-            // Verify the tab is still active after wait (prevents race)
-            const [currentActive] = await browser.tabs.query({ active: true, windowId: session.windowId });
-            if (currentActive?.id !== targetTabId) {
-              throw new Error(`Screenshot race: tab ${targetTabId} was switched away during capture`);
+            // Capture with JPEG compression (much smaller than PNG)
+            const captureFormat = format === 'png' ? 'png' : 'jpeg';
+            const captureOpts = { format: captureFormat };
+            if (captureFormat === 'jpeg') {
+              captureOpts.quality = Math.min(100, Math.max(1, quality));
             }
-          } else if (!skipReadiness) {
-            // Even without tab switch, do quick render check for current tab
-            screenshotReadiness = await waitForPageReady(targetTabId, {
-              maxWait: Math.min(maxWait, 2000), // Shorter wait for already-visible tab
-              requireVisualIdle: waitForImages
-            });
-          }
+            // Hide watermark during capture (opacity:0 covers character + glow)
+            await executeInTab(targetTabId, 'hideWatermark', {});
 
-          // Capture with JPEG compression (much smaller than PNG)
-          const captureFormat = format === 'png' ? 'png' : 'jpeg';
-          const captureOpts = { format: captureFormat };
-          if (captureFormat === 'jpeg') {
-            captureOpts.quality = Math.min(100, Math.max(1, quality));
-          }
-          // Hide watermark during capture (opacity:0 covers character + glow)
-          await executeInTab(targetTabId, 'hideWatermark', {});
+            // Annotate elements if requested
+            let annotationLabels = null;
+            if (params.annotate) {
+              const annResp = await executeInTab(targetTabId, 'annotateElements', { maxElements: 30 });
+              if (annResp.success) annotationLabels = annResp.result.labels;
+            }
 
-          // Annotate elements if requested
-          let annotationLabels = null;
-          if (params.annotate) {
-            const annResp = await executeInTab(targetTabId, 'annotateElements', { maxElements: 30 });
-            if (annResp.success) annotationLabels = annResp.result.labels;
-          }
+            const rawDataUrl = await browser.tabs.captureVisibleTab(session.windowId, captureOpts);
 
-          const rawDataUrl = await browser.tabs.captureVisibleTab(session.windowId, captureOpts);
+            // Restore watermark and remove annotations after capture
+            await executeInTab(targetTabId, 'showWatermark', {});
+            if (params.annotate) {
+              await executeInTab(targetTabId, 'removeAnnotations', {});
+            }
 
-          // Restore watermark and remove annotations after capture
-          await executeInTab(targetTabId, 'showWatermark', {});
-          if (params.annotate) {
-            await executeInTab(targetTabId, 'removeAnnotations', {});
-          }
-
-          // Build base response with readiness data
-          const baseResponse = {
-            tabId: targetTabId,
-            format: captureFormat,
-            quality,
-            readiness: screenshotReadiness ? {
-              waitMs: screenshotReadiness.totalWaitMs,
-              timedOut: screenshotReadiness.timedOut,
-              timeline: screenshotReadiness.timeline
-            } : { waitMs: 0, timedOut: false, timeline: [] }
-          };
-
-          // If scale < 1, resize via content script
-          if (scale < 1) {
-            const response = await executeInTab(targetTabId, 'resizeImage', {
-              dataUrl: rawDataUrl,
-              scale,
-              quality,
+            // Build base response with readiness data
+            const baseResponse = {
+              tabId: targetTabId,
               format: captureFormat,
-            });
-            return {
-              ...baseResponse,
-              dataUrl: response.result.dataUrl,
-              originalSize: response.result.originalSize,
-              scaledSize: response.result.scaledSize,
-              scale,
-              ...(annotationLabels ? { labels: annotationLabels } : {}),
+              quality,
+              readiness: screenshotReadiness ? {
+                waitMs: screenshotReadiness.totalWaitMs,
+                timedOut: screenshotReadiness.timedOut,
+                timeline: screenshotReadiness.timeline
+              } : { waitMs: 0, timedOut: false, timeline: [] }
             };
-          } else {
-            return { ...baseResponse, dataUrl: rawDataUrl, scale: 1, ...(annotationLabels ? { labels: annotationLabels } : {}) };
-          }
+
+            // If scale < 1, resize via content script
+            if (scale < 1) {
+              const response = await executeInTab(targetTabId, 'resizeImage', {
+                dataUrl: rawDataUrl,
+                scale,
+                quality,
+                format: captureFormat,
+              });
+              return {
+                ...baseResponse,
+                dataUrl: response.result.dataUrl,
+                originalSize: response.result.originalSize,
+                scaledSize: response.result.scaledSize,
+                scale,
+                ...(annotationLabels ? { labels: annotationLabels } : {}),
+              };
+            } else {
+              return { ...baseResponse, dataUrl: rawDataUrl, scale: 1, ...(annotationLabels ? { labels: annotationLabels } : {}) };
+            }
           } finally {
             // Release mutex
             screenshotMutexHolder = null;
