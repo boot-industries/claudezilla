@@ -5,10 +5,39 @@
 
 ## v0.6.1 (2026-03-07) — WIP / internal
 
-**Linux support.**
+**Linux support + reliability/security audit.**
 
 - **Portable shebang** — `host/index.js` changed from `#!/opt/homebrew/bin/node` to `#!/usr/bin/env node`. Homebrew path doesn't exist on Linux; env-lookup works on all Unix-like systems.
 - **MCP dependencies on Linux** — `install/install-linux.sh` now runs `npm install` in `mcp/` after manifest setup, matching the macOS installer. Prevents MCP crash on first launch.
+
+### Reliability & Security Audit (9 fix batches)
+
+**MCP server (`mcp/server.js`)**
+
+- **Socket listener cleanup** — `sendCommandOnce` now calls `socket.removeAllListeners()` + `socket.destroy()` on every resolve/reject path. Previously, `data`/`error`/`timeout`/`close` listeners accumulated over many commands causing FD leaks. Close handler now logs JSON parse failures instead of silently swallowing them.
+- **Process robustness** — `cleanupOrphanedAgents` interval callback is now wrapped in try/catch with `.catch()` to prevent silent async crashes. Interval ID stored as `cleanupIntervalId` and cleared in `handleShutdown` to prevent races on exit. Added `process.on('unhandledRejection', ...)` handler to surface any missed rejections.
+- **Domain pattern ReDoS prevention** — `checkDomainAllowed` now validates each domain pattern before constructing a regex: max 255 chars, only `[a-zA-Z0-9*.\-]` characters allowed. Pathological wildcard patterns previously could cause catastrophic backtracking.
+
+**Host (`host/index.js`, `host/ipc.js`)**
+
+- **Connection limit** — `server.maxConnections = 10` prevents FD exhaustion under DoS conditions.
+- **Socket error cleanup** — Socket error handler now calls `socket.destroy()` after logging, preventing half-open connections from lingering.
+- **Per-socket request tracking** — Each socket tracks its pending request IDs in a `Set`; on socket close, all associated entries are removed from `pendingCliRequests` to prevent memory leaks on abrupt disconnect.
+- **Auth token hardening** — Auth check strengthened to `!authToken || typeof authToken !== 'string' || authToken !== SOCKET_AUTH_TOKEN` to guard against null/non-string bypass.
+- **Command validation** — `command` field validated as a non-empty string before dispatch; invalid commands return a structured error JSON response instead of propagating `undefined` into handlers.
+- **`icacls` command injection** (Windows) — `host/ipc.js` replaced `exec()` shell invocation with `execFile('icacls', [...args])` array form, eliminating shell interpretation of file paths containing quotes or special characters.
+
+**Extension (`extension/background.js`, `extension/content.js`)**
+
+- **Screenshot mutex finally block** — `screenshotMutexHolder = null` is now inside a `finally` block, ensuring the mutex is always released even if the screenshot throws. Previously a mid-flight exception would leave the mutex permanently held, blocking all subsequent screenshots.
+- **`consoleCaptureEnabled` typo** — Renamed from `consoleCapureEnabled` (missing 't') across all 6 occurrences.
+- **Focusglow style dedup** — `initFocusglow()` now checks for `#claudezilla-focusglow-styles` before injecting the `<style>` block, preventing style accumulation on repeated calls.
+
+**Installers (`install/install-linux.sh`, `install/install-macos.sh`)**
+
+- **npm pre-check** — Both installers now verify `npm` is available before running `npm install`, with a clear error message pointing to Node.js installation if missing.
+- **XPI validation** (Linux) — Installer verifies XPI exists before attempting sideload copy; `cp` failure also exits with an error instead of continuing silently.
+- **systemd journal output** (Linux) — Service `[Service]` block now includes `StandardInput=null`, `StandardOutput=journal`, `StandardError=journal` to prevent hangs on headless systems waiting for stdin.
 
 ## v0.6.0 (2026-03-06)
 
