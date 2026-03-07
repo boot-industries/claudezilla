@@ -237,9 +237,9 @@ function handleLoopCommand(command, params, callback) {
  * Handle command from CLI (via socket)
  * SECURITY: Validates auth token and command against whitelist
  */
-function handleCliCommand(command, params, authToken, callback) {
+function handleCliCommand(command, params, authToken, callback, socketRequests) {
   // SECURITY: Validate auth token
-  if (authToken !== SOCKET_AUTH_TOKEN) {
+  if (!authToken || typeof authToken !== 'string' || authToken !== SOCKET_AUTH_TOKEN) {
     callback({ success: false, error: 'Invalid or missing auth token' });
     return;
   }
@@ -262,6 +262,7 @@ function handleCliCommand(command, params, authToken, callback) {
 
   // Store callback for when extension responds
   pendingCliRequests.set(id, callback);
+  if (socketRequests) socketRequests.add(id);
 
   // Per-operation timeout support (default: 150s, range: 5s-300s)
   const timeoutMs = (params._timeout && params._timeout >= 5000 && params._timeout <= 300000)
@@ -323,6 +324,7 @@ function startSocketServer() {
     log('CLI client connected');
 
     let buffer = '';
+    const socketRequests = new Set();
 
     socket.on('data', (data) => {
       buffer += data.toString();
@@ -344,13 +346,21 @@ function startSocketServer() {
         if (!line.trim()) continue;
 
         try {
-          const { command, params = {}, authToken } = JSON.parse(line);
+          const parsed = JSON.parse(line);
+
+          // SECURITY: Validate command is a non-empty string before dispatch
+          if (!parsed.command || typeof parsed.command !== 'string') {
+            socket.write(JSON.stringify({ success: false, error: 'Invalid or missing command' }) + '\n');
+            return;
+          }
+
+          const { command, params = {}, authToken } = parsed;
 
           log(`CLI command: ${command}`);
 
           handleCliCommand(command, params, authToken, (response) => {
             socket.write(JSON.stringify(response) + '\n');
-          });
+          }, socketRequests);
         } catch (e) {
           log('Invalid CLI message:', e.message);
           socket.write(JSON.stringify({ success: false, error: 'Invalid JSON' }) + '\n');
@@ -360,12 +370,20 @@ function startSocketServer() {
 
     socket.on('close', () => {
       log('CLI client disconnected');
+      // Clean up pending requests for this socket
+      for (const reqId of socketRequests) {
+        pendingCliRequests.delete(reqId);
+      }
+      socketRequests.clear();
     });
 
     socket.on('error', (err) => {
       log('Socket error:', err.message);
+      socket.destroy();
     });
   });
+
+  server.maxConnections = 10;
 
   server.listen(SOCKET_PATH, async () => {
     log(`Socket server listening on ${SOCKET_PATH}`);

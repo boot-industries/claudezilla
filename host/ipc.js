@@ -184,17 +184,16 @@ export async function setWindowsFileACL(filePath) {
   if (!IS_WINDOWS) return;
 
   try {
-    const { exec } = await import('child_process');
+    const { execFile } = await import('child_process');
     const { promisify } = await import('util');
-    const execAsync = promisify(exec);
+    const execFileAsync = promisify(execFile);
 
     // Remove inherited permissions and grant only current user full control
     // /inheritance:r - Remove all inherited ACEs
     // /grant:r - Replace (not add) permissions for specified user
-    // %USERNAME%:(F) - Full control for current user
-    await execAsync(`icacls "${filePath}" /inheritance:r /grant:r "%USERNAME%:(F)"`, {
-      shell: 'cmd.exe'
-    });
+    // SECURITY: Use execFile with args array to prevent command injection via filePath
+    const username = process.env.USERNAME || process.env.USER || '';
+    await execFileAsync('icacls', [filePath, '/inheritance:r', '/grant:r', `${username}:(F)`]);
     console.error(`[claudezilla] Set ACL on ${filePath}`);
   } catch (e) {
     // Log warning but don't fail - ACL is a defense-in-depth measure

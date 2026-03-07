@@ -55,6 +55,7 @@ echo "Native manifest: $MANIFEST_PATH"
 
 MCP_DIR="$PROJECT_DIR/mcp"
 if [ -f "$MCP_DIR/package.json" ]; then
+    command -v npm >/dev/null 2>&1 || { echo "Error: npm not found. Please install Node.js and npm first."; exit 1; }
     echo "Installing MCP dependencies..."
     cd "$MCP_DIR" && npm install --quiet
     cd "$PROJECT_DIR"
@@ -188,7 +189,8 @@ user_pref("datareporting.policy.dataSubmissionEnabled", false);
 USERJS_EOF
 
     # Sideload extension into profile
-    cp "$XPI_PATH" "$PROFILE_DIR/extensions/claudezilla@boot.industries.xpi"
+    [ -f "$XPI_PATH" ] || { echo "Error: XPI not found at $XPI_PATH. Build the extension first."; exit 1; }
+    cp "$XPI_PATH" "$PROFILE_DIR/extensions/claudezilla@boot.industries.xpi" || { echo "Error: Failed to copy XPI to Firefox profile"; exit 1; }
     echo "  Extension sideloaded into profile: $PROFILE_DIR"
 
     # Register profile in profiles.ini
@@ -244,6 +246,9 @@ Type=simple
 ExecStart=$FIREFOX_BIN --headless --no-remote --profile $PROFILE_DIR
 Restart=on-failure
 RestartSec=5s
+StandardInput=null
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=default.target

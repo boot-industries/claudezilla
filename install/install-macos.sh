@@ -29,6 +29,7 @@ echo "Set host script permissions to 755: $HOST_PATH"
 # Install MCP server dependencies
 MCP_DIR="$PROJECT_DIR/mcp"
 if [ -f "$MCP_DIR/package.json" ]; then
+    command -v npm >/dev/null 2>&1 || { echo "Error: npm not found. Please install Node.js and npm first."; exit 1; }
     echo "Installing MCP dependencies..."
     cd "$MCP_DIR" && npm install --quiet
     echo "MCP dependencies installed."
