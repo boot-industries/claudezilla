@@ -1,7 +1,51 @@
 # CLZ002 Changelog
 
 **Project:** Claudezilla
-**Current Version:** 0.5.9
+**Current Version:** 0.6.1
+
+## v0.6.1 (2026-03-07) — WIP / internal
+
+**Linux support.**
+
+- **Portable shebang** — `host/index.js` changed from `#!/opt/homebrew/bin/node` to `#!/usr/bin/env node`. Homebrew path doesn't exist on Linux; env-lookup works on all Unix-like systems.
+- **MCP dependencies on Linux** — `install/install-linux.sh` now runs `npm install` in `mcp/` after manifest setup, matching the macOS installer. Prevents MCP crash on first launch.
+
+## v0.6.0 (2026-03-06)
+
+**Annotated screenshots, domain allowlists, smarter waiting, page state diffing.**
+
+This release adds four new capabilities and a round of stability fixes from community feedback.
+
+### Features
+
+- **Annotated screenshots** — `firefox_screenshot` with `annotate: true` overlays numbered badges on every interactive element (buttons, links, inputs, form controls) using Shadow DOM isolation. The response includes a `labels` map keyed by badge number so agents can reference elements by number in follow-up commands (e.g., "click element 3"). Badges are injected, the screenshot is captured, and badges are removed in one atomic sequence — no visual artifacts persist on the page.
+
+- **Domain allowlist** — Agents can restrict their own navigation to approved domains via `firefox_set_config({ allowedDomains: ["*.example.com", "docs.stripe.com"] })`. Supports exact matches and wildcard prefixes. Any `createWindow` or `navigate` call to an unapproved domain returns a `DOMAIN_BLOCKED` error with the rejected URL. Opt-in per agent — no global config changes, no impact on other agents in multi-agent setups.
+
+- **Expanded waitFor** — `firefox_wait_for` now supports three modes:
+  - `selector` — CSS selector (existing behavior)
+  - `text` — Substring match on visible page text (`document.body.innerText`)
+  - `url` — Glob match on `window.location.href` (useful for waiting on redirects or SPA navigation)
+  - All modes respect the existing `timeout` and `pollInterval` parameters.
+
+- **Page state diff** — `firefox_diff_page_state` takes two snapshots (from `firefox_get_page_state`) and returns structured diffs: added/removed/changed headings, links, buttons, and form fields. Runs entirely in the MCP server with no extension round-trip needed — useful for verifying that a click or form submission actually changed the page.
+
+### Bug Fixes
+
+- **Orphan tab timeout increased** — Changed from 2 minutes to 10 minutes. The previous threshold caused false positives during long-running operations (large page screenshots, complex waitFor chains), incorrectly cleaning up active agents' tabs.
+- **`pressKey` error messages** — Invalid key names now return actionable errors listing the valid key (e.g., `"Unknown key 'enter' — did you mean 'Enter'?"`) instead of a generic type error.
+- **`scroll` noEffect flag** — `firefox_scroll` response now includes `noEffect: true` when the viewport position didn't change after scrolling (already at top/bottom), letting agents detect when they've reached the end of a page.
+- **Screenshot watermark hidden during capture** — The Claudezilla watermark and focus glow effects are now hidden during `captureVisibleTab` and restored after, eliminating visual artifacts in screenshots.
+- **CONTENT_SCRIPT_ERROR false positives** — JSON, XML, PDF, and binary tabs no longer trigger content script injection errors. The extension now checks the tab's content type before attempting `sendMessage` and returns a descriptive `NON_HTML_TAB` error instead.
+- **Network header stripping** — `getNetworkRequests` no longer includes raw request/response headers in the payload, reducing response size by ~60% for header-heavy pages.
+- **Background scroll warning** — Suppressed harmless `scroll` event listener warning in the background script console.
+
+### Updated
+
+- Version bumped to 0.6.0 across extension manifest, host, MCP server, popup, and package.json
+- Documentation site launched at [docs.claudezilla.com](https://docs.claudezilla.com)
+
+---
 
 ## v0.5.9 (2026-03-04)
 
