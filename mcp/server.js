@@ -22,6 +22,11 @@ import { getSocketPath, getAuthTokenPath } from '../host/ipc.js';
 const SOCKET_PATH = getSocketPath();
 const AUTH_TOKEN_FILE = getAuthTokenPath();
 
+process.on('unhandledRejection', (reason) => {
+  console.error('[claudezilla] Unhandled rejection:', reason);
+  process.exit(1);
+});
+
 /**
  * Load auth token from file (written by host on startup)
  * Returns null if file doesn't exist (host not running)
@@ -74,6 +79,13 @@ function checkDomainAllowed(agentId, url) {
   // about: URLs always allowed
   if (url.startsWith('about:')) return null;
   
+  const VALID_DOMAIN_PATTERN = /^[a-zA-Z0-9*.\-]+$/;
+  for (const pattern of config.allowedDomains) {
+    if (pattern.length > 255 || !VALID_DOMAIN_PATTERN.test(pattern)) {
+      return `DOMAIN_BLOCKED: Invalid domain pattern "${pattern}"`;
+    }
+  }
+
   const allowed = config.allowedDomains.some(pattern => {
     if (pattern.startsWith('*.')) {
       const base = pattern.slice(2).replace(/\./g, '\.');
@@ -161,7 +173,9 @@ async function cleanupOrphanedAgents() {
 }
 
 // Start periodic orphaned agent cleanup
-setInterval(cleanupOrphanedAgents, CLEANUP_INTERVAL_MS);
+const cleanupIntervalId = setInterval(() => {
+  cleanupOrphanedAgents().catch(e => console.error('[claudezilla] Cleanup error:', e));
+}, CLEANUP_INTERVAL_MS);
 
 /**
  * Run diagnostics on Claudezilla connection
@@ -369,6 +383,17 @@ function sendCommandOnce(command, params = {}) {
     let buffer = '';
     let resolved = false;
 
+    // Per-operation timeout support (default: 150s)
+    const socketTimeoutMs = (params._timeout && params._timeout >= 5000 && params._timeout <= 300000)
+      ? params._timeout + 5000 // Add 5s buffer above the operation timeout
+      : 155000;
+    socket.setTimeout(socketTimeoutMs);
+
+    function cleanup() {
+      socket.removeAllListeners();
+      socket.destroy();
+    }
+
     socket.on('connect', () => {
       const message = JSON.stringify({ command, params, authToken }) + '\n';
       socket.write(message);
@@ -384,9 +409,11 @@ function sendCommandOnce(command, params = {}) {
         try {
           const response = JSON.parse(jsonStr);
           resolved = true;
-          socket.end();
+          cleanup();
           resolve(response);
         } catch (e) {
+          resolved = true;
+          cleanup();
           reject(new Error('Invalid response from Claudezilla host: ' + e.message));
         }
       }
@@ -394,9 +421,11 @@ function sendCommandOnce(command, params = {}) {
 
     socket.on('error', (err) => {
       if (resolved) return;
+      resolved = true;
       // Preserve the error code for retry logic
       const wrappedErr = new Error(buildErrorMessage(err.code, SOCKET_PATH, AUTH_TOKEN_FILE));
       wrappedErr.code = err.code;
+      cleanup();
       reject(wrappedErr);
     });
 
@@ -408,23 +437,19 @@ function sendCommandOnce(command, params = {}) {
           resolved = true;
           resolve(response);
         } catch (e) {
-          // Ignore - may have already resolved
+          console.error('Parse error in close handler:', e.message);
         }
       }
     });
 
     socket.on('timeout', () => {
-      socket.end();
       if (!resolved) {
-        reject(new Error(`Connection timed out after ${socketTimeoutMs}ms (command: ${command})`));
+        resolved = true;
+        const err = new Error(`Connection timed out after ${socketTimeoutMs}ms (command: ${command})`);
+        cleanup();
+        reject(err);
       }
     });
-
-    // Per-operation timeout support (default: 150s)
-    const socketTimeoutMs = (params._timeout && params._timeout >= 5000 && params._timeout <= 300000)
-      ? params._timeout + 5000 // Add 5s buffer above the operation timeout
-      : 155000;
-    socket.setTimeout(socketTimeoutMs);
   });
 }
 
@@ -1362,6 +1387,7 @@ let isShuttingDown = false;
 function handleShutdown(signal) {
   if (isShuttingDown) return;
   isShuttingDown = true;
+  clearInterval(cleanupIntervalId);
   console.error(`[claudezilla] Received ${signal}, cleaning up...`);
   sendGoodbye().finally(() => process.exit(0));
 }
