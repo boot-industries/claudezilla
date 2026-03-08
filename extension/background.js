@@ -1780,6 +1780,22 @@ async function handleCliCommand(message) {
         break;
       }
 
+      case 'handleConsent': {
+        const { windowId, tabId: targetTab, agentId, ...consentParams } = params;
+        const session = await getSession(windowId);
+        const tabId = Number(targetTab) || session.tabId;
+        // SECURITY: Verify agent owns the target tab
+        if (targetTab && agentId) {
+          verifyTabOwnership(tabId, agentId, 'handle consent in');
+        }
+        const response = await executeInTab(tabId, 'handleConsent', consentParams);
+        if (!response.success) {
+          throw new Error(response.error);
+        }
+        result = { tabId, ...response.result };
+        break;
+      }
+
       default:
         throw new Error(`Unknown command: ${command}`);
     }
