@@ -10,6 +10,20 @@
 - **Portable shebang** — `host/index.js` changed from `#!/opt/homebrew/bin/node` to `#!/usr/bin/env node`. Homebrew path doesn't exist on Linux; env-lookup works on all Unix-like systems.
 - **MCP dependencies on Linux** — `install/install-linux.sh` now runs `npm install` in `mcp/` after manifest setup, matching the macOS installer. Prevents MCP crash on first launch.
 
+### Features
+
+**Consent Form Automation**
+
+- **`firefox_handle_consent` MCP tool** — Automatically detects and dismisses common cookie/consent dialogs and GDPR overlays. Operates with a 4-pass detection strategy:
+  - **Pass 1: CMP selectors** — Google consent.google.com (`#L2AGLb`), OneTrust (`#onetrust-accept-btn-handler`), Quantcast, Didomi, Cookiebot, and generic `[id*="accept"][id*="cookie"]` patterns
+  - **Pass 2: Text matching** — Button text matching "I agree", "Accept all", "Allow all", "Consent", "Got it", etc. (rejects buttons containing "reject", "decline", "refuse")
+  - **Pass 3: Shadow DOM traversal** — Scans shallow shadow roots on consent host elements (closed-mode roots gracefully skipped)
+  - **Pass 4: ARIA dialog fallback** — `[role="dialog"]` and `[role="alertdialog"]` elements as final fallback
+  - Returns `{ found, clicked, buttonText, method, elapsed }` so agents can verify success
+  - 3-second default timeout prevents hanging on unresponsive pages
+- **`handleConsent: true` config option** — Agents can enable automatic consent handling via `firefox_set_config({ handleConsent: true })`. After navigation, consent dismissal is triggered fire-and-forget with 800ms delay, allowing page to settle before scanning. Does not block navigation or error out if consent not found.
+- **Known limitations:** TrustArc dialogs, closed Shadow DOM roots (inaccessible by design), pages with custom obfuscated consent mechanics
+
 ### Reliability & Security Audit (9 fix batches)
 
 **MCP server (`mcp/server.js`)**
