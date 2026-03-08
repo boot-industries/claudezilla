@@ -58,8 +58,8 @@ function truncateAgentId(id) {
   return id.length > 15 ? id.slice(0, 12) + '...' : id;
 }
 
-// Per-agent configuration (allowedDomains, etc.)
-const agentConfig = new Map(); // agentId -> { allowedDomains: [...] }
+// Per-agent configuration (allowedDomains, handleConsent, etc.)
+const agentConfig = new Map(); // agentId -> { allowedDomains: [...], handleConsent: boolean }
 
 /**
  * Check if a URL is allowed for the given agent based on their allowedDomains config
@@ -1054,6 +1054,21 @@ const TOOLS = [
     },
   },
 
+  // ===== CONSENT =====
+  {
+    name: 'firefox_handle_consent',
+    description: 'Explicit consent dismissal tool. Dismisses common cookie/consent dialogs and modals.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        timeout: {
+          type: 'number',
+          description: 'Request timeout in milliseconds (default: 150000, range: 5000-300000)',
+        },
+      },
+    },
+  },
+
   // ===== CONFIG =====
   {
     name: 'firefox_set_config',
@@ -1065,6 +1080,10 @@ const TOOLS = [
           type: 'array',
           items: { type: 'string' },
           description: 'List of allowed domains for navigation. Supports wildcards: "*.example.com". When set, firefox_navigate and firefox_create_window will block requests to unlisted domains. Pass empty array to clear restriction.',
+        },
+        handleConsent: {
+          type: 'boolean',
+          description: 'Enable automatic consent handling after navigation (fire-and-forget, 800ms delay)',
         },
       },
     },
@@ -1161,6 +1180,8 @@ const TOOL_TO_COMMAND = {
   firefox_request_tab_space: 'requestTabSpace',
   firefox_grant_tab_space: 'grantTabSpace',
   firefox_get_slot_requests: 'getSlotRequests',
+  // Consent
+  firefox_handle_consent: 'handleConsent',
   // Settings
   firefox_set_private_mode: 'setPrivateMode',
   // Config (handled locally)
@@ -1207,6 +1228,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const existing = agentConfig.get(agentId) || {};
       if (args.allowedDomains !== undefined) {
         existing.allowedDomains = args.allowedDomains;
+      }
+      if (args.handleConsent !== undefined) {
+        existing.handleConsent = args.handleConsent;
       }
       agentConfig.set(agentId, existing);
       return {
@@ -1288,6 +1312,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       'firefox_request_tab_space',
       'firefox_grant_tab_space',
       'firefox_get_slot_requests',
+      'firefox_handle_consent',
     ];
     if (OWNERSHIP_COMMANDS.includes(name)) {
       commandParams.agentId = AGENT_ID;
@@ -1309,6 +1334,18 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     // Bug 3: Refresh heartbeat before the async wait to prevent orphan timeout during long operations
     updateAgentHeartbeat(AGENT_ID);
     const response = await sendCommand(command, commandParams);
+
+    // Auto-trigger handleConsent if configured and navigation succeeded
+    if (response.success && (name === 'firefox_navigate' || name === 'firefox_create_window')) {
+      const config = agentConfig.get(AGENT_ID);
+      if (config?.handleConsent) {
+        setTimeout(() => {
+          sendCommand('handleConsent', { agentId: AGENT_ID }).catch(err => {
+            console.error('[claudezilla] Auto-trigger handleConsent failed:', err.message);
+          });
+        }, 800);
+      }
+    }
 
     if (response.success) {
       // Special handling for screenshots - return as image

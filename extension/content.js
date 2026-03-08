@@ -1941,6 +1941,200 @@ function removeAnnotations() {
   return { removed: true };
 }
 
+/**
+ * Detect and dismiss GDPR/cookie consent overlays
+ * 4-pass detection: CMP selectors → text matching → shadow DOM → ARIA dialogs
+ */
+async function handleConsent(params = {}) {
+  const { scanTimeout = 3000 } = params;
+  const startTime = Date.now();
+
+  // Visibility check helper (mirrors walkTree pattern from getAccessibilitySnapshot)
+  function isConsentVisible(el) {
+    const rect = el.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0 &&
+           window.getComputedStyle(el).display !== 'none' &&
+           window.getComputedStyle(el).visibility !== 'hidden';
+  }
+
+  // Click mechanics (reuse pattern from click() function)
+  async function clickElement(el, buttonText) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+    el.click();
+    return { found: true, clicked: true, buttonText, method: 'cmp-selector', elapsed: Date.now() - startTime };
+  }
+
+  function timeoutGuard() {
+    return Date.now() - startTime < scanTimeout;
+  }
+
+  // Known CMP selectors (Google, OneTrust, Cookiebot, Didomi, Quantcast, etc.)
+  const CMP_SELECTORS = [
+    // Google consent.google.com
+    '#L2AGLb',
+    'button[aria-label="Accept all"]',
+    // OneTrust
+    '#onetrust-accept-btn-handler',
+    '#accept-recommended-btn-handler',
+    // Quantcast
+    '.qc-cmp2-summary-buttons button:first-child',
+    // Didomi
+    '#didomi-notice-agree-button',
+    // Cookiebot
+    '#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll',
+    // Generic patterns
+    '[id*="accept"][id*="cookie"]',
+    '[id*="consent"][id*="accept"]',
+    '[class*="accept-all"]',
+    '[class*="consent-accept"]',
+  ];
+
+  // ===== PASS 1: CMP-specific selectors =====
+  if (timeoutGuard()) {
+    for (const selector of CMP_SELECTORS) {
+      if (!timeoutGuard()) break;
+      try {
+        const el = document.querySelector(selector);
+        if (el && isConsentVisible(el)) {
+          return await clickElement(el, el.textContent?.trim().slice(0, 50) || '');
+        }
+      } catch {
+        // Invalid selector — skip silently
+      }
+    }
+  }
+
+  // ===== PASS 2: Text matching on buttons =====
+  if (timeoutGuard()) {
+    const ACCEPT_PATTERNS = [
+      /^i agree$/,
+      /^accept all$/,
+      /^accept all cookies$/,
+      /^allow all$/,
+      /^allow all cookies$/,
+      /^agree$/,
+      /^ok$/,
+      /^got it$/,
+      /^consent$/,
+    ];
+    const REJECT_GUARD = /\b(reject|decline|refuse|deny|no thanks)\b/i;
+
+    // Button selector base (mirrors getPageState line 1445)
+    const buttons = document.querySelectorAll('button, [role="button"], input[type="submit"], input[type="button"]');
+    for (const btn of buttons) {
+      if (!timeoutGuard()) break;
+
+      // Get button text from textContent or aria-label
+      const textContent = (btn.textContent?.trim() || btn.getAttribute('aria-label') || '').toLowerCase();
+      if (!textContent) continue;
+
+      // Check if text matches an accept pattern
+      const matches = ACCEPT_PATTERNS.some(pat => pat.test(textContent));
+      if (matches && !REJECT_GUARD.test(textContent) && isConsentVisible(btn)) {
+        return await clickElement(btn, (btn.textContent?.trim() || btn.getAttribute('aria-label') || '').slice(0, 50));
+      }
+    }
+  }
+
+  // ===== PASS 3: Shadow DOM shallow traversal =====
+  if (timeoutGuard()) {
+    // Likely shadow root hosts
+    const shadowHosts = document.querySelectorAll(
+      'div[id*="consent"], div[id*="cookie"], div[class*="consent"], ' +
+      'div[class*="cookie"], section[id*="consent"], #usercentrics-root'
+    );
+
+    for (const host of shadowHosts) {
+      if (!timeoutGuard()) break;
+      if (!host.shadowRoot) continue; // Closed-mode shadow roots return null — skip silently
+
+      // Re-run CMP selectors inside shadowRoot
+      for (const selector of CMP_SELECTORS) {
+        if (!timeoutGuard()) break;
+        try {
+          const el = host.shadowRoot.querySelector(selector);
+          if (el && isConsentVisible(el)) {
+            return await clickElement(el, el.textContent?.trim().slice(0, 50) || '');
+          }
+        } catch {
+          // Skip invalid selectors
+        }
+      }
+
+      // Re-run text matching inside shadowRoot
+      const ACCEPT_PATTERNS = [
+        /^i agree$/,
+        /^accept all$/,
+        /^accept all cookies$/,
+        /^allow all$/,
+        /^allow all cookies$/,
+        /^agree$/,
+        /^ok$/,
+        /^got it$/,
+        /^consent$/,
+      ];
+      const REJECT_GUARD = /\b(reject|decline|refuse|deny|no thanks)\b/i;
+
+      const buttons = host.shadowRoot.querySelectorAll('button, [role="button"], input[type="submit"], input[type="button"]');
+      for (const btn of buttons) {
+        if (!timeoutGuard()) break;
+
+        const textContent = (btn.textContent?.trim() || btn.getAttribute('aria-label') || '').toLowerCase();
+        if (!textContent) continue;
+
+        const matches = ACCEPT_PATTERNS.some(pat => pat.test(textContent));
+        if (matches && !REJECT_GUARD.test(textContent) && isConsentVisible(btn)) {
+          return await clickElement(btn, (btn.textContent?.trim() || btn.getAttribute('aria-label') || '').slice(0, 50));
+        }
+      }
+    }
+  }
+
+  // ===== PASS 4: ARIA dialog fallback =====
+  if (timeoutGuard()) {
+    const dialogs = document.querySelectorAll('[role="dialog"], [role="alertdialog"]');
+    const ACCEPT_PATTERNS = [
+      /^i agree$/,
+      /^accept all$/,
+      /^accept all cookies$/,
+      /^allow all$/,
+      /^allow all cookies$/,
+      /^agree$/,
+      /^ok$/,
+      /^got it$/,
+      /^consent$/,
+    ];
+    const REJECT_GUARD = /\b(reject|decline|refuse|deny|no thanks)\b/i;
+
+    for (const dialog of dialogs) {
+      if (!timeoutGuard()) break;
+      const buttons = dialog.querySelectorAll('button, [role="button"], input[type="submit"], input[type="button"]');
+
+      for (const btn of buttons) {
+        if (!timeoutGuard()) break;
+
+        const textContent = (btn.textContent?.trim() || btn.getAttribute('aria-label') || '').toLowerCase();
+        if (!textContent) continue;
+
+        const matches = ACCEPT_PATTERNS.some(pat => pat.test(textContent));
+        if (matches && !REJECT_GUARD.test(textContent) && isConsentVisible(btn)) {
+          return await clickElement(btn, (btn.textContent?.trim() || btn.getAttribute('aria-label') || '').slice(0, 50));
+        }
+      }
+    }
+  }
+
+  // No consent overlay found
+  return {
+    found: false,
+    clicked: false,
+    buttonText: null,
+    method: null,
+    elapsed: Date.now() - startTime,
+  };
+}
+
         case 'hideWatermark':
           if (watermarkElement) watermarkElement.style.opacity = '0';
           result = { hidden: true };
@@ -1985,6 +2179,10 @@ function removeAnnotations() {
 
         case 'removeAnnotations':
           result = removeAnnotations();
+          break;
+
+        case 'handleConsent':
+          result = await handleConsent(params);
           break;
 
         case 'resizeImage':
