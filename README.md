@@ -2,7 +2,7 @@
 
 **Browser automation for Claude Code that runs on Firefox** — for systems where Chrome is unavailable, unwelcome, or policy-prohibited.
 
-[![Version](https://img.shields.io/badge/version-0.5.9-blue.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.6.1-blue.svg)](./CHANGELOG.md)
 
 The only Firefox-native MCP server for Claude Code. Navigate, automate, screenshot, and extract data on any system that runs Firefox — no Chrome dependency, no Google infrastructure.
 
@@ -79,12 +79,17 @@ Claude, get all the links on this page
 
 ### Browser Control
 - `firefox_create_window` — Open URL in browser
+- `firefox_navigate` — Navigate current tab to a URL
 - `firefox_get_content` — Read page text (50K char limit)
 - `firefox_click` — Click element by CSS selector
 - `firefox_type` — Type into input field
 - `firefox_press_key` — Keyboard events (Enter, Tab, shortcuts)
-- `firefox_screenshot` — Capture viewport
+- `firefox_screenshot` — Capture viewport (supports annotated mode)
 - `firefox_get_tabs` / `firefox_close_tab` — Manage tabs
+
+### Configuration
+- `firefox_set_config` — Set domain allowlist and other session config
+- `firefox_set_private_mode` — Toggle private/regular browsing
 
 ### Focus Loops
 - `firefox_start_loop` — Start persistent iteration with prompt and max iterations
@@ -92,10 +97,10 @@ Claude, get all the links on this page
 - `firefox_loop_status` — Check iteration count and state
 
 ### Page Analysis
-- `firefox_get_page_state` — Structured data (headings, links, buttons)
+- `firefox_get_page_state` — Structured data (headings, links, buttons, diff support)
 - `firefox_get_accessibility_snapshot` — Semantic tree (screen reader view)
-- `firefox_get_element` — Element attributes and styles
-- `firefox_wait_for` — Wait for element to appear
+- `firefox_get_element_info` — Element attributes and styles
+- `firefox_wait_for` — Wait for element, text, or URL pattern
 - `firefox_scroll` — Scroll to element or position
 
 ### Diagnostics

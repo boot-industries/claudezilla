@@ -6,8 +6,8 @@
 
 Firefox extension providing browser automation for Claude Code CLI. A Google-free alternative to the official Chrome extension.
 
-**Key Features (v0.6.0):**
-- **NEW: Annotated screenshots, domain allowlist, expanded waitFor, page state diff, QA fixes**
+**Key Features:**
+- Annotated screenshots, domain allowlist, expanded waitFor, page state diff
 - Autonomous installation - Installers auto-configure Claude Code permissions and MCP settings
 - Extended timeouts - 150s request timeout for long-running browser operations
 - Windows 10/11 support - Named pipes, ACL security, platform-independent IPC abstraction
@@ -16,12 +16,11 @@ Firefox extension providing browser automation for Claude Code CLI. A Google-fre
 - Expression validation - Blocked dangerous patterns in `firefox_evaluate` (fetch, eval, cookies)
 - Agent ID truncation - Privacy-enhanced logging (12-char truncation in all outputs)
 - Selector search optimization - Early exit and 100-element limit per category
-- Focus loops - `/focus` slash command for iterative development
+- Focus loops - Persistent iterative development with `/focus` slash command
 - Auto-retry system - Smart element waiting with enhanced error messages
 - Task detection - Automatic detection of iterative tasks for focus loop suggestions
-- Orphaned tab cleanup - Automatic cleanup of tabs from disconnected agents (2-minute timeout)
+- Orphaned tab cleanup - Automatic cleanup of tabs from disconnected agents (10-minute timeout)
 - Fair multi-agent coordination - POOL_FULL and MUTEX_BUSY errors with clear feedback
-- Focus loops - Persistent iterative development like Ralph Wiggum
 - Single window with max 12 tabs shared across Claude agents
 - Multi-agent safety (tab ownership, screenshot mutex, 128-bit agent IDs, own-tab-only eviction)
 - Security hardening (socket permissions, URL validation, selector validation)
@@ -117,7 +116,7 @@ claudezilla@boot.industries
 - Protocol: JSON over stdin/stdout with 4-byte length header
 - Host location: `~/.mozilla/native-messaging-hosts/claudezilla.json`
 - Max message: 1MB (host→extension), 4GB (extension→host)
-- **Per-operation timeouts (v0.5.7):** All tools support optional `timeout` parameter (5000-300000 ms, default: 150000)
+- All tools support optional `timeout` parameter (5000-300000 ms, default: 150000)
 
 ## Commands
 
@@ -157,16 +156,16 @@ claudezilla@boot.industries
 | getConsoleLogs | Console output by level |
 | getNetworkRequests | XHR/fetch with timing |
 
-### Focus Loop (v0.4.2)
+### Focus Loop
 | Command | Description |
 |---------|-------------|
 | startLoop | Start iterative loop with prompt and max iterations |
 | stopLoop | Stop the active loop |
 | getLoopState | Get current loop state (iteration, prompt, etc.) |
 
-## Focus Loops (v0.4.2)
+## Focus Loops
 
-Enables Ralph Wiggum-style persistent iterative development. Claude works on a prompt repeatedly until completion.
+Enables persistent iterative development. Claude works on a prompt repeatedly until completion.
 
 **Architecture:**
 ```
@@ -214,7 +213,7 @@ ln -s "$(pwd)/plugin" ~/.claude/plugins/claudezilla-loop
 - Iteration counter and prompt preview
 - Stop button for manual cancellation
 
-## Screenshot Timing (v0.4.3)
+## Screenshot Timing
 
 Dynamic page readiness detection replaces hardcoded delays. Screenshots now wait for actual signals from the page before capture.
 
@@ -250,7 +249,7 @@ Dynamic page readiness detection replaces hardcoded delays. Screenshots now wait
 
 **Fast path:** If page is already idle, captures in <50ms (just double RAF).
 
-## Payload Optimization (v0.3.0)
+## Payload Optimization
 
 | Function | Default Limit | Parameter |
 |----------|---------------|-----------|
@@ -259,7 +258,7 @@ Dynamic page readiness detection replaces hardcoded delays. Screenshots now wait
 | getAccessibilitySnapshot | 200 nodes | `maxNodes` |
 | getPageState | 50 links, 30 buttons | `maxLinks`, `maxButtons`, etc. |
 
-## Multi-Agent Safety (v0.3.1+)
+## Multi-Agent Safety
 
 **Tab Ownership:**
 - Each tab tracks its creator (agentId from MCP server)
@@ -268,12 +267,12 @@ Dynamic page readiness detection replaces hardcoded delays. Screenshots now wait
 - Other agents get: `OWNERSHIP: Cannot <operation> tab X (owned by agent_Y)`
 - Use `getTabs` to see ownership info for all tabs
 
-**Tab Pool Coordination (v0.4.4):**
+**Tab Pool Coordination:**
 - Agents can only evict their **own** tabs when pool is full
 - If agent has no tabs but needs one, returns `POOL_FULL` error with hint to use mercy system
 - No silent eviction of other agents' tabs
 
-**Mercy System (v0.4.4, enhanced v0.5.6):**
+**Mercy System:**
 When blocked by POOL_FULL, agents can request tab space with guaranteed slot reservation:
 1. Blocked agent calls `firefox_request_tab_space` → queues request
 2. When any agent closes a tab or calls `grantTabSpace`, a **30-second slot reservation** is created
@@ -286,21 +285,21 @@ When blocked by POOL_FULL, agents can request tab space with guaranteed slot res
 | `firefox_grant_tab_space` | Release oldest tab, creates 30s reservation for waiting agent |
 | `firefox_get_slot_requests` | Check pending requests, active reservations, your reservation status |
 
-**Slot Reservation (v0.5.6):**
+**Slot Reservation:**
 - Reservations prevent other agents from stealing freed slots
 - 30-second TTL (configurable via `SLOT_RESERVATION_TTL_MS`)
 - `createWindow` checks for valid reservation and allows reserved agent through
 - Expired reservations are automatically cleaned up
 - `getSlotRequests` response includes `youHaveReservation`, `reservationExpiresInMs`
 
-**Session Cleanup (v0.5.6):**
+**Session Cleanup:**
 When a Claude session ends, its tabs are cleaned up immediately:
 - **Graceful exit**: MCP server sends `goodbye` command on SIGINT/SIGTERM/SIGHUP/beforeExit
 - **Immediate cleanup**: Extension closes all tabs owned by the exiting agent
 - **State cleanup**: Also removes agent's slot reservations and pending requests
 - **Logging**: Cleanup events logged with agent ID (truncated) and tab count
 
-**Orphaned Tab Cleanup (v0.4.5 fallback):**
+**Orphaned Tab Cleanup (fallback for hard crashes):**
 For hard crashes (SIGKILL, OOM) where `goodbye` cannot be sent:
 - **Heartbeat tracking**: MCP server tracks agent activity via command timestamps
 - **Timeout threshold**: Agent is orphaned if no commands received in 10 minutes (600s)
@@ -321,13 +320,13 @@ This solves the "ghost agent" problem where tabs remain allocated to Claude sess
     Hint: Use getPageState (no mutex) or retry after delay.
   ```
 
-**Agent IDs (v0.4.0):**
+**Agent IDs:**
 - Generated at MCP server startup: `agent_<128-bit-hex>_<pid>`
 - 128-bit entropy (16 random bytes) for security
 - Passed automatically with all ownership-requiring commands
 - Visible in `getTabs` response as `ownerId` field
 
-## Security (v0.4.0)
+## Security
 
 **Socket Security:**
 - Permissions set to 0600 (user-only access)
