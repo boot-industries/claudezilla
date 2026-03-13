@@ -423,62 +423,44 @@ erDiagram
           <p class="ex-diagram-card__desc">Unix + Windows machines, Cloudflare Edge, External services</p>
           <div class="ex-mermaid-container" data-panzoom="true" data-diagram-height="700">
             <pre class="mermaid">
-flowchart TB
-    subgraph USER_UNIX["User Machine (macOS/Linux)"]
-        subgraph FIREFOX_UNIX["Firefox Browser"]
-            EXT_UNIX["Claudezilla Extension"]
-            PRIVATE_UNIX["Private Window"]
-        end
-        subgraph NATIVE_UNIX["Native Components"]
-            HOST_UNIX["Native Host"]
-            SOCKET_UNIX["Unix Socket<br/>($TMPDIR/claudezilla.sock)"]
-        end
-        subgraph CLAUDE_UNIX["Claude Code CLI"]
-            MCP_UNIX["MCP Server"]
-        end
+flowchart LR
+    subgraph UNIX["macOS / Linux"]
+        MCP_U["MCP Server"]
+        SOCK["Unix Socket"]
+        HOST_U["Native Host"]
+        EXT_U["Firefox Extension"]
     end
 
-    subgraph USER_WIN["User Machine (Windows)"]
-        subgraph FIREFOX_WIN["Firefox Browser"]
-            EXT_WIN["Claudezilla Extension"]
-            PRIVATE_WIN["Private Window"]
-        end
-        subgraph NATIVE_WIN["Native Components"]
-            HOST_WIN["Native Host"]
-            PIPE_WIN["Named Pipe<br/>(\\.\pipe\claudezilla)"]
-        end
-        subgraph CLAUDE_WIN["Claude Code CLI"]
-            MCP_WIN["MCP Server"]
-        end
+    subgraph WIN["Windows"]
+        MCP_W["MCP Server"]
+        PIPE["Named Pipe"]
+        HOST_W["Native Host"]
+        EXT_W["Firefox Extension"]
     end
 
-    subgraph CLOUDFLARE["Cloudflare Edge"]
-        PAGES["Cloudflare Pages<br/>(claudezilla.com)"]
-        WORKER["Cloudflare Worker<br/>(Stripe API)"]
-        D1["D1 Database<br/>(email_signups)"]
+    subgraph CLOUD["Cloudflare Edge"]
+        PAGES["Pages\n(claudezilla.com)"]
+        WORKER["Worker\n(Stripe API)"]
+        D1["D1 Database"]
     end
 
-    subgraph EXTERNAL["External Services"]
-        STRIPE["Stripe API"]
-        AMO["Firefox Add-ons"]
-        GITHUB["GitHub"]
-    end
+    STRIPE["Stripe API"]
+    AMO["Firefox Add-ons"]
+    GITHUB["GitHub"]
 
-    EXT_UNIX <-->|Native Messaging| HOST_UNIX
-    HOST_UNIX <-->|Unix Socket| SOCKET_UNIX
-    SOCKET_UNIX <-->|Commands| MCP_UNIX
+    MCP_U <-->|commands| SOCK
+    SOCK <-->|native msg| HOST_U
+    HOST_U <-->|msg| EXT_U
 
-    EXT_WIN <-->|Native Messaging| HOST_WIN
-    HOST_WIN <-->|Named Pipe| PIPE_WIN
-    PIPE_WIN <-->|Commands| MCP_WIN
+    MCP_W <-->|commands| PIPE
+    PIPE <-->|native msg| HOST_W
+    HOST_W <-->|msg| EXT_W
 
-    PAGES -.->|Serves| WEBSITE[/"Website"/]
-    WORKER -.->|Payment| STRIPE
-    WORKER -.->|Store| D1
-
-    AMO -.->|Install| EXT_UNIX
-    AMO -.->|Install| EXT_WIN
-    GITHUB -.->|Deploy| PAGES
+    WORKER -->|payment| STRIPE
+    WORKER -->|store| D1
+    GITHUB -.->|deploy| PAGES
+    AMO -.->|install| EXT_U
+    AMO -.->|install| EXT_W
             </pre>
           </div>
         </div>
