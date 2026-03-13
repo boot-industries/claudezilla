@@ -77,30 +77,18 @@
           <div class="ex-mermaid-container" data-panzoom="true" data-expandable="true" data-diagram-height="800">
             <pre class="mermaid">
 flowchart LR
-    subgraph CLAUDE["Claude Code CLI"]
-        SDK["Anthropic SDK"]
-        MCP_CLIENT["MCP Client"]
-    end
-
-    subgraph MCP_LAYER["MCP Server Layer"]
-        MCP_SERVER["MCP Server"]
-        TOOLS["27 Browser Tools"]
-        EXPR_BLOCK["Expression Blocklist"]
-    end
-
-    subgraph HOST_LAYER["Native Host Layer"]
-        IPC_LAYER["IPC Abstraction"]
-        SOCKET["Unix Socket"]
-        NAMED_PIPE["Named Pipe"]
-        AUTH["Auth Token"]
-    end
-
-    subgraph EXTENSION_LAYER["Firefox Extension Layer"]
-        BG["Background Script"]
-        SESSION["Session Manager"]
-        MUTEX["Screenshot Mutex"]
-    end
-
+    SDK["Claude Code\nAnthropic SDK"]
+    MCP_CLIENT["Claude Code\nMCP Client"]
+    MCP_SERVER["MCP Server\n(server.js)"]
+    TOOLS["27 Browser Tools"]
+    EXPR_BLOCK["Expression\nBlocklist"]
+    IPC["IPC Abstraction\n(ipc.js)"]
+    SOCKET["Unix Socket"]
+    NAMED_PIPE["Named Pipe"]
+    AUTH["Auth Token"]
+    BG["Background Script\n(Persistent)"]
+    SESSION["Session Manager\n12-tab pool"]
+    MUTEX["Screenshot\nMutex"]
     CONTENT["Content Scripts"]
     BROWSER["Firefox Browser"]
     PLUGIN["Claude Plugin"]
@@ -108,17 +96,17 @@ flowchart LR
     MCP_CLIENT -->|MCP Protocol| MCP_SERVER
     MCP_SERVER --> TOOLS
     MCP_SERVER --> EXPR_BLOCK
-    MCP_SERVER -->|Commands + Auth| IPC_LAYER
-    IPC_LAYER -->|macOS/Linux| SOCKET
-    IPC_LAYER -->|Windows| NAMED_PIPE
+    MCP_SERVER -->|Commands + Auth| IPC
+    IPC --> SOCKET
+    IPC --> NAMED_PIPE
     SOCKET -->|Native Messaging| BG
     NAMED_PIPE -->|Native Messaging| BG
-    BG -->|executeInTab| CONTENT
+    BG --> CONTENT
     CONTENT --> BROWSER
-    AUTH -->|Validates| IPC_LAYER
-    MUTEX -.->|Serializes| BG
-    SESSION -.->|Ownership| BG
-    PLUGIN -.->|stop hook| IPC_LAYER
+    AUTH -.-> IPC
+    MUTEX -.-> BG
+    SESSION -.-> BG
+    PLUGIN -.->|stop hook| IPC
             </pre>
           </div>
         </div>
@@ -424,43 +412,30 @@ erDiagram
           <div class="ex-mermaid-container" data-panzoom="true" data-diagram-height="700">
             <pre class="mermaid">
 flowchart LR
-    subgraph UNIX["macOS / Linux"]
-        MCP_U["MCP Server"]
-        SOCK["Unix Socket"]
-        HOST_U["Native Host"]
-        EXT_U["Firefox Extension"]
-    end
+    MCP_U["MCP Server\nmacOS/Linux"]
+    SOCK["Unix Socket"]
+    HOST_U["Native Host\nmacOS/Linux"]
+    EXT_U["Firefox Extension\nmacOS/Linux"]
 
-    subgraph WIN["Windows"]
-        MCP_W["MCP Server"]
-        PIPE["Named Pipe"]
-        HOST_W["Native Host"]
-        EXT_W["Firefox Extension"]
-    end
+    MCP_W["MCP Server\nWindows"]
+    PIPE["Named Pipe"]
+    HOST_W["Native Host\nWindows"]
+    EXT_W["Firefox Extension\nWindows"]
 
-    subgraph CLOUD["Cloudflare Edge"]
-        PAGES["Pages\n(claudezilla.com)"]
-        WORKER["Worker\n(Stripe API)"]
-        D1["D1 Database"]
-    end
-
+    PAGES["Cloudflare Pages\nclaudezilla.com"]
+    WORKER["Cloudflare Worker\nStripe API"]
+    D1["D1 Database"]
     STRIPE["Stripe API"]
     AMO["Firefox Add-ons"]
     GITHUB["GitHub"]
 
-    MCP_U <-->|commands| SOCK
-    SOCK <-->|native msg| HOST_U
-    HOST_U <-->|msg| EXT_U
-
-    MCP_W <-->|commands| PIPE
-    PIPE <-->|native msg| HOST_W
-    HOST_W <-->|msg| EXT_W
-
-    WORKER -->|payment| STRIPE
-    WORKER -->|store| D1
-    GITHUB -.->|deploy| PAGES
-    AMO -.->|install| EXT_U
-    AMO -.->|install| EXT_W
+    MCP_U --> SOCK --> HOST_U --> EXT_U
+    MCP_W --> PIPE --> HOST_W --> EXT_W
+    WORKER --> STRIPE
+    WORKER --> D1
+    GITHUB -.-> PAGES
+    AMO -.-> EXT_U
+    AMO -.-> EXT_W
             </pre>
           </div>
         </div>
