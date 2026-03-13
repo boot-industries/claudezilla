@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en" data-repo="claudezilla" data-doc-type="architecture-gallery">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Claudezilla — Architecture Gallery</title>
+  <link rel="stylesheet" href="/shared/explainers-docs.css">
+</head>
+<body>
+
+  <header class="ex-doc-header">
+    <div class="ex-doc-container">
+      <div class="ex-doc-breadcrumb"><!-- injected by initBreadcrumb() --></div>
+      <h1>Claudezilla Architecture</h1>
+    </div>
+  </header>
+
+  <main class="ex-doc-container">
+
+    <nav class="ex-quicknav" aria-label="Diagram sections">
+      <div class="ex-quicknav-group">
+        <span class="ex-quicknav-label">System:</span>
+        <a href="#architecture">Architecture</a>
+        <a href="#components">Components</a>
+        <a href="#dataflow">Data Flow</a>
+      </div>
+      <div class="ex-quicknav-group">
+        <span class="ex-quicknav-label">Structure:</span>
+        <a href="#repo">Repository</a>
+        <a href="#entry">Entry Points</a>
+        <a href="#database">Database</a>
+        <a href="#deployment">Deployment</a>
+      </div>
+    </nav>
+
+    <div class="ex-legend" aria-label="Diagram legend">
+      <div class="ex-legend-item">
+        <span class="ex-legend-swatch" style="background: #bbdefb;"></span>
+        MCP Layer
+      </div>
+      <div class="ex-legend-item">
+        <span class="ex-legend-swatch" style="background: #c8e6c9;"></span>
+        Extension
+      </div>
+      <div class="ex-legend-item">
+        <span class="ex-legend-swatch" style="background: #fff9c4;"></span>
+        Native Host
+      </div>
+      <div class="ex-legend-item">
+        <span class="ex-legend-swatch" style="background: #f8bbd0;"></span>
+        Security
+      </div>
+      <div class="ex-legend-item">
+        <span class="ex-legend-swatch" style="background: #e1bee7;"></span>
+        Plugin
+      </div>
+      <div class="ex-legend-item">
+        <span class="ex-legend-swatch" style="background: #ffe0b2;"></span>
+        Cloud Services
+      </div>
+      <div class="ex-legend-item">
+        <span class="ex-legend-swatch" style="background: #ffffd0; border: 1px solid #ff9900;"></span>
+        New in v0.5.6
+      </div>
+    </div>
+
+    <div class="ex-gallery-grid">
+
+      <section class="ex-diagram-card" id="architecture">
+        <button class="ex-diagram-card__header" aria-expanded="true">
+          <span class="ex-diagram-card__chevron" aria-hidden="true">&#9660;</span>
+          <span class="ex-diagram-card__title">System Architecture</span>
+          <span class="ex-badge">flowchart</span>
+        </button>
+        <div class="ex-diagram-card__body">
+          <p class="ex-diagram-card__desc">4-layer architecture with IPC abstraction for cross-platform support</p>
+          <div class="ex-mermaid-container" data-panzoom="true" data-expandable="true" data-diagram-height="800">
+            <pre class="mermaid">
+flowchart LR
+    subgraph CLAUDE["Claude Code CLI"]
+        SDK["Anthropic SDK"]
+        MCP_CLIENT["MCP Client"]
+    end
+
+    subgraph MCP_LAYER["MCP Server Layer"]
+        MCP_SERVER["MCP Server"]
+        TOOLS["27 Browser Tools"]
+        EXPR_BLOCK["Expression Blocklist"]
+    end
+
+    subgraph HOST_LAYER["Native Host Layer"]
+        IPC_LAYER["IPC Abstraction"]
+        SOCKET["Unix Socket"]
+        NAMED_PIPE["Named Pipe"]
+        AUTH["Auth Token"]
+    end
+
+    subgraph EXTENSION_LAYER["Firefox Extension Layer"]
+        BG["Background Script"]
+        SESSION["Session Manager"]
+        MUTEX["Screenshot Mutex"]
+    end
+
+    CONTENT["Content Scripts"]
+    BROWSER["Firefox Browser"]
+    PLUGIN["Claude Plugin"]
+
+    MCP_CLIENT -->|MCP Protocol| MCP_SERVER
+    MCP_SERVER --> TOOLS
+    MCP_SERVER --> EXPR_BLOCK
+    MCP_SERVER -->|Commands + Auth| IPC_LAYER
+    IPC_LAYER -->|macOS/Linux| SOCKET
+    IPC_LAYER -->|Windows| NAMED_PIPE
+    SOCKET -->|Native Messaging| BG
+    NAMED_PIPE -->|Native Messaging| BG
+    BG -->|executeInTab| CONTENT
+    CONTENT --> BROWSER
+    AUTH -->|Validates| IPC_LAYER
+    MUTEX -.->|Serializes| BG
+    SESSION -.->|Ownership| BG
+    PLUGIN -.->|stop hook| IPC_LAYER
+            </pre>
+          </div>
+        </div>
+      </section>
+
+      <section class="ex-diagram-card" id="components">
+        <button class="ex-diagram-card__header" aria-expanded="true">
+          <span class="ex-diagram-card__chevron" aria-hidden="true">&#9660;</span>
+          <span class="ex-diagram-card__title">Component Map</span>
+          <span class="ex-badge">classDiagram</span>
+        </button>
+        <div class="ex-diagram-card__body">
+          <p class="ex-diagram-card__desc">Modules with APIs, IPC abstraction, and tool categories</p>
+          <div class="ex-mermaid-container" data-panzoom="true">
+            <pre class="mermaid">
+classDiagram
+    class MCPServer {
+        +Server server
+        +String AGENT_ID
+        +Map agentHeartbeats
+        +Array EXPRESSION_BLOCKLIST
+        +sendCommand(command, params)
+        +runDiagnostics()
+        +cleanupOrphanedAgents()
+        +updateAgentHeartbeat(agentId)
+        +truncateAgentId(agentId)
+        +handleShutdown(signal)
+        +validateExpression(expression)
+    }
+
+    class IPC {
+        &lt;&lt;module&gt;&gt;
+        +getSocketPath() String
+        +getAuthTokenPath() String
+        +getSafeTempDir() String
+        +validatePath(path, context)
+        +cleanupSocket(socketPath)
+        +setSecurePermissions(path, mode)
+        +setWindowsFileACL(path)
+        +isWindows() Boolean
+    }
+
+    class NativeHost {
+        +Object loopState
+        +Server socketServer
+        +String SOCKET_AUTH_TOKEN
+        +Map pendingCliRequests
+        +handleLoopCommand(command, params)
+        +handleCliCommand(command, params, auth)
+        +handleExtensionMessage(message)
+        +startSocketServer()
+    }
+
+    class BackgroundScript {
+        +Port port
+        +Map pendingRequests
+        +Object claudezillaWindow
+        +Number activeTabId
+        +Promise screenshotLock
+        +Array pendingSlotRequests
+        +Map slotReservations
+        +connect()
+        +sendToHost(command, params)
+        +handleCliCommand(message)
+        +verifyTabOwnership(tabId, agentId)
+        +waitForPageReady(tabId, options)
+        +handleGoodbye(agentId)
+        +createSlotReservation(agentId)
+    }
+
+    class ContentScript {
+        +click(params) Object
+        +type(params) Object
+        +getContent(params) Object
+        +getPageState() Object
+        +getAccessibilitySnapshot() Object
+        +evaluate(expression) Object
+        +enableClaudezillaVisuals()
+    }
+
+    class BrowserTools {
+        firefox_create_window()
+        firefox_navigate()
+        firefox_close_tab()
+        firefox_close_window()
+        firefox_get_tabs()
+        firefox_resize_window()
+        firefox_set_viewport()
+    }
+
+    class PageTools {
+        firefox_get_content()
+        firefox_click()
+        firefox_type()
+        firefox_press_key()
+        firefox_scroll()
+        firefox_wait_for()
+    }
+
+    class AnalysisTools {
+        firefox_screenshot()
+        firefox_get_page_state()
+        firefox_get_accessibility_snapshot()
+        firefox_get_element()
+        firefox_evaluate()
+    }
+
+    class DevTools {
+        firefox_get_console()
+        firefox_get_network()
+    }
+
+    class CoordinationTools {
+        firefox_request_tab_space()
+        firefox_grant_tab_space()
+        firefox_get_slot_requests()
+    }
+
+    class DiagnosticTools {
+        firefox_diagnose()
+    }
+
+    class LoopTools {
+        firefox_start_loop()
+        firefox_stop_loop()
+        firefox_loop_status()
+    }
+
+    MCPServer --> IPC : platform paths
+    MCPServer --> NativeHost : Unix socket/Named pipe
+    IPC --> NativeHost : socket/pipe paths
+    NativeHost --> BackgroundScript : native messaging
+    BackgroundScript --> ContentScript : executeInTab
+
+    MCPServer ..> BrowserTools
+    MCPServer ..> PageTools
+    MCPServer ..> AnalysisTools
+    MCPServer ..> DevTools
+    MCPServer ..> CoordinationTools
+    MCPServer ..> DiagnosticTools
+    MCPServer ..> LoopTools
+            </pre>
+          </div>
+        </div>
+      </section>
+
+      <section class="ex-diagram-card" id="dataflow">
+        <button class="ex-diagram-card__header" aria-expanded="true">
+          <span class="ex-diagram-card__chevron" aria-hidden="true">&#9660;</span>
+          <span class="ex-diagram-card__title">Data Flow</span>
+          <span class="ex-badge">sequenceDiagram</span>
+        </button>
+        <div class="ex-diagram-card__body">
+          <p class="ex-diagram-card__desc">Command flow, screenshot mutex, expression validation, session cleanup, slot reservation</p>
+          <div class="ex-mermaid-container" data-panzoom="true" data-expandable="true">
+            <pre class="mermaid">
+sequenceDiagram
+    participant Claude as Claude Code CLI
+    participant MCP as MCP Server
+    participant IPC as IPC Layer
+    participant Host as Native Host
+    participant BG as Background Script
+    participant CS as Content Script
+    participant Page as Web Page
+
+    Note over Claude,Page: Standard Command Flow (e.g., firefox_click)
+
+    Claude->>+MCP: CallToolRequest {name: "firefox_click", args}
+    MCP->>MCP: Inject agentId, updateHeartbeat()
+    MCP->>+IPC: getSocketPath()
+    IPC-->>-MCP: Unix socket or Named pipe path
+    MCP->>+Host: JSON + auth {command, params, authToken}
+    Host->>Host: Validate authToken
+    Host->>+BG: Native Messaging: {id, type, command, params}
+    BG->>BG: verifyTabOwnership(tabId, agentId)
+    BG->>+CS: browser.tabs.sendMessage({action: "click"})
+    CS->>+Page: element.click()
+    Page-->>-CS: Event dispatched
+    CS-->>-BG: {success: true, result}
+    BG-->>-Host: port.postMessage response
+    Host-->>-MCP: JSON response
+    MCP-->>-Claude: {content: [{type: "text", text: result}]}
+
+    Note over Claude,Page: Screenshot with Mutex (3s timeout)
+
+    Claude->>+MCP: firefox_screenshot({tabId})
+    MCP->>+BG: screenshot command
+    BG->>BG: Check screenshotMutexHolder
+    alt Mutex held by another agent >3s
+        BG-->>MCP: MUTEX_BUSY error
+    else Mutex available
+        BG->>BG: Acquire mutex
+        BG->>BG: Switch to target tab
+        BG->>+CS: waitForPageReady()
+        CS-->>-BG: {timeline, waitMs}
+        BG->>BG: captureVisibleTab()
+        BG->>+CS: resizeImage(dataUrl, scale)
+        CS-->>-BG: Compressed JPEG
+        BG->>BG: Release mutex
+        BG-->>-MCP: {dataUrl, readiness}
+        MCP-->>-Claude: {type: "image", data: base64}
+    end
+
+    Note over Claude,Page: Expression Validation (v0.5.6)
+
+    Claude->>+MCP: firefox_evaluate({expression: "fetch(...)"})
+    MCP->>MCP: validateExpression(expression)
+    alt Expression blocked
+        MCP-->>Claude: Error: Blocked pattern 'fetch('
+    else Expression allowed
+        MCP->>+Host: {command: "evaluate", params}
+        Host->>+CS: evaluate(expression)
+        CS-->>-Host: Result
+        Host-->>-MCP: Response
+        MCP-->>-Claude: Result
+    end
+
+    Note over Claude,Page: Session Cleanup (v0.5.6)
+
+    Claude->>MCP: Session ending (SIGINT/SIGTERM)
+    MCP->>MCP: handleShutdown(signal)
+    MCP->>+Host: {command: "goodbye", agentId}
+    Host->>+BG: goodbye message
+    BG->>BG: Close all tabs owned by agentId
+    BG->>BG: Remove slot reservations
+    BG->>BG: Remove pending requests
+    BG-->>-Host: {closed: N, cleaned: true}
+    Host-->>-MCP: Cleanup confirmed
+
+    Note over Claude,Page: Slot Reservation Flow (v0.5.6)
+
+    Claude->>+MCP: firefox_create_window({url})
+    MCP->>+BG: createWindow command
+    BG-->>-MCP: POOL_FULL error (12/12 tabs)
+    MCP-->>-Claude: Error: POOL_FULL
+
+    Claude->>+MCP: firefox_request_tab_space()
+    MCP->>+BG: requestTabSpace
+    BG->>BG: Queue slot request for agentId
+    BG-->>-MCP: {queued: true}
+    MCP-->>-Claude: Request queued
+
+    Note right of BG: Another agent closes tab or grants space
+    BG->>BG: createSlotReservation(agentId, 30s TTL)
+
+    Claude->>+MCP: firefox_get_slot_requests()
+    MCP->>+BG: getSlotRequests
+    BG-->>-MCP: {youHaveReservation: true, reservationExpiresInMs: 28000}
+    MCP-->>-Claude: Reservation ready
+
+    Claude->>+MCP: firefox_create_window({url})
+    MCP->>+BG: createWindow command
+    BG->>BG: Check reservation for agentId
+    BG->>BG: Valid reservation found, bypass POOL_FULL
+    BG-->>-MCP: {tabId: 456, url}
+    MCP-->>-Claude: Tab created
+            </pre>
+          </div>
+        </div>
+      </section>
+
+      <section class="ex-diagram-card" id="repo">
+        <button class="ex-diagram-card__header" aria-expanded="true">
+          <span class="ex-diagram-card__chevron" aria-hidden="true">&#9660;</span>
+          <span class="ex-diagram-card__title">Repository Structure</span>
+          <span class="ex-badge">flowchart</span>
+        </button>
+        <div class="ex-diagram-card__body">
+          <p class="ex-diagram-card__desc">Extension + Host + IPC + MCP + Plugin + Website + Worker</p>
+          <div class="ex-mermaid-container" data-panzoom="true" data-expandable="true">
+            <pre class="mermaid">
+graph LR
+    ROOT["claudezilla/"]
+    ROOT --> EXT["extension/\nFirefox WebExtension"]
+    ROOT --> HOST["host/\nNative Host"]
+    ROOT --> MCP["mcp/\nMCP Server (27 tools)"]
+    ROOT --> PLUGIN["plugin/\nClaude Code Plugin"]
+    ROOT --> INSTALL["install/\nSetup Scripts"]
+    ROOT --> WEB["website/\nMarketing Site"]
+    ROOT --> WORKER["worker/\nCloudflare Worker"]
+    EXT -.->|native messaging| HOST
+    HOST -.->|IPC| MCP
+    PLUGIN -.->|stop hook| HOST
+            </pre>
+          </div>
+        </div>
+      </section>
+
+      <section class="ex-diagram-card" id="entry">
+        <button class="ex-diagram-card__header" aria-expanded="true">
+          <span class="ex-diagram-card__chevron" aria-hidden="true">&#9660;</span>
+          <span class="ex-diagram-card__title">Entry Points</span>
+          <span class="ex-badge">flowchart</span>
+        </button>
+        <div class="ex-diagram-card__body">
+          <p class="ex-diagram-card__desc">MCP tools, slash commands, popup, APIs, Windows installer</p>
+          <div class="ex-mermaid-container" data-panzoom="true" data-expandable="true">
+            <pre class="mermaid">
+flowchart TB
+    subgraph CLAUDE_CODE["Claude Code CLI"]
+        MCP_TOOLS["MCP Tools<br/>(27 firefox_* tools)"]
+        SLASH_CMDS["Slash Commands<br/>(/focus, /cancel-focus)"]
+    end
+
+    subgraph PLUGIN["Claude Plugin"]
+        STOP_HOOK["Stop Hook<br/>(hooks/stop-hook.sh)"]
+        CMD_FOCUS["focus.md"]
+        CMD_CANCEL["cancel-focus.md"]
+    end
+
+    subgraph EXTENSION["Firefox Extension"]
+        POPUP["Extension Popup<br/>(Click toolbar icon)"]
+        BG_CONNECT["Background Script<br/>(Auto-connects)"]
+    end
+
+    subgraph HOST["Native Host"]
+        subgraph IPC_UNIX["Unix"]
+            SOCKET_SERVER["Unix Socket"]
+        end
+        subgraph IPC_WIN["Windows"]
+            PIPE_SERVER["Named Pipe"]
+        end
+        NATIVE_MSG["Native Messaging<br/>(stdin/stdout)"]
+    end
+
+    subgraph CLOUD_API["Cloud APIs"]
+        CHECKOUT["POST /create-checkout<br/>(Stripe session)"]
+        NOTIFY["POST /notify<br/>(Email signup)"]
+        HEALTH["GET /health"]
+    end
+
+    subgraph CLI_TOOLS["CLI Tools"]
+        WEB_EXT["web-ext run<br/>(Development)"]
+        INSTALL_MAC["install-macos.sh"]
+        INSTALL_WIN["install-windows.ps1"]
+    end
+
+    MCP_TOOLS -->|Commands| SOCKET_SERVER
+    MCP_TOOLS -->|Commands| PIPE_SERVER
+    SLASH_CMDS --> CMD_FOCUS
+    STOP_HOOK -->|Query loop state| SOCKET_SERVER
+    STOP_HOOK -->|Query loop state| PIPE_SERVER
+    POPUP -->|Test connection| BG_CONNECT
+    BG_CONNECT <-->|Native Messaging| NATIVE_MSG
+    SOCKET_SERVER <--> NATIVE_MSG
+    PIPE_SERVER <--> NATIVE_MSG
+            </pre>
+          </div>
+        </div>
+      </section>
+
+      <section class="ex-diagram-card" id="database">
+        <button class="ex-diagram-card__header" aria-expanded="true">
+          <span class="ex-diagram-card__chevron" aria-hidden="true">&#9660;</span>
+          <span class="ex-diagram-card__title">Database Schema</span>
+          <span class="ex-badge">erDiagram</span>
+        </button>
+        <div class="ex-diagram-card__body">
+          <p class="ex-diagram-card__desc">D1 database + in-memory state structures</p>
+          <div class="ex-mermaid-container">
+            <pre class="mermaid">
+erDiagram
+    EMAIL_SIGNUPS {
+        INTEGER id PK
+        TEXT email UK
+        INTEGER created_at
+    }
+
+    LOOP_STATE {
+        BOOLEAN active
+        TEXT prompt
+        INTEGER iteration
+        INTEGER maxIterations
+        TEXT completionPromise
+        TEXT startedAt
+    }
+
+    CLAUDEZILLA_WINDOW {
+        INTEGER windowId
+        INTEGER createdAt
+        INTEGER groupId
+    }
+
+    TAB_ENTRY {
+        INTEGER tabId PK
+        TEXT ownerId
+    }
+
+    AGENT_HEARTBEAT {
+        TEXT agentId PK
+        INTEGER lastSeen
+    }
+
+    SCREENSHOT_MUTEX {
+        TEXT agentId
+        INTEGER acquiredAt
+        TEXT requestId
+    }
+
+    NETWORK_REQUEST {
+        TEXT requestId PK
+        TEXT url
+        TEXT method
+        TEXT type
+        INTEGER tabId
+        TEXT status
+        INTEGER statusCode
+    }
+
+    CLAUDEZILLA_WINDOW ||--o{ TAB_ENTRY : "contains max 12"
+    TAB_ENTRY }o--|| AGENT_HEARTBEAT : "owned by"
+            </pre>
+          </div>
+        </div>
+      </section>
+
+      <section class="ex-diagram-card" id="deployment">
+        <button class="ex-diagram-card__header" aria-expanded="true">
+          <span class="ex-diagram-card__chevron" aria-hidden="true">&#9660;</span>
+          <span class="ex-diagram-card__title">Deployment Infrastructure</span>
+          <span class="ex-badge">flowchart</span>
+        </button>
+        <div class="ex-diagram-card__body">
+          <p class="ex-diagram-card__desc">Unix + Windows machines, Cloudflare Edge, External services</p>
+          <div class="ex-mermaid-container" data-panzoom="true" data-diagram-height="700">
+            <pre class="mermaid">
+flowchart TB
+    subgraph USER_UNIX["User Machine (macOS/Linux)"]
+        subgraph FIREFOX_UNIX["Firefox Browser"]
+            EXT_UNIX["Claudezilla Extension"]
+            PRIVATE_UNIX["Private Window"]
+        end
+        subgraph NATIVE_UNIX["Native Components"]
+            HOST_UNIX["Native Host"]
+            SOCKET_UNIX["Unix Socket<br/>($TMPDIR/claudezilla.sock)"]
+        end
+        subgraph CLAUDE_UNIX["Claude Code CLI"]
+            MCP_UNIX["MCP Server"]
+        end
+    end
+
+    subgraph USER_WIN["User Machine (Windows)"]
+        subgraph FIREFOX_WIN["Firefox Browser"]
+            EXT_WIN["Claudezilla Extension"]
+            PRIVATE_WIN["Private Window"]
+        end
+        subgraph NATIVE_WIN["Native Components"]
+            HOST_WIN["Native Host"]
+            PIPE_WIN["Named Pipe<br/>(\\.\pipe\claudezilla)"]
+        end
+        subgraph CLAUDE_WIN["Claude Code CLI"]
+            MCP_WIN["MCP Server"]
+        end
+    end
+
+    subgraph CLOUDFLARE["Cloudflare Edge"]
+        PAGES["Cloudflare Pages<br/>(claudezilla.com)"]
+        WORKER["Cloudflare Worker<br/>(Stripe API)"]
+        D1["D1 Database<br/>(email_signups)"]
+    end
+
+    subgraph EXTERNAL["External Services"]
+        STRIPE["Stripe API"]
+        AMO["Firefox Add-ons"]
+        GITHUB["GitHub"]
+    end
+
+    EXT_UNIX <-->|Native Messaging| HOST_UNIX
+    HOST_UNIX <-->|Unix Socket| SOCKET_UNIX
+    SOCKET_UNIX <-->|Commands| MCP_UNIX
+
+    EXT_WIN <-->|Native Messaging| HOST_WIN
+    HOST_WIN <-->|Named Pipe| PIPE_WIN
+    PIPE_WIN <-->|Commands| MCP_WIN
+
+    PAGES -.->|Serves| WEBSITE[/"Website"/]
+    WORKER -.->|Payment| STRIPE
+    WORKER -.->|Store| D1
+
+    AMO -.->|Install| EXT_UNIX
+    AMO -.->|Install| EXT_WIN
+    GITHUB -.->|Deploy| PAGES
+            </pre>
+          </div>
+        </div>
+      </section>
+
+    </div><!-- /.ex-gallery-grid -->
+
+  </main>
+
+  <footer class="ex-doc-footer">
+    <div class="ex-doc-container">
+      <span>Version: 0.5.6 | Last Updated: 2026-02-01</span>
+      &nbsp;|&nbsp;
+      <a href="../docs/repo-commands-v2.html" style="color: var(--ex-accent);">Command Reference</a>
+      &nbsp;|&nbsp;
+      <a href="../CLAUDE.md" style="color: var(--ex-accent);">CLAUDE.md</a>
+    </div>
+  </footer>
+
+  <div class="ex-kbd-hints"></div>
+
+  <script type="module">
+    import init from '/shared/explainers-docs.js';
+    init();
+  </script>
+
+</body>
+</html>
