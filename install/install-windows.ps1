@@ -81,13 +81,18 @@ if (-not (Test-Path $ManifestDir)) {
 }
 Write-Host "[OK] Manifest directory: $ManifestDir"
 
+# Create wrapper batch file (Windows native messaging requires path to an executable)
+$BatPath = Join-Path $ProjectDir "host\host.bat"
+$BatContent = "@echo off`r`n`"$NodeExe`" `"$HostPath`""
+Set-Content -Path $BatPath -Value $BatContent -Encoding ASCII
+Write-Host "[OK] Created wrapper batch file: $BatPath"
+
 # Create native messaging manifest using ConvertTo-Json (safe serialization)
-# Note: path uses node.exe, args passes the host script
+# Note: path points to the batch file, no args needed (bat file handles node + script)
 $ManifestObject = @{
     name = "claudezilla"
     description = "Claudezilla native messaging host for Firefox browser automation"
-    path = $NodeExe
-    args = @($HostPath)
+    path = $BatPath
     type = "stdio"
     allowed_extensions = @("claudezilla@boot.industries")
 }
