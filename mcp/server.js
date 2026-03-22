@@ -1146,6 +1146,78 @@ for (const tool of TOOLS) {
   }
 }
 
+// Assign categories to tools for lazy loading
+const TOOL_CATEGORIES = {
+  firefox_create_window: 'core',
+  firefox_navigate: 'core',
+  firefox_click: 'core',
+  firefox_type: 'core',
+  firefox_press_key: 'core',
+  firefox_scroll: 'core',
+  firefox_screenshot: 'core',
+  firefox_get_page_state: 'core',
+  firefox_get_tabs: 'core',
+  firefox_close_tab: 'core',
+  firefox_get_content: 'inspection',
+  firefox_get_element: 'inspection',
+  firefox_wait_for: 'inspection',
+  firefox_diff_page_state: 'inspection',
+  firefox_get_console: 'devtools',
+  firefox_get_network: 'devtools',
+  firefox_evaluate: 'devtools',
+  firefox_get_accessibility_snapshot: 'devtools',
+  firefox_request_tab_space: 'multiagent',
+  firefox_grant_tab_space: 'multiagent',
+  firefox_get_slot_requests: 'multiagent',
+  firefox_start_loop: 'loop',
+  firefox_stop_loop: 'loop',
+  firefox_loop_status: 'loop',
+  firefox_set_config: 'config',
+  firefox_set_viewport: 'config',
+  firefox_set_private_mode: 'config',
+  firefox_handle_consent: 'config',
+  firefox_close_window: 'config',
+  firefox_resize_window: 'config',
+  firefox_diagnose: 'diagnose',
+};
+for (const tool of TOOLS) {
+  tool.category = TOOL_CATEGORIES[tool.name] || 'core';
+}
+
+// Lazy loading activation state
+let activatedCategories = new Set();
+let isActivated = false;
+
+// Category groups — 'all' expands to every category
+const CATEGORY_GROUPS = {
+  core: ['core'],
+  devtools: ['core', 'devtools'],
+  inspection: ['core', 'inspection'],
+  multiagent: ['core', 'multiagent'],
+  loop: ['core', 'loop'],
+  config: ['core', 'config'],
+  diagnose: ['diagnose'],
+  all: ['core', 'inspection', 'devtools', 'multiagent', 'loop', 'config', 'diagnose'],
+};
+
+// Gateway tool — the only tool exposed before activation
+const GATEWAY_TOOLS = [
+  {
+    name: 'firefox_activate',
+    description: 'Activate Claudezilla browser tools. Call this before using any firefox_* tools. Optional: specify a category to load only what you need. Categories: "core" (navigate/click/type/screenshot — default), "devtools" (console/network/evaluate), "inspection" (content/element/wait), "multiagent" (tab space management), "loop" (iterative dev), "config" (viewport/privacy/consent), "diagnose" (health check), "all" (everything). Returns list of activated tools.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        category: {
+          type: 'string',
+          description: 'Tool category to activate (default: "core")',
+          enum: ['core', 'devtools', 'inspection', 'multiagent', 'loop', 'config', 'diagnose', 'all'],
+        },
+      },
+    },
+  },
+];
+
 // Map MCP tool names to Claudezilla commands
 const TOOL_TO_COMMAND = {
   // Core browser control
@@ -1198,20 +1270,24 @@ const server = new Server(
   },
   {
     capabilities: {
-      tools: {},
+      tools: { listChanged: true },
     },
   }
 );
 
 // Handle list tools request
 server.setRequestHandler(ListToolsRequestSchema, async () => {
-  // Dynamically filter tools based on extension permission state
+  // Before activation: expose only the gateway tool
+  if (!isActivated) {
+    return { tools: GATEWAY_TOOLS };
+  }
+
+  // After activation: filter by activated categories + canNavigate check
   const navigateAllowed = await canNavigate();
 
-  let availableTools = TOOLS;
+  let availableTools = TOOLS.filter(tool => activatedCategories.has(tool.category));
   if (!navigateAllowed) {
-    // Filter out firefox_navigate if permission is enabled (private windows mode)
-    availableTools = TOOLS.filter(tool => tool.name !== 'firefox_navigate');
+    availableTools = availableTools.filter(tool => tool.name !== 'firefox_navigate');
   }
 
   return { tools: availableTools };
@@ -1220,6 +1296,36 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 // Handle tool calls
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
+
+  // Gateway tool: activate tool categories and emit listChanged notification
+  if (name === 'firefox_activate') {
+    const category = args?.category || 'core';
+    const categoriesToActivate = CATEGORY_GROUPS[category];
+    if (!categoriesToActivate) {
+      return {
+        content: [{ type: 'text', text: `Unknown category: "${category}". Valid: ${Object.keys(CATEGORY_GROUPS).join(', ')}` }],
+        isError: true,
+      };
+    }
+    for (const cat of categoriesToActivate) {
+      activatedCategories.add(cat);
+    }
+    isActivated = true;
+    // Notify client that tool list has changed
+    server.notification({ method: 'notifications/tools/list_changed' });
+    const activatedTools = TOOLS.filter(t => activatedCategories.has(t.category)).map(t => t.name);
+    return {
+      content: [{
+        type: 'text',
+        text: JSON.stringify({
+          activated: true,
+          categories: [...activatedCategories],
+          tools: activatedTools,
+          count: activatedTools.length,
+        }),
+      }],
+    };
+  }
 
   // Special case: firefox_set_config runs locally (updates in-memory agent config)
   if (name === 'firefox_set_config') {

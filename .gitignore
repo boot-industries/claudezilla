@@ -5,6 +5,7 @@ node_modules/
 *.xpi
 *.zip
 web-ext-artifacts/
+artifacts/
 
 # OS files
 .DS_Store

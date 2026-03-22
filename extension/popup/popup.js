@@ -1,6 +1,6 @@
 /**
  * Claudezilla Popup Script
- * v0.5.9 - Fix macOS install path, npm install step, tabId string coercion
+ * v0.6.1 - Consent automation, lazy tool loading, Linux support
  */
 
 // Elements

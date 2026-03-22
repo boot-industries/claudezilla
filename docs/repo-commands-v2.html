@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en" data-repo="claudezilla" data-doc-type="repo-commands">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Claudezilla — Command Reference</title>
+  <link rel="stylesheet" href="/shared/explainers-docs.css">
+</head>
+<body>
+
+  <header class="ex-doc-header">
+    <div class="ex-doc-container">
+      <div class="ex-doc-breadcrumb"><!-- injected by initBreadcrumb() --></div>
+      <h1>Claudezilla — Command Reference</h1>
+    </div>
+  </header>
+
+  <main class="ex-doc-container">
+
+    <div class="ex-search-wrap">
+      <input
+        type="text"
+        class="ex-search"
+        placeholder="Filter commands..."
+        aria-label="Search commands"
+      >
+      <span class="ex-search-count" aria-live="polite">All commands</span>
+    </div>
+
+    <table class="ex-cmd-table">
+      <thead>
+        <tr>
+          <th>Job</th>
+          <th>Command</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+
+        <!-- Setup & Installation -->
+        <tr class="ex-cmd-section-header" data-section="setup" tabindex="0" aria-expanded="true">
+          <td colspan="3">
+            <span class="ex-cmd-chevron" aria-hidden="true">&#9660;</span>
+            Setup &amp; Installation
+          </td>
+        </tr>
+        <tr class="ex-cmd-section-row" data-section="setup">
+          <td>Install macOS</td>
+          <td><code class="ex-cmd-pill" data-copy="./install/install-macos.sh">./install/install-macos.sh &#x1F4CB;</code></td>
+          <td>Install native messaging host on macOS <span class="ex-platform-badge ex-platform-badge--unix">macOS</span></td>
+        </tr>
+        <tr class="ex-cmd-section-row" data-section="setup">
+          <td>Install Linux</td>
+          <td><code class="ex-cmd-pill" data-copy="./install/install-linux.sh">./install/install-linux.sh &#x1F4CB;</code></td>
+          <td>Install native messaging host on Linux <span class="ex-platform-badge ex-platform-badge--unix">Linux</span></td>
+        </tr>
+        <tr class="ex-cmd-section-row" data-section="setup">
+          <td>Install Windows</td>
+          <td><code class="ex-cmd-pill" data-copy=".\install\install-windows.ps1">.\install\install-windows.ps1 &#x1F4CB;</code></td>
+          <td>Install native messaging host on Windows (PowerShell) <span class="ex-platform-badge ex-platform-badge--windows">Windows</span></td>
+        </tr>
+        <tr class="ex-cmd-section-row" data-section="setup">
+          <td>Uninstall Windows</td>
+          <td><code class="ex-cmd-pill" data-copy=".\install\uninstall-windows.ps1">.\install\uninstall-windows.ps1 &#x1F4CB;</code></td>
+          <td>Uninstall native messaging host on Windows <span class="ex-platform-badge ex-platform-badge--windows">Windows</span></td>
+        </tr>
+        <tr class="ex-cmd-section-row" data-section="setup">
+          <td>Install plugin</td>
+          <td><code class="ex-cmd-pill" data-copy='ln -s "$(pwd)/plugin" ~/.claude/plugins/claudezilla-loop'>ln -s "$(pwd)/plugin" ~/.claude/plugins/claudezilla-loop &#x1F4CB;</code></td>
+          <td>Install Claude Code plugin for focus loops <span class="ex-platform-badge ex-platform-badge--unix">Unix</span></td>
+        </tr>
+
+        <!-- Development -->
+        <tr class="ex-cmd-section-header" data-section="development" tabindex="0" aria-expanded="true">
+          <td colspan="3">
+            <span class="ex-cmd-chevron" aria-hidden="true">&#9660;</span>
+            Development
+          </td>
+        </tr>
+        <tr class="ex-cmd-section-row" data-section="development">
+          <td>Run native host</td>
+          <td><code class="ex-cmd-pill" data-copy="cd host && node index.js">cd host &amp;&amp; node index.js &#x1F4CB;</code></td>
+          <td>Run native messaging host directly (for debugging) <span class="ex-platform-badge ex-platform-badge--all">All</span></td>
+        </tr>
+        <tr class="ex-cmd-section-row" data-section="development">
+          <td>Run MCP server</td>
+          <td><code class="ex-cmd-pill" data-copy="node mcp/server.js">node mcp/server.js &#x1F4CB;</code></td>
+          <td>Run MCP server directly (for debugging) <span class="ex-platform-badge ex-platform-badge--all">All</span></td>
+        </tr>
+        <tr class="ex-cmd-section-row" data-section="development">
+          <td>Load extension</td>
+          <td><code class="ex-cmd-pill" data-copy="web-ext run --source-dir extension/">web-ext run --source-dir extension/ &#x1F4CB;</code></td>
+          <td>Load extension in Firefox for development <span class="ex-platform-badge ex-platform-badge--all">All</span></td>
+        </tr>
+        <tr class="ex-cmd-section-row" data-section="development">
+          <td>Load with profile</td>
+          <td><code class="ex-cmd-pill" data-copy="web-ext run --source-dir extension/ --firefox-profile dev">web-ext run --source-dir extension/ --firefox-profile dev &#x1F4CB;</code></td>
+          <td>Load extension with named Firefox profile <span class="ex-platform-badge ex-platform-badge--all">All</span></td>
+        </tr>
+
+        <!-- Testing & Diagnostics -->
+        <tr class="ex-cmd-section-header" data-section="testing" tabindex="0" aria-expanded="true">
+          <td colspan="3">
+            <span class="ex-cmd-chevron" aria-hidden="true">&#9660;</span>
+            Testing &amp; Diagnostics
+          </td>
+        </tr>
+        <tr class="ex-cmd-section-row" data-section="testing">
+          <td>Diagnose</td>
+          <td><code class="ex-cmd-pill" data-copy="firefox_diagnose">firefox_diagnose &#x1F4CB;</code></td>
+          <td>MCP tool: Check socket, auth token, extension status <span class="ex-platform-badge ex-platform-badge--mcp">MCP</span></td>
+        </tr>
+        <tr class="ex-cmd-section-row" data-section="testing">
+          <td>Check socket files</td>
+          <td><code class="ex-cmd-pill" data-copy="ls -la $TMPDIR/claudezilla*">ls -la $TMPDIR/claudezilla* &#x1F4CB;</code></td>
+          <td>Check socket and auth token files exist (Unix) <span class="ex-platform-badge ex-platform-badge--unix">Unix</span></td>
+        </tr>
+        <tr class="ex-cmd-section-row" data-section="testing">
+          <td>View auth token (Unix)</td>
+          <td><code class="ex-cmd-pill" data-copy="cat $TMPDIR/claudezilla-auth.token">cat $TMPDIR/claudezilla-auth.token &#x1F4CB;</code></td>
+          <td>View auth token (Unix) <span class="ex-platform-badge ex-platform-badge--unix">Unix</span></td>
+        </tr>
+        <tr class="ex-cmd-section-row" data-section="testing">
+          <td>View auth token (Win)</td>
+          <td><code class="ex-cmd-pill" data-copy="type %LOCALAPPDATA%\claudezilla\auth.token">type %LOCALAPPDATA%\claudezilla\auth.token &#x1F4CB;</code></td>
+          <td>View auth token (Windows) <span class="ex-platform-badge ex-platform-badge--windows">Windows</span></td>
+        </tr>
+        <tr class="ex-cmd-section-row" data-section="testing">
+          <td>Check manifest</td>
+          <td><code class="ex-cmd-pill" data-copy="ls -la ~/.mozilla/native-messaging-hosts/">ls -la ~/.mozilla/native-messaging-hosts/ &#x1F4CB;</code></td>
+          <td>Check native messaging manifest exists <span class="ex-platform-badge ex-platform-badge--unix">Unix</span></td>
+        </tr>
+        <tr class="ex-cmd-section-row" data-section="testing">
+          <td>Check registry</td>
+          <td><code class="ex-cmd-pill" data-copy='reg query "HKCU\Software\Mozilla\NativeMessagingHosts\claudezilla"'>reg query "HKCU\Software\Mozilla\NativeMessagingHosts\claudezilla" &#x1F4CB;</code></td>
+          <td>Check Windows registry for native messaging <span class="ex-platform-badge ex-platform-badge--windows">Windows</span></td>
+        </tr>
+
+        <!-- MCP Server Commands -->
+        <tr class="ex-cmd-section-header" data-section="mcp" tabindex="0" aria-expanded="true">
+          <td colspan="3">
+            <span class="ex-cmd-chevron" aria-hidden="true">&#9660;</span>
+            MCP Server Commands
+          </td>
+        </tr>
+        <tr class="ex-cmd-section-row" data-section="mcp">
+          <td>Create window</td>
+          <td><code class="ex-cmd-pill" data-copy="firefox_create_window">firefox_create_window &#x1F4CB;</code></td>
+          <td>Open URL in shared 12-tab pool <span class="ex-platform-badge ex-platform-badge--mcp">MCP</span></td>
+        </tr>
+        <tr class="ex-cmd-section-row" data-section="mcp">
+          <td>Get tabs</td>
+          <td><code class="ex-cmd-pill" data-copy="firefox_get_tabs">firefox_get_tabs &#x1F4CB;</code></td>
+          <td>List all tabs with ownership info <span class="ex-platform-badge ex-platform-badge--mcp">MCP</span></td>
+        </tr>
+        <tr class="ex-cmd-section-row" data-section="mcp">
+          <td>Screenshot</td>
+          <td><code class="ex-cmd-pill" data-copy="firefox_screenshot">firefox_screenshot &#x1F4CB;</code></td>
+          <td>Capture viewport (mutex-protected, 3s timeout) <span class="ex-platform-badge ex-platform-badge--mcp">MCP</span></td>
+        </tr>
+        <tr class="ex-cmd-section-row" data-section="mcp">
+          <td>Page state</td>
+          <td><code class="ex-cmd-pill" data-copy="firefox_get_page_state">firefox_get_page_state &#x1F4CB;</code></td>
+          <td>Fast structured JSON (headings, links, buttons) <span class="ex-platform-badge ex-platform-badge--mcp">MCP</span></td>
+        </tr>
+        <tr class="ex-cmd-section-row" data-section="mcp">
+          <td>Start loop</td>
+          <td><code class="ex-cmd-pill" data-copy="firefox_start_loop">firefox_start_loop &#x1F4CB;</code></td>
+          <td>Begin focus loop for iterative development <span class="ex-platform-badge ex-platform-badge--mcp">MCP</span></td>
+        </tr>
+        <tr class="ex-cmd-section-row" data-section="mcp">
+          <td>Loop status</td>
+          <td><code class="ex-cmd-pill" data-copy="firefox_loop_status">firefox_loop_status &#x1F4CB;</code></td>
+          <td>Check current loop state and iteration <span class="ex-platform-badge ex-platform-badge--mcp">MCP</span></td>
+        </tr>
+
+        <!-- Build & Package -->
+        <tr class="ex-cmd-section-header" data-section="build" tabindex="0" aria-expanded="true">
+          <td colspan="3">
+            <span class="ex-cmd-chevron" aria-hidden="true">&#9660;</span>
+            Build &amp; Package
+          </td>
+        </tr>
+        <tr class="ex-cmd-section-row" data-section="build">
+          <td>npm pack</td>
+          <td><code class="ex-cmd-pill" data-copy="npm pack">npm pack &#x1F4CB;</code></td>
+          <td>Create npm package (includes host and MCP) <span class="ex-platform-badge ex-platform-badge--all">All</span></td>
+        </tr>
+        <tr class="ex-cmd-section-row" data-section="build">
+          <td>Build extension</td>
+          <td><code class="ex-cmd-pill" data-copy="web-ext build --source-dir extension/">web-ext build --source-dir extension/ &#x1F4CB;</code></td>
+          <td>Build extension XPI for distribution <span class="ex-platform-badge ex-platform-badge--all">All</span></td>
+        </tr>
+        <tr class="ex-cmd-section-row" data-section="build">
+          <td>Sign extension</td>
+          <td><code class="ex-cmd-pill" data-copy="web-ext sign --source-dir extension/ --api-key=$AMO_KEY --api-secret=$AMO_SECRET">web-ext sign --source-dir extension/ --api-key=$AMO_KEY --api-secret=$AMO_SECRET &#x1F4CB;</code></td>
+          <td>Sign extension for AMO distribution <span class="ex-platform-badge ex-platform-badge--all">All</span></td>
+        </tr>
+
+        <!-- Deployment -->
+        <tr class="ex-cmd-section-header" data-section="deployment" tabindex="0" aria-expanded="true">
+          <td colspan="3">
+            <span class="ex-cmd-chevron" aria-hidden="true">&#9660;</span>
+            Deployment
+          </td>
+        </tr>
+        <tr class="ex-cmd-section-row" data-section="deployment">
+          <td>Deploy website</td>
+          <td><code class="ex-cmd-pill" data-copy="wrangler pages deploy website --project-name=claudezilla">wrangler pages deploy website --project-name=claudezilla &#x1F4CB;</code></td>
+          <td>Deploy marketing website to Cloudflare Pages <span class="ex-platform-badge ex-platform-badge--all">All</span></td>
+        </tr>
+        <tr class="ex-cmd-section-row" data-section="deployment">
+          <td>Deploy worker</td>
+          <td><code class="ex-cmd-pill" data-copy="cd worker && wrangler deploy">cd worker &amp;&amp; wrangler deploy &#x1F4CB;</code></td>
+          <td>Deploy Stripe worker to Cloudflare <span class="ex-platform-badge ex-platform-badge--all">All</span></td>
+        </tr>
+        <tr class="ex-cmd-section-row" data-section="deployment">
+          <td>List deployments</td>
+          <td><code class="ex-cmd-pill" data-copy="wrangler pages deployment list --project-name=claudezilla">wrangler pages deployment list --project-name=claudezilla &#x1F4CB;</code></td>
+          <td>List recent Cloudflare Pages deployments <span class="ex-platform-badge ex-platform-badge--all">All</span></td>
+        </tr>
+
+        <!-- Git Workflow -->
+        <tr class="ex-cmd-section-header" data-section="git" tabindex="0" aria-expanded="true">
+          <td colspan="3">
+            <span class="ex-cmd-chevron" aria-hidden="true">&#9660;</span>
+            Git Workflow
+          </td>
+        </tr>
+        <tr class="ex-cmd-section-row" data-section="git">
+          <td>Status</td>
+          <td><code class="ex-cmd-pill" data-copy="git status">git status &#x1F4CB;</code></td>
+          <td>Show working tree status <span class="ex-platform-badge ex-platform-badge--all">All</span></td>
+        </tr>
+        <tr class="ex-cmd-section-row" data-section="git">
+          <td>Diff</td>
+          <td><code class="ex-cmd-pill" data-copy="git diff">git diff &#x1F4CB;</code></td>
+          <td>Show unstaged changes <span class="ex-platform-badge ex-platform-badge--all">All</span></td>
+        </tr>
+        <tr class="ex-cmd-section-row" data-section="git">
+          <td>Log</td>
+          <td><code class="ex-cmd-pill" data-copy="git log --oneline -10">git log --oneline -10 &#x1F4CB;</code></td>
+          <td>Show last 10 commits (one line each) <span class="ex-platform-badge ex-platform-badge--all">All</span></td>
+        </tr>
+        <tr class="ex-cmd-section-row" data-section="git">
+          <td>New branch</td>
+          <td><code class="ex-cmd-pill" data-copy="git checkout -b feature/my-feature">git checkout -b feature/my-feature &#x1F4CB;</code></td>
+          <td>Create and switch to new feature branch <span class="ex-platform-badge ex-platform-badge--all">All</span></td>
+        </tr>
+        <tr class="ex-cmd-section-row" data-section="git">
+          <td>Push branch</td>
+          <td><code class="ex-cmd-pill" data-copy="git push -u origin HEAD">git push -u origin HEAD &#x1F4CB;</code></td>
+          <td>Push current branch and set upstream <span class="ex-platform-badge ex-platform-badge--all">All</span></td>
+        </tr>
+
+        <!-- Troubleshooting -->
+        <tr class="ex-cmd-section-header" data-section="troubleshooting" tabindex="0" aria-expanded="true">
+          <td colspan="3">
+            <span class="ex-cmd-chevron" aria-hidden="true">&#9660;</span>
+            Troubleshooting
+          </td>
+        </tr>
+        <tr class="ex-cmd-section-row" data-section="troubleshooting">
+          <td>Remove socket</td>
+          <td><code class="ex-cmd-pill" data-copy="rm -f $TMPDIR/claudezilla.sock">rm -f $TMPDIR/claudezilla.sock &#x1F4CB;</code></td>
+          <td>Remove stale socket file (Unix) <span class="ex-platform-badge ex-platform-badge--unix">Unix</span></td>
+        </tr>
+        <tr class="ex-cmd-section-row" data-section="troubleshooting">
+          <td>Debug log (Unix)</td>
+          <td><code class="ex-cmd-pill" data-copy="cat $TMPDIR/claudezilla-debug.log">cat $TMPDIR/claudezilla-debug.log &#x1F4CB;</code></td>
+          <td>View native host debug log (Unix) <span class="ex-platform-badge ex-platform-badge--unix">Unix</span></td>
+        </tr>
+        <tr class="ex-cmd-section-row" data-section="troubleshooting">
+          <td>Debug log (Win)</td>
+          <td><code class="ex-cmd-pill" data-copy="type %LOCALAPPDATA%\claudezilla\debug.log">type %LOCALAPPDATA%\claudezilla\debug.log &#x1F4CB;</code></td>
+          <td>View native host debug log (Windows) <span class="ex-platform-badge ex-platform-badge--windows">Windows</span></td>
+        </tr>
+        <tr class="ex-cmd-section-row" data-section="troubleshooting">
+          <td>Kill process (Unix)</td>
+          <td><code class="ex-cmd-pill" data-copy="pkill -f &quot;node.*claudezilla&quot;">pkill -f "node.*claudezilla" &#x1F4CB;</code></td>
+          <td>Kill stuck Claudezilla processes (Unix) <span class="ex-platform-badge ex-platform-badge--unix">Unix</span></td>
+        </tr>
+        <tr class="ex-cmd-section-row" data-section="troubleshooting">
+          <td>Kill process (Win)</td>
+          <td><code class="ex-cmd-pill" data-copy="taskkill /F /IM node.exe /FI &quot;WINDOWTITLE eq claudezilla*&quot;">taskkill /F /IM node.exe /FI "WINDOWTITLE eq claudezilla*" &#x1F4CB;</code></td>
+          <td>Kill stuck Claudezilla processes (Windows) <span class="ex-platform-badge ex-platform-badge--windows">Windows</span></td>
+        </tr>
+        <tr class="ex-cmd-section-row" data-section="troubleshooting">
+          <td>Firefox debug page</td>
+          <td><code class="ex-cmd-pill" data-copy="about:debugging#/runtime/this-firefox">about:debugging#/runtime/this-firefox &#x1F4CB;</code></td>
+          <td>Firefox debugging page (paste in address bar) <span class="ex-platform-badge ex-platform-badge--all">All</span></td>
+        </tr>
+
+      </tbody>
+    </table>
+
+  </main>
+
+  <footer class="ex-doc-footer">
+    <div class="ex-doc-container">
+      <span>Version: 0.5.6 | Last Updated: 2026-01-26</span>
+      &nbsp;|&nbsp;
+      <a href="../wireframes/architecture-gallery-v2.html" style="color: var(--ex-accent);">Architecture Gallery</a>
+      &nbsp;|&nbsp;
+      <a href="../CLAUDE.md" style="color: var(--ex-accent);">CLAUDE.md</a>
+    </div>
+  </footer>
+
+  <div class="ex-kbd-hints"></div>
+
+  <script type="module">
+    import init from '/shared/explainers-docs.js';
+    init();
+  </script>
+
+</body>
+</html>
