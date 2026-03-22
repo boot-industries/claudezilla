@@ -3,9 +3,17 @@
 **Project:** Claudezilla
 **Current Version:** 0.6.1
 
-## v0.6.1 (2026-03-07) — WIP / internal
+## v0.6.1 (2026-03-22)
 
-**Linux support + reliability/security audit.**
+**Linux support + reliability/security audit + lazy tool loading.**
+
+**Lazy Tool Loading (MCP context optimization)**
+
+- **`firefox_activate` gateway tool** — At session start, only this single tool (~50 tokens) is exposed instead of all 31 tools (~6,529 tokens). Call `firefox_activate()` to load the default `core` category, or `firefox_activate({ category: "..." })` for a specific subset.
+- **Category system** — Tools organized into 8 categories: `core` (navigate/click/type/scroll/screenshot/page_state/tabs), `inspection` (content/element/wait/diff), `devtools` (console/network/evaluate/accessibility), `multiagent` (tab space management), `loop` (iterative dev), `config` (viewport/privacy/consent/window), `diagnose` (health check), `all` (everything).
+- **`notifications/tools/list_changed`** — Server declares `listChanged: true` capability and emits the notification after activation, so Claude Code updates its tool list immediately without a round-trip.
+- **Additive activation** — Calling `firefox_activate` multiple times with different categories accumulates tools (core + devtools, etc.).
+- **Token savings** — ~6,400 tokens saved per session where browser automation isn't needed. Sessions using Claudezilla load tools on-demand.
 
 - **Portable shebang** — `host/index.js` changed from `#!/opt/homebrew/bin/node` to `#!/usr/bin/env node`. Homebrew path doesn't exist on Linux; env-lookup works on all Unix-like systems.
 - **MCP dependencies on Linux** — `install/install-linux.sh` now runs `npm install` in `mcp/` after manifest setup, matching the macOS installer. Prevents MCP crash on first launch.
