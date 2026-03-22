@@ -52,6 +52,7 @@ No manual config required — restart Claude Code and you're ready.
 | **Read** | Extract text, get page structure, accessibility tree |
 | **Interact** | Click buttons, fill forms, press keys, scroll |
 | **Screenshot** | Capture pages (JPEG, configurable quality) |
+| **Consent** | Auto-dismiss cookie/GDPR consent dialogs |
 | **Wait** | Handle SPAs and dynamic content |
 | **Focus Loops** | Persistent iterative tasks until completion |
 
@@ -88,8 +89,10 @@ Claude, get all the links on this page
 - `firefox_get_tabs` / `firefox_close_tab` — Manage tabs
 
 ### Configuration
-- `firefox_set_config` — Set domain allowlist and other session config
+- `firefox_activate` — Load tool categories on demand (lazy loading saves ~6K tokens)
+- `firefox_set_config` — Set domain allowlist, consent auto-dismiss, and session config
 - `firefox_set_private_mode` — Toggle private/regular browsing
+- `firefox_handle_consent` — Dismiss cookie/GDPR consent dialogs
 
 ### Focus Loops
 - `firefox_start_loop` — Start persistent iteration with prompt and max iterations

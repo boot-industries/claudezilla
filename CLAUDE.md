@@ -7,6 +7,9 @@
 Firefox extension providing browser automation for Claude Code CLI. A Google-free alternative to the official Chrome extension.
 
 **Key Features:**
+- Consent automation - Auto-dismiss cookie/GDPR dialogs with 4-pass detection (CMP selectors, text matching, shadow DOM, ARIA fallback)
+- Lazy tool loading - Only ~50 tokens at session start; load tool categories on demand (~6,400 token savings)
+- Linux support - Portable shebang, headless Firefox profile, systemd service, XPI sideloading
 - Annotated screenshots, domain allowlist, expanded waitFor, page state diff
 - Autonomous installation - Installers auto-configure Claude Code permissions and MCP settings
 - Extended timeouts - 150s request timeout for long-running browser operations
