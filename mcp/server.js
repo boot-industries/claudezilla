@@ -88,7 +88,7 @@ function checkDomainAllowed(agentId, url) {
 
   const allowed = config.allowedDomains.some(pattern => {
     if (pattern.startsWith('*.')) {
-      const base = pattern.slice(2).replace(/\./g, '\.');
+      const base = pattern.slice(2).replace(/\./g, '\\.');
       return new RegExp(`^[^.]+\.${base}$`).test(hostname) || hostname === pattern.slice(2);
     }
     return hostname === pattern;
@@ -1065,6 +1065,10 @@ const TOOLS = [
           type: 'number',
           description: 'Request timeout in milliseconds (default: 150000, range: 5000-300000)',
         },
+        scanTimeout: {
+          type: 'number',
+          description: 'How long to scan for consent elements in milliseconds (default: 3000, range: 1000-10000)',
+        },
       },
     },
   },
@@ -1312,7 +1316,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
     isActivated = true;
     // Notify client that tool list has changed
-    server.notification({ method: 'notifications/tools/list_changed' });
+    server.notification({ method: 'notifications/tools/list_changed' }).catch(err => {
+      console.error('[claudezilla] listChanged notification failed:', err.message);
+    });
     const activatedTools = TOOLS.filter(t => activatedCategories.has(t.category)).map(t => t.name);
     return {
       content: [{
@@ -1324,6 +1330,27 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           count: activatedTools.length,
         }),
       }],
+    };
+  }
+
+  // SECURITY: Block all tools (except diagnostics) before activation
+  if (name !== 'firefox_diagnose' && !isActivated) {
+    return {
+      content: [{ type: 'text', text: 'ACTIVATION_REQUIRED: Call firefox_activate first.' }],
+      isError: true,
+    };
+  }
+
+  // SECURITY: Enforce category-scoped activation at call time
+  const TOOL_TO_CATEGORY = {};
+  for (const tool of TOOLS) {
+    if (tool.category) TOOL_TO_CATEGORY[tool.name] = tool.category;
+  }
+  const toolCategory = TOOL_TO_CATEGORY[name];
+  if (toolCategory && !activatedCategories.has(toolCategory)) {
+    return {
+      content: [{ type: 'text', text: `CATEGORY_REQUIRED: "${name}" needs category "${toolCategory}". Call firefox_activate({ category: "${toolCategory}" }).` }],
+      isError: true,
     };
   }
 
@@ -1445,8 +1472,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     if (response.success && (name === 'firefox_navigate' || name === 'firefox_create_window')) {
       const config = agentConfig.get(AGENT_ID);
       if (config?.handleConsent) {
+        const navigatedTabId = response.result?.tabId;
         setTimeout(() => {
-          sendCommand('handleConsent', { agentId: AGENT_ID }).catch(err => {
+          sendCommand('handleConsent', { agentId: AGENT_ID, tabId: navigatedTabId }).catch(err => {
             console.error('[claudezilla] Auto-trigger handleConsent failed:', err.message);
           });
         }, 800);
