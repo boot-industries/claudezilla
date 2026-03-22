@@ -701,7 +701,7 @@ async function handleCliCommand(message) {
 
       case 'version':
         result = {
-          extension: '0.5.9',
+          extension: '0.6.1',
           browser: navigator.userAgent,
           features: ['devtools', 'network', 'console', 'evaluate', 'focusglow', 'tabgroups', 'security-hardened', 'orphan-cleanup', 'focus-loop', 'auto-retry', 'task-detection', 'expression-validation', 'windows-support', 'autonomous-install'],
         };
@@ -710,7 +710,7 @@ async function handleCliCommand(message) {
       case 'canNavigate': {
         // Check if navigate command is available (disabled if in private windows mode)
         const allowed = await canRunInPrivateWindows();
-        result = { canNavigate: !allowed };
+        result = { canNavigate: allowed };
         break;
       }
 
@@ -1784,8 +1784,8 @@ async function handleCliCommand(message) {
         const { windowId, tabId: targetTab, agentId, ...consentParams } = params;
         const session = await getSession(windowId);
         const tabId = Number(targetTab) || session.tabId;
-        // SECURITY: Verify agent owns the target tab
-        if (targetTab && agentId) {
+        // SECURITY: Verify agent owns the target tab (always check when agentId present)
+        if (agentId) {
           verifyTabOwnership(tabId, agentId, 'handle consent in');
         }
         const response = await executeInTab(tabId, 'handleConsent', consentParams);

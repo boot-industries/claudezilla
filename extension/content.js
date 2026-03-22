@@ -1958,11 +1958,11 @@ async function handleConsent(params = {}) {
   }
 
   // Click mechanics (reuse pattern from click() function)
-  async function clickElement(el, buttonText) {
+  async function clickElement(el, buttonText, method = 'cmp-selector') {
     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
     el.click();
-    return { found: true, clicked: true, buttonText, method: 'cmp-selector', elapsed: Date.now() - startTime };
+    return { found: true, clicked: true, buttonText, method, elapsed: Date.now() - startTime };
   }
 
   function timeoutGuard() {
@@ -1973,7 +1973,7 @@ async function handleConsent(params = {}) {
   const CMP_SELECTORS = [
     // Google consent.google.com
     '#L2AGLb',
-    'button[aria-label="Accept all"]',
+    '.fc-consent-root button[aria-label="Accept all"]',
     // OneTrust
     '#onetrust-accept-btn-handler',
     '#accept-recommended-btn-handler',
@@ -2014,7 +2014,6 @@ async function handleConsent(params = {}) {
       /^allow all$/,
       /^allow all cookies$/,
       /^agree$/,
-      /^ok$/,
       /^got it$/,
       /^consent$/,
     ];
@@ -2032,7 +2031,7 @@ async function handleConsent(params = {}) {
       // Check if text matches an accept pattern
       const matches = ACCEPT_PATTERNS.some(pat => pat.test(textContent));
       if (matches && !REJECT_GUARD.test(textContent) && isConsentVisible(btn)) {
-        return await clickElement(btn, (btn.textContent?.trim() || btn.getAttribute('aria-label') || '').slice(0, 50));
+        return await clickElement(btn, (btn.textContent?.trim() || btn.getAttribute('aria-label') || '').slice(0, 50), 'text-match');
       }
     }
   }
@@ -2055,7 +2054,7 @@ async function handleConsent(params = {}) {
         try {
           const el = host.shadowRoot.querySelector(selector);
           if (el && isConsentVisible(el)) {
-            return await clickElement(el, el.textContent?.trim().slice(0, 50) || '');
+            return await clickElement(el, el.textContent?.trim().slice(0, 50) || '', 'shadow-dom');
           }
         } catch {
           // Skip invalid selectors
@@ -2070,7 +2069,6 @@ async function handleConsent(params = {}) {
         /^allow all$/,
         /^allow all cookies$/,
         /^agree$/,
-        /^ok$/,
         /^got it$/,
         /^consent$/,
       ];
@@ -2085,7 +2083,7 @@ async function handleConsent(params = {}) {
 
         const matches = ACCEPT_PATTERNS.some(pat => pat.test(textContent));
         if (matches && !REJECT_GUARD.test(textContent) && isConsentVisible(btn)) {
-          return await clickElement(btn, (btn.textContent?.trim() || btn.getAttribute('aria-label') || '').slice(0, 50));
+          return await clickElement(btn, (btn.textContent?.trim() || btn.getAttribute('aria-label') || '').slice(0, 50), 'shadow-dom');
         }
       }
     }
@@ -2101,7 +2099,6 @@ async function handleConsent(params = {}) {
       /^allow all$/,
       /^allow all cookies$/,
       /^agree$/,
-      /^ok$/,
       /^got it$/,
       /^consent$/,
     ];
@@ -2119,7 +2116,7 @@ async function handleConsent(params = {}) {
 
         const matches = ACCEPT_PATTERNS.some(pat => pat.test(textContent));
         if (matches && !REJECT_GUARD.test(textContent) && isConsentVisible(btn)) {
-          return await clickElement(btn, (btn.textContent?.trim() || btn.getAttribute('aria-label') || '').slice(0, 50));
+          return await clickElement(btn, (btn.textContent?.trim() || btn.getAttribute('aria-label') || '').slice(0, 50), 'aria-dialog');
         }
       }
     }

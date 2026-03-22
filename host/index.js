@@ -86,6 +86,10 @@ const ALLOWED_COMMANDS = new Set([
   'cleanupOrphanedTabs',
   // Settings
   'setPrivateMode',
+  // Session cleanup
+  'goodbye',
+  // Consent automation
+  'handleConsent',
 ]);
 
 /**
