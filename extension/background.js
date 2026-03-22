@@ -55,7 +55,7 @@ let activeTabId = null; // Currently active tab in the Claudezilla window
 // (captureVisibleTab only works on visible tab, so we must switch tabs sequentially)
 let screenshotLock = Promise.resolve();
 let screenshotMutexHolder = null;    // { agentId, acquiredAt, operation }
-const MUTEX_BUSY_THRESHOLD_MS = 3000; // Return MUTEX_BUSY if held longer than this
+const MUTEX_BUSY_THRESHOLD_MS = 2500; // Return MUTEX_BUSY if held longer than this
 
 // Tab pool coordination - pending slot requests from agents
 const pendingSlotRequests = [];  // [{ agentId, requestedAt }]
@@ -937,7 +937,7 @@ async function handleCliCommand(message) {
         if (tabId) {
           setTimeout(() => {
             browser.tabs.sendMessage(tabId, { action: 'enableClaudezillaVisuals' }).catch(() => {});
-          }, 500);
+          }, 350);
         }
 
         result = {

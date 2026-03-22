@@ -1477,7 +1477,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           sendCommand('handleConsent', { agentId: AGENT_ID, tabId: navigatedTabId }).catch(err => {
             console.error('[claudezilla] Auto-trigger handleConsent failed:', err.message);
           });
-        }, 800);
+        }, 600);
       }
     }
 

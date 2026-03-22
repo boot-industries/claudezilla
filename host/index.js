@@ -327,6 +327,14 @@ function startSocketServer() {
   const server = createServer((socket) => {
     log('CLI client connected');
 
+    // Baseline idle timeout — close sockets that connect but never send commands.
+    // Per-command timeouts override this via socket.setTimeout() in handleCliCommand.
+    socket.setTimeout(60000);
+    socket.on('timeout', () => {
+      log('Socket idle timeout (60s) — closing');
+      socket.destroy();
+    });
+
     let buffer = '';
     const socketRequests = new Set();
 
