@@ -2,7 +2,7 @@
 
 **Browser automation for Claude Code that runs on Firefox** — for systems where Chrome is unavailable, unwelcome, or policy-prohibited.
 
-[![Version](https://img.shields.io/badge/version-0.6.1-blue.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.6.2-blue.svg)](./CHANGELOG.md)
 
 The only Firefox-native MCP server for Claude Code. Navigate, automate, screenshot, and extract data on any system that runs Firefox — no Chrome dependency, no Google infrastructure.
 

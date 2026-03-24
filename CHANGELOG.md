@@ -1,7 +1,22 @@
 # CLZ002 Changelog
 
 **Project:** Claudezilla
-**Current Version:** 0.6.1
+**Current Version:** 0.6.2
+
+## v0.6.2 (2026-03-24)
+
+**Socket path reliability + Windows native messaging — community contributions.**
+
+### Bug Fixes
+
+- **Socket path consistency on macOS** — `getSafeTempDir()` now falls back to `~/.claudezilla/` (mode 0700) between XDG_RUNTIME_DIR and tmpdir(). Fixes socket path mismatch when macOS assigns different per-process TMPDIR values to Firefox vs Claude Desktop.
+- **CLI socket path** — `host/cli.js` now uses `getSocketPath()` and `getAuthTokenPath()` from ipc.js instead of hardcoded `/tmp/claudezilla.sock`.
+- **Stop hook socket fallback** — `plugin/hooks/stop-hook.sh` now mirrors the full 3-tier fallback (XDG > ~/.claudezilla/ > TMPDIR) matching the Node.js ipc.js logic.
+- **Windows native messaging** — Installer creates a `host.bat` wrapper instead of using the non-spec `args` manifest field. Fixes silent connection failure on Windows.
+
+### Contributors
+
+Thanks to community contributors for these fixes.
 
 ## v0.6.1 (2026-03-22)
 
