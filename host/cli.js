@@ -16,8 +16,18 @@
  */
 
 import { connect } from 'net';
+import { readFileSync } from 'fs';
+import { getSocketPath, getAuthTokenPath } from './ipc.js';
 
-const SOCKET_PATH = '/tmp/claudezilla.sock';
+const SOCKET_PATH = getSocketPath();
+
+function readAuthToken() {
+  try {
+    return readFileSync(getAuthTokenPath(), 'utf8').trim();
+  } catch {
+    return null;
+  }
+}
 
 function sendCommand(command, params = {}) {
   return new Promise((resolve, reject) => {
@@ -25,7 +35,8 @@ function sendCommand(command, params = {}) {
     let buffer = '';
 
     socket.on('connect', () => {
-      const message = JSON.stringify({ command, params }) + '\n';
+      const authToken = readAuthToken();
+      const message = JSON.stringify({ command, params, authToken }) + '\n';
       socket.write(message);
     });
 

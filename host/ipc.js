@@ -3,11 +3,11 @@
  *
  * Provides platform-independent IPC paths and utilities.
  * Supports:
- *   - macOS/Linux: Unix sockets (e.g., /tmp/claudezilla.sock)
+ *   - macOS/Linux: Unix sockets (prefers XDG_RUNTIME_DIR, then ~/.claudezilla/, then tmpdir)
  *   - Windows: Named pipes (e.g., \\.\pipe\claudezilla)
  */
 
-import { platform, tmpdir } from 'os';
+import { platform, tmpdir, homedir } from 'os';
 import { join, dirname } from 'path';
 import { existsSync, unlinkSync, chmodSync, mkdirSync } from 'fs';
 
@@ -80,6 +80,23 @@ export function getSafeTempDir() {
       console.error(`[claudezilla] Skipping invalid XDG_RUNTIME_DIR: ${e.message}`);
     }
   }
+
+  // Fallback: ~/.claudezilla/ for consistent cross-process paths on macOS
+  // macOS assigns different per-process TMPDIR values (/var/folders/...)
+  const home = homedir();
+  if (home) {
+    const claudezillaDir = join(home, '.claudezilla');
+    try {
+      validatePath(claudezillaDir, 'home fallback dir');
+      if (!existsSync(claudezillaDir)) {
+        mkdirSync(claudezillaDir, { recursive: true, mode: 0o700 });
+      }
+      return claudezillaDir;
+    } catch (e) {
+      console.error(`[claudezilla] Could not create ~/.claudezilla: ${e.message}`);
+    }
+  }
+
   return tmpdir();
 }
 
