@@ -1,11 +1,12 @@
 # CLZ — Claudezilla Documentation Index
 
-**Last Updated:** 2026-03-22
+**Last Updated:** 2026-03-24
 
 ---
 
 ## Recent Documents
 
+- [[CLZ020 v0.6.2 Release Reference]] (2026-03-24) — Socket path reliability (macOS ~/.claudezilla/ fallback), Windows bat wrapper, community PRs #4 and #5
 - [[CLZ019 v0.6.1 Release Reference]] (2026-03-22) — Definitive v0.6.1 release doc: consent automation, lazy loading, Linux support, red-team audit, reliability fixes
 - [[CLZ018 Consent Overlay Automation Sprint]] (2026-03-08) — GDPR consent handling, MCP tool + config
 - [[CLZ017 v0.6.1 Reliability and Security Audit Sprint]] — Security audit, orphaned tab cleanup
@@ -37,6 +38,7 @@
 
 | Doc | Date | Status | Topic |
 |-----|------|--------|-------|
+| CLZ020 | 2026-03-24 | Complete | v0.6.2 release reference (socket path, Windows bat wrapper, community PRs) |
 | CLZ019 | 2026-03-22 | Complete | v0.6.1 release reference (consent, lazy loading, Linux, red-team, audit) |
 | CLZ018 | 2026-03-08 | Complete | Consent automation (MCP tool + config) |
 | CLZ017 | 2026-03-XX | Complete | v0.6.1 audit sprint |
