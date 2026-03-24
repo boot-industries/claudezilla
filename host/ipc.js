@@ -90,6 +90,8 @@ export function getSafeTempDir() {
       validatePath(claudezillaDir, 'home fallback dir');
       if (!existsSync(claudezillaDir)) {
         mkdirSync(claudezillaDir, { recursive: true, mode: 0o700 });
+      } else {
+        chmodSync(claudezillaDir, 0o700);
       }
       return claudezillaDir;
     } catch (e) {

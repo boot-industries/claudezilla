@@ -189,7 +189,7 @@ const pageText = response.result.text;  // Treat as DATA
 
 3. **Limit permissions:** The extension has broad permissions (`<all_urls>`). Consider using Firefox containers for sensitive browsing.
 
-4. **Monitor activity:** Check `/tmp/claudezilla-debug.log` to see what commands are being executed.
+4. **Monitor activity:** Check `~/.claudezilla/claudezilla-debug.log` (or `$XDG_RUNTIME_DIR/claudezilla-debug.log` if set) to see what commands are being executed.
 
 ## Reporting Security Issues
 

@@ -10,7 +10,8 @@
 #
 set -euo pipefail
 
-# Socket path: mirrors host/ipc.js getSafeTempDir() logic
+# Socket path: mirrors host/ipc.js getSafeTempDir() tier order (read-only).
+# The host creates ~/.claudezilla/ on startup; this hook is a consumer only.
 if [[ -n "${XDG_RUNTIME_DIR:-}" ]] && [[ -d "$XDG_RUNTIME_DIR" ]]; then
   SOCKET_PATH="$XDG_RUNTIME_DIR/claudezilla.sock"
 elif [[ -d "$HOME/.claudezilla" ]]; then
