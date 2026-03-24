@@ -27,6 +27,7 @@ claudezilla-debug.log
 
 # Generated files
 install/claudezilla.json
+host/host.bat
 
 # Runtime files
 /tmp/claudezilla.sock
