@@ -120,6 +120,8 @@ claudezilla@boot.industries
 - Host location: `~/.mozilla/native-messaging-hosts/claudezilla.json`
 - Max message: 1MB (host→extension), 4GB (extension→host)
 - All tools support optional `timeout` parameter (5000-300000 ms, default: 150000)
+- **Socket path fallback** (macOS/Linux): XDG_RUNTIME_DIR → `~/.claudezilla/` (mode 0700) → tmpdir(). The `~/.claudezilla/` fallback solves macOS per-process TMPDIR inconsistency.
+- **Windows**: Installer creates `host.bat` wrapper instead of using non-spec `args` manifest field
 
 ## Commands
 
