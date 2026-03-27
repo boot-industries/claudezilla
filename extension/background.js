@@ -701,7 +701,7 @@ async function handleCliCommand(message) {
 
       case 'version':
         result = {
-          extension: '0.6.2',
+          extension: '0.6.3',
           browser: navigator.userAgent,
           features: ['devtools', 'network', 'console', 'evaluate', 'focusglow', 'tabgroups', 'security-hardened', 'orphan-cleanup', 'focus-loop', 'auto-retry', 'task-detection', 'expression-validation', 'windows-support', 'autonomous-install'],
         };
@@ -1969,17 +1969,7 @@ browser.tabs.onActivated.addListener((activeInfo) => {
 // Connect on startup
 connect();
 
-// Reconnect on browser action click if disconnected
-browser.browserAction.onClicked.addListener(() => {
-  if (!port) {
-    // Reset reconnect state for fresh manual attempt
-    reconnectAttempt = 0;
-    if (reconnectTimer) {
-      clearTimeout(reconnectTimer);
-      reconnectTimer = null;
-    }
-    connect();
-  }
-});
+// NOTE: browserAction.onClicked never fires when default_popup is set.
+// Auto-reconnect is handled in the runtime.onMessage listener instead.
 
 console.log('[claudezilla] Background script loaded');

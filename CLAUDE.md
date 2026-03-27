@@ -1,6 +1,6 @@
 # Claudezilla - Claude Code Firefox Extension
 
-**Version:** 0.6.2
+**Version:** 0.6.3
 
 ## Overview
 

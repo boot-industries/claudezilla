@@ -147,7 +147,7 @@ async function sendMessage(action, params = {}) {
 
 async function testConnection() {
   hideError();
-  setStatus(false, 'Testing...');
+  setStatus(false, 'Connecting...');
 
   try {
     const result = await sendMessage('ping');
@@ -166,7 +166,7 @@ async function testConnection() {
     });
   } catch (error) {
     setStatus(false, 'Disconnected');
-    showError(error.message);
+    showError('Native host disconnected: ' + (error.message || 'Unknown reason'));
   }
 }
 

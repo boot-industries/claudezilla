@@ -34,6 +34,23 @@ fi
 chmod 755 "$HOST_PATH"
 echo "Set host permissions to 755: $HOST_PATH"
 
+# Resolve absolute node path (GUI-launched Firefox may not have full PATH)
+NODE_PATH="$(command -v node 2>/dev/null)"
+if [ -z "$NODE_PATH" ]; then
+    echo "Error: node not found in PATH. Please install Node.js first."
+    exit 1
+fi
+echo "Found Node.js at: $NODE_PATH"
+
+# Create wrapper script with absolute node path
+WRAPPER_PATH="$PROJECT_DIR/host/run.sh"
+cat > "$WRAPPER_PATH" << WRAPPER_EOF
+#!/bin/bash
+exec "$NODE_PATH" "$HOST_PATH" "\$@"
+WRAPPER_EOF
+chmod 755 "$WRAPPER_PATH"
+echo "Created host wrapper: $WRAPPER_PATH"
+
 mkdir -p "$NATIVE_HOSTS_DIR"
 
 MANIFEST_PATH="$NATIVE_HOSTS_DIR/claudezilla.json"
@@ -41,7 +58,7 @@ cat > "$MANIFEST_PATH" << EOF
 {
   "name": "claudezilla",
   "description": "Claude Code Firefox browser automation bridge",
-  "path": "$HOST_PATH",
+  "path": "$WRAPPER_PATH",
   "type": "stdio",
   "allowed_extensions": ["claudezilla@boot.industries"]
 }

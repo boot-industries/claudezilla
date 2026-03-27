@@ -1,7 +1,16 @@
 # CLZ002 Changelog
 
 **Project:** Claudezilla
-**Current Version:** 0.6.2
+**Current Version:** 0.6.3
+
+## v0.6.3 (2026-03-27)
+
+**Critical fix: native host fails to start on macOS (and Linux with non-standard node paths).**
+
+### Bug Fixes
+
+- **Native host PATH resolution** — Firefox (GUI app) doesn't inherit shell PATH, so `#!/usr/bin/env node` fails with exit 127 when Node.js is installed via Homebrew (`/opt/homebrew/bin`), nvm, or any non-system path. Installer now resolves the absolute node path at install time and writes a `host/run.sh` wrapper with `exec /absolute/path/to/node`. Affects both macOS and Linux installers.
+- **Dead `browserAction.onClicked` listener** — Removed listener that never fires because `default_popup` is defined in the manifest. Reconnection already handled by `sendToHost()` calling `connect()` when `port` is null.
 
 ## v0.6.2 (2026-03-24)
 

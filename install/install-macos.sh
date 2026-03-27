@@ -26,6 +26,24 @@ fi
 chmod 755 "$HOST_PATH"
 echo "Set host script permissions to 755: $HOST_PATH"
 
+# Resolve absolute node path (GUI apps like Firefox don't inherit shell PATH)
+NODE_PATH="$(command -v node 2>/dev/null)"
+if [ -z "$NODE_PATH" ]; then
+    echo "Error: node not found in PATH. Please install Node.js first."
+    exit 1
+fi
+echo "Found Node.js at: $NODE_PATH"
+
+# Create wrapper script that Firefox will execute
+# This ensures node is found even when Firefox lacks /opt/homebrew/bin in PATH
+WRAPPER_PATH="$PROJECT_DIR/host/run.sh"
+cat > "$WRAPPER_PATH" << WRAPPER_EOF
+#!/bin/bash
+exec "$NODE_PATH" "$HOST_PATH" "\$@"
+WRAPPER_EOF
+chmod 755 "$WRAPPER_PATH"
+echo "Created host wrapper: $WRAPPER_PATH"
+
 # Install MCP server dependencies
 MCP_DIR="$PROJECT_DIR/mcp"
 if [ -f "$MCP_DIR/package.json" ]; then
@@ -46,7 +64,7 @@ cat > "$MANIFEST_PATH" << EOF
 {
   "name": "claudezilla",
   "description": "Claude Code Firefox browser automation bridge",
-  "path": "$HOST_PATH",
+  "path": "$WRAPPER_PATH",
   "type": "stdio",
   "allowed_extensions": ["claudezilla@boot.industries"]
 }
