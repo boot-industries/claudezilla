@@ -277,7 +277,24 @@ jobs:
           fi
 
       # ------------------------------------------------------------------ #
-      # 5. Post PR comment (always runs, even on failure)                   #
+      # 5. Bot-opened PR detection                                          #
+      # ------------------------------------------------------------------ #
+      - name: Detect bot-opened PRs
+        id: bot_check
+        env:
+          PR_ACTOR: ${{ github.actor }}
+        run: |
+          BOT_PR="false"
+          case "$PR_ACTOR" in
+            dependabot\[bot\]|renovate\[bot\]|github-actions\[bot\])
+              BOT_PR="true"
+              echo "::warning::This PR was opened by bot: ${PR_ACTOR}"
+              ;;
+          esac
+          echo "is_bot=${BOT_PR}" >> "$GITHUB_OUTPUT"
+
+      # ------------------------------------------------------------------ #
+      # 6. Post PR comment (always runs, even on failure)                   #
       # ------------------------------------------------------------------ #
       - name: Post PR comment
         if: always()
@@ -286,6 +303,7 @@ jobs:
           AUDIT_STATUS: ${{ steps.audit.outputs.audit_status }}
           FINDINGS: ${{ steps.audit.outputs.findings }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          IS_BOT: ${{ steps.bot_check.outputs.is_bot }}
         run: |
           if [ "${AUDIT_STATUS}" = "pass" ]; then
             ICON="green_circle"
@@ -295,11 +313,16 @@ jobs:
             HEADLINE="Dependency audit FAILED"
           fi
 
+          BOT_NOTICE=""
+          if [ "${IS_BOT}" = "true" ]; then
+            BOT_NOTICE=$'\n> :robot: **This dependency update was opened by a bot.** Manual security review is required before merge.\n'
+          fi
+
           BODY=$(cat <<COMMENT
           ### :${ICON}: ${HEADLINE}
 
           **Workflow:** \`dep-audit\` | **PR:** #${PR_NUMBER} | **Commit:** \`${GITHUB_SHA:0:7}\`
-
+          ${BOT_NOTICE}
           <details>
           <summary>Audit findings</summary>
 
