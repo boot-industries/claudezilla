@@ -5,6 +5,9 @@ on:
     branches: [feature/windows-support-v0.5.5]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   test-windows:
     runs-on: windows-latest
