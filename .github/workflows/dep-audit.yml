@@ -1,0 +1,318 @@
+# dep-audit.yml — Reusable dependency audit workflow
+# Copy to .github/workflows/dep-audit.yml in any repo with CI.
+# Triggers on PRs that modify dependency files, audits for vulnerabilities
+# and suspicious new packages, then posts a summary comment on the PR.
+
+name: Dependency Audit
+
+on:
+  pull_request:
+    paths:
+      - 'package.json'
+      - 'package-lock.json'
+      - 'pnpm-lock.yaml'
+      - 'requirements.txt'
+      - 'pyproject.toml'
+      - 'poetry.lock'
+      - 'Pipfile'
+      - 'Pipfile.lock'
+
+concurrency:
+  group: dep-audit-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  dep-audit:
+    runs-on: ubuntu-latest
+
+    steps:
+      # ------------------------------------------------------------------ #
+      # 1. Checkout — full history so we can diff base vs head              #
+      # ------------------------------------------------------------------ #
+      - name: Checkout PR branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+        with:
+          fetch-depth: 0
+
+      # ------------------------------------------------------------------ #
+      # 2. Toolchain setup                                                   #
+      # ------------------------------------------------------------------ #
+      - name: Setup Node.js 20
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
+        with:
+          node-version: '20'
+
+      - name: Setup Python 3.13
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
+        with:
+          python-version: '3.13'
+
+      - name: Install pip-audit
+        run: pip install pip-audit
+
+      # ------------------------------------------------------------------ #
+      # 3. Detect project type and run audits                                #
+      # ------------------------------------------------------------------ #
+      - name: Run dependency audits
+        id: audit
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          FINDINGS=""
+          AUDIT_STATUS="pass"
+
+          # ---- helpers --------------------------------------------------
+          append() { FINDINGS="${FINDINGS}"$'\n'"$1"; }
+          fail()   { AUDIT_STATUS="fail"; append "FAIL: $1"; }
+          info()   { append "INFO: $1"; }
+
+          # ---- npm audit ------------------------------------------------
+          if [ -f package.json ]; then
+            echo "::group::npm audit"
+            info "npm project detected"
+
+            # Install without running scripts to populate node_modules
+            npm ci --ignore-scripts --no-audit 2>/dev/null || \
+              npm install --ignore-scripts --no-audit 2>/dev/null || true
+
+            npm audit --json > /tmp/npm-audit.json 2>&1 || true
+
+            # Parse HIGH / CRITICAL counts from audit JSON
+            HIGH=$(jq '[.vulnerabilities // {} | to_entries[].value
+                        | select(.severity == "high")] | length' \
+                        /tmp/npm-audit.json 2>/dev/null || echo 0)
+            CRIT=$(jq '[.vulnerabilities // {} | to_entries[].value
+                        | select(.severity == "critical")] | length' \
+                        /tmp/npm-audit.json 2>/dev/null || echo 0)
+
+            info "npm audit: high=${HIGH} critical=${CRIT}"
+
+            if [ "$HIGH" -gt 0 ] || [ "$CRIT" -gt 0 ]; then
+              fail "npm audit found ${HIGH} high and ${CRIT} critical vulnerabilities"
+              # Surface the affected package names
+              jq -r '.vulnerabilities // {} | to_entries[]
+                     | select(.value.severity == "high" or .value.severity == "critical")
+                     | "  - \(.key) [\(.value.severity)]"' \
+                     /tmp/npm-audit.json 2>/dev/null | while read line; do
+                append "$line"
+              done
+            fi
+            echo "::endgroup::"
+          fi
+
+          # ---- pip-audit ------------------------------------------------
+          PYTHON_PROJECT=0
+          [ -f pyproject.toml ]    && PYTHON_PROJECT=1
+          [ -f requirements.txt ]  && PYTHON_PROJECT=1
+          [ -f Pipfile ]           && PYTHON_PROJECT=1
+
+          if [ "$PYTHON_PROJECT" -eq 1 ]; then
+            echo "::group::pip-audit"
+            info "Python project detected"
+
+            # Build audit target flags
+            AUDIT_ARGS="--format=json --output=/tmp/pip-audit.json"
+            if [ -f requirements.txt ]; then
+              AUDIT_ARGS="$AUDIT_ARGS -r requirements.txt"
+            elif [ -f pyproject.toml ]; then
+              # pip-audit can scan the local project if installed
+              pip install --quiet . 2>/dev/null || true
+            elif [ -f Pipfile ]; then
+              pip install --quiet pipenv 2>/dev/null || true
+              pipenv install --quiet 2>/dev/null || true
+              AUDIT_ARGS="$AUDIT_ARGS -r <(pipenv requirements 2>/dev/null)"
+            fi
+
+            pip-audit $AUDIT_ARGS 2>/dev/null || true
+
+            if [ -f /tmp/pip-audit.json ]; then
+              # pip-audit JSON: array of {name, version, vulns:[{id, fix_versions, aliases, description}]}
+              # Severity is inferred from CVSS via aliases; filter HIGH/CRITICAL by CVSS score
+              HIGH=$(jq '[.[] | select(.vulns | length > 0) | .vulns[]
+                          | select(.aliases[]? | test("CVE-"; "i"))
+                         ] | length' /tmp/pip-audit.json 2>/dev/null || echo 0)
+              # pip-audit does not natively expose CVSS severity; treat any vuln as high
+              VULN_COUNT=$(jq '[.[] | select(.vulns | length > 0)] | length' \
+                              /tmp/pip-audit.json 2>/dev/null || echo 0)
+
+              info "pip-audit: packages_with_vulns=${VULN_COUNT}"
+
+              if [ "$VULN_COUNT" -gt 0 ]; then
+                fail "pip-audit found ${VULN_COUNT} package(s) with vulnerabilities"
+                jq -r '.[] | select(.vulns | length > 0)
+                       | "  - \(.name)==\(.version): \([.vulns[].id] | join(", "))"' \
+                       /tmp/pip-audit.json 2>/dev/null | while read line; do
+                  append "$line"
+                done
+              fi
+            fi
+            echo "::endgroup::"
+          fi
+
+          # ----------------------------------------------------------------
+          # 4. Age / download-count checks on NEW packages in lockfiles
+          # ----------------------------------------------------------------
+          echo "::group::New package age checks"
+          info "Diffing lockfiles between base (${BASE_SHA}) and head (${HEAD_SHA})"
+
+          # --- npm new packages ---
+          if [ -f package-lock.json ] || [ -f pnpm-lock.yaml ]; then
+
+            LOCKFILE=""
+            [ -f package-lock.json ] && LOCKFILE="package-lock.json"
+            [ -f pnpm-lock.yaml ]    && LOCKFILE="pnpm-lock.yaml"
+
+            # Extract added lines from the lockfile diff
+            git diff "${BASE_SHA}..${HEAD_SHA}" -- "$LOCKFILE" 2>/dev/null \
+              | grep '^+' \
+              | grep -v '^+++' \
+              | grep -Eo '"[^"@]+@[^"]+"|node_modules/[^/":]+' \
+              | sed 's|node_modules/||; s|"||g' \
+              | sort -u > /tmp/new-npm-pkgs.txt || true
+
+            if [ -s /tmp/new-npm-pkgs.txt ]; then
+              info "New npm packages detected:"
+              while IFS= read -r pkg; do
+                # Strip version specifier to get bare name
+                PKGNAME=$(echo "$pkg" | sed 's/@[^@]*$//')
+                [ -z "$PKGNAME" ] && continue
+
+                # Query npm registry for publish date
+                REG_JSON=$(curl -sf --max-time 10 \
+                  "https://registry.npmjs.org/${PKGNAME}" 2>/dev/null || echo "{}")
+                CREATED=$(echo "$REG_JSON" | jq -r '.time.created // empty' 2>/dev/null || echo "")
+                LATEST=$(echo "$REG_JSON"  | jq -r '.["dist-tags"].latest // empty' 2>/dev/null || echo "")
+
+                if [ -n "$CREATED" ]; then
+                  # Age in days
+                  CREATED_EPOCH=$(date -d "$CREATED" +%s 2>/dev/null || \
+                                  date -j -f "%Y-%m-%dT%H:%M:%S" \
+                                  "${CREATED%%.*}" +%s 2>/dev/null || echo 0)
+                  NOW_EPOCH=$(date +%s)
+                  AGE_DAYS=$(( (NOW_EPOCH - CREATED_EPOCH) / 86400 ))
+
+                  if [ "$AGE_DAYS" -lt 7 ]; then
+                    fail "npm package '${PKGNAME}' was published only ${AGE_DAYS} day(s) ago — possible typosquat or brand-new supply-chain risk"
+                  else
+                    info "  + ${PKGNAME} (${LATEST:-unknown}) — age: ${AGE_DAYS} days"
+                  fi
+                else
+                  info "  + ${PKGNAME} — could not verify age (registry unreachable?)"
+                fi
+              done < /tmp/new-npm-pkgs.txt
+            else
+              info "No new npm packages detected in lockfile diff"
+            fi
+          fi
+
+          # --- Python new packages ---
+          PYLOCKFILE=""
+          [ -f poetry.lock ]       && PYLOCKFILE="poetry.lock"
+          [ -f Pipfile.lock ]      && PYLOCKFILE="Pipfile.lock"
+          [ -f requirements.txt ]  && PYLOCKFILE="requirements.txt"
+
+          if [ -n "$PYLOCKFILE" ]; then
+            git diff "${BASE_SHA}..${HEAD_SHA}" -- "$PYLOCKFILE" 2>/dev/null \
+              | grep '^+' \
+              | grep -v '^+++' \
+              | grep -Eo 'name\s*=\s*"[^"]+"|^[A-Za-z0-9_.-]+[>=<!=]' \
+              | sed 's/name\s*=\s*"//; s/"//; s/[>=<!=].*//' \
+              | tr '[:upper:]' '[:lower:]' \
+              | sort -u > /tmp/new-py-pkgs.txt || true
+
+            if [ -s /tmp/new-py-pkgs.txt ]; then
+              info "New Python packages detected:"
+              while IFS= read -r pkg; do
+                [ -z "$pkg" ] && continue
+
+                # Query PyPI for upload date
+                PYPI_JSON=$(curl -sf --max-time 10 \
+                  "https://pypi.org/pypi/${pkg}/json" 2>/dev/null || echo "{}")
+                UPLOAD_TIME=$(echo "$PYPI_JSON" | \
+                  jq -r '.releases // {} | to_entries | sort_by(.key) | first | .value[0].upload_time // empty' \
+                  2>/dev/null || echo "")
+
+                if [ -n "$UPLOAD_TIME" ]; then
+                  UPLOAD_EPOCH=$(date -d "$UPLOAD_TIME" +%s 2>/dev/null || \
+                                 date -j -f "%Y-%m-%dT%H:%M:%S" \
+                                 "${UPLOAD_TIME%%.*}" +%s 2>/dev/null || echo 0)
+                  NOW_EPOCH=$(date +%s)
+                  AGE_DAYS=$(( (NOW_EPOCH - UPLOAD_EPOCH) / 86400 ))
+
+                  if [ "$AGE_DAYS" -lt 7 ]; then
+                    fail "PyPI package '${pkg}' first appeared only ${AGE_DAYS} day(s) ago — possible typosquat or supply-chain risk"
+                  else
+                    info "  + ${pkg} — age: ${AGE_DAYS} days"
+                  fi
+                else
+                  info "  + ${pkg} — could not verify age (PyPI unreachable?)"
+                fi
+              done < /tmp/new-py-pkgs.txt
+            else
+              info "No new Python packages detected in lockfile diff"
+            fi
+          fi
+
+          echo "::endgroup::"
+
+          # ---- Write summary to step output ----------------------------
+          {
+            echo "audit_status=${AUDIT_STATUS}"
+            echo "findings<<FINDINGS_EOF"
+            echo "${FINDINGS}"
+            echo "FINDINGS_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          # Fail the step if any HIGH/CRITICAL issues were found
+          if [ "$AUDIT_STATUS" = "fail" ]; then
+            echo "::error::Dependency audit failed — see PR comment for details"
+            exit 1
+          fi
+
+      # ------------------------------------------------------------------ #
+      # 5. Post PR comment (always runs, even on failure)                   #
+      # ------------------------------------------------------------------ #
+      - name: Post PR comment
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          AUDIT_STATUS: ${{ steps.audit.outputs.audit_status }}
+          FINDINGS: ${{ steps.audit.outputs.findings }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          if [ "${AUDIT_STATUS}" = "pass" ]; then
+            ICON="green_circle"
+            HEADLINE="Dependency audit passed"
+          else
+            ICON="red_circle"
+            HEADLINE="Dependency audit FAILED"
+          fi
+
+          BODY=$(cat <<COMMENT
+          ### :${ICON}: ${HEADLINE}
+
+          **Workflow:** \`dep-audit\` | **PR:** #${PR_NUMBER} | **Commit:** \`${GITHUB_SHA:0:7}\`
+
+          <details>
+          <summary>Audit findings</summary>
+
+          \`\`\`
+          ${FINDINGS:-No findings recorded.}
+          \`\`\`
+
+          </details>
+
+          > Audits: \`npm audit\` (HIGH/CRITICAL), \`pip-audit\` (any CVE), lockfile age check (packages < 7 days old).
+          COMMENT
+          )
+
+          gh pr comment "${PR_NUMBER}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --body "$BODY"
