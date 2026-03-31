@@ -15,7 +15,7 @@
 import { readMessage, sendMessage } from './protocol.js';
 import { appendFileSync, unlinkSync, existsSync, chmodSync, writeFileSync } from 'fs';
 import { createServer } from 'net';
-import { randomUUID, randomBytes } from 'crypto';
+import { randomUUID, randomBytes, timingSafeEqual } from 'crypto';
 import {
   getSocketPath,
   getAuthTokenPath,
@@ -243,7 +243,8 @@ function handleLoopCommand(command, params, callback) {
  */
 function handleCliCommand(command, params, authToken, callback, socketRequests) {
   // SECURITY: Validate auth token
-  if (!authToken || typeof authToken !== 'string' || authToken !== SOCKET_AUTH_TOKEN) {
+  if (!authToken || typeof authToken !== 'string' || authToken.length !== SOCKET_AUTH_TOKEN.length ||
+      !timingSafeEqual(Buffer.from(authToken), Buffer.from(SOCKET_AUTH_TOKEN))) {
     callback({ success: false, error: 'Invalid or missing auth token' });
     return;
   }
@@ -308,7 +309,7 @@ function handleExtensionMessage(message) {
       id,
       success: true,
       result: {
-        host: '0.6.3',
+        host: '0.6.4',
         node: process.version,
         platform: process.platform,
         features: ['security-hardened', 'focus-loop', 'auto-retry', 'task-detection', 'expression-validation', 'windows-support', 'autonomous-install'],

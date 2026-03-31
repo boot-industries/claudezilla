@@ -192,7 +192,7 @@ jobs:
       - name: Test MCP server import
         shell: bash
         run: |
-          cd mcp && npm install --silent
+          cd mcp && npm install --silent --ignore-scripts
           node -e "
           import('../mcp/server.js').then(() => {
             console.log('MCP server loads on Windows: PASS');
