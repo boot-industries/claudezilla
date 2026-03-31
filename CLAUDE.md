@@ -1,13 +1,13 @@
 # Claudezilla — Claude Code Firefox Extension
 
-**Version:** 0.6.3
+**Version:** 0.6.4
 **Documentation PREFIX:** CLZ
 
 ## Overview
 
 Firefox extension providing browser automation for Claude Code CLI. A Google-free alternative to the official Chrome extension.
 
-**Key Features:** Consent automation (4-pass CMP detection), lazy tool loading (~6,400 token savings), Linux/Windows/macOS support, annotated screenshots, focus loops, multi-agent tab coordination, orphaned tab cleanup, auto-retry system.
+**Key Features:** Consent automation (4-pass CMP detection), lazy tool loading (~6,400 token savings), Linux/Windows/macOS support, annotated screenshots, focus loops, multi-agent tab coordination, orphaned tab cleanup, auto-retry system, supply chain hardened.
 
 ## Architecture
 
@@ -113,6 +113,19 @@ claudezilla@boot.industries
 - Expression validation blocks dangerous patterns in `evaluate`
 - Path security: null byte, traversal, UNC injection prevention
 - Console capture opt-in, request bodies never captured
+- Auth token comparison via `crypto.timingSafeEqual()`
+- Explicit CSP in manifest: `script-src 'self'; object-src 'self'`
+
+### Supply Chain Hardening (v0.6.4)
+
+- `ignore-scripts=true` in `.npmrc` (root, `mcp/`, `worker/`) — blocks postinstall hook attacks
+- All dependency versions pinned to exact (no `^`/`~` ranges)
+- pnpm with strict dependency isolation (root, `mcp/`, `worker/`)
+- GitHub Actions SHA-pinned (no mutable tags)
+- All CI workflows have explicit `permissions:` blocks
+- Bot-detection in `dep-audit.yml` flags Dependabot/Renovate PRs
+- Install scripts use `--ignore-scripts` flag
+- Lockfiles committed for all workspaces including zero-dep `host/`
 
 See [SECURITY.md](./SECURITY.md) for full security model.
 

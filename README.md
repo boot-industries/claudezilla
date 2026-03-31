@@ -2,7 +2,7 @@
 
 **Browser automation for Claude Code that runs on Firefox** — for systems where Chrome is unavailable, unwelcome, or policy-prohibited.
 
-[![Version](https://img.shields.io/badge/version-0.6.3-blue.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.6.4-blue.svg)](./CHANGELOG.md)
 
 The only Firefox-native MCP server for Claude Code. Navigate, automate, screenshot, and extract data on any system that runs Firefox — no Chrome dependency, no Google infrastructure.
 
@@ -123,6 +123,7 @@ Claudezilla is designed with security in mind:
 - **Local only** — Communication via Unix socket (no network exposure)
 - **Tab isolation** — Each Claude session owns its tabs
 - **URL validation** — Blocks dangerous schemes (`javascript:`, `data:`)
+- **Supply chain hardened** — `ignore-scripts=true`, pinned dependencies, pnpm strict isolation, SHA-pinned CI actions, timing-safe auth
 
 Works in both regular and private Firefox windows. Tab navigation respects ownership — Claude can only navigate tabs it created.
 

@@ -1,6 +1,6 @@
 {
   "name": "claudezilla-host",
-  "version": "0.6.3",
+  "version": "0.6.4",
   "description": "Native messaging host for Claudezilla Firefox extension",
   "type": "module",
   "main": "index.js",

@@ -1,7 +1,25 @@
 # CLZ002 Changelog
 
 **Project:** Claudezilla
-**Current Version:** 0.6.3
+**Current Version:** 0.6.4
+
+## v0.6.4 (2026-03-31)
+
+**Supply chain hardening — closes ignore-scripts gap, hardens auth, upgrades MCP SDK.**
+
+Triggered by WHB011-014 TeamPCP campaign audit. No indicators of compromise found, but the `ignore-scripts` gap left postinstall hooks enabled — the primary CanisterWorm attack vector. This release closes all identified gaps.
+
+### Security Fixes
+
+- **Block dependency lifecycle scripts** — Added `ignore-scripts=true` to root `.npmrc` and created per-workspace `.npmrc` files for `mcp/` and `worker/` (independent lockfiles don't inherit root config). Prevents postinstall hook execution — the primary TeamPCP/CanisterWorm attack vector.
+- **Harden install scripts** — Added `--ignore-scripts` flag to `npm install` in `install-macos.sh`, `install-linux.sh`, and `windows-test.yml` CI workflow. User-facing install paths were previously unprotected.
+- **Timing-safe auth comparison** — Replaced `!==` string comparison with `crypto.timingSafeEqual()` for socket auth token validation in native host (`host/index.js`).
+- **Explicit Content Security Policy** — Added `content_security_policy` to `extension/manifest.json` (defense-in-depth over MV2 default).
+- **Host lockfile** — Added `pnpm-lock.yaml` to `host/` to gate future dependency additions via lockfile review.
+
+### Dependencies
+
+- **Upgraded `@modelcontextprotocol/sdk`** from 1.25.2 to 1.29.0 — patches GHSA-345p-7cg4-v4c7 (cross-client data leak via shared server/transport). Claudezilla uses stdio transport (1:1 pipe), so was not exploitable in our architecture, but upgraded for hygiene.
 
 ## v0.6.3 (2026-03-27)
 
