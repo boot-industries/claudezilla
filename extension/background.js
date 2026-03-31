@@ -620,7 +620,9 @@ async function getSession(windowId) {
   // Verify window still exists
   try {
     const win = await browser.windows.get(claudezillaWindow.windowId);
-    if (!win.incognito && await isPrivateModeRequired()) {
+    // Only reject if window mode is unknown (legacy) AND storage requires private.
+    // If isPrivate is tracked (set by createWindow), trust it — the agent chose this mode.
+    if (claudezillaWindow.isPrivate === undefined && !win.incognito && await isPrivateModeRequired()) {
       claudezillaWindow = null;
       activeTabId = null;
       throw new Error('Claudezilla window is not private. Set privateMode: false in storage to allow non-private windows.');
@@ -789,7 +791,7 @@ async function handleCliCommand(message) {
         // Single window mode: reuse existing window or create new one
         // Max 12 tabs - oldest tab closed when limit reached
         // Tab ownership: each tab tracks its creator agent for close permission
-        const { url, agentId } = params;
+        const { url, agentId, private: requestedPrivate } = params;
         const ownerId = agentId || 'unknown';
 
         // SECURITY: Validate URL scheme (blocks javascript:, data:)
@@ -799,6 +801,7 @@ async function handleCliCommand(message) {
         let tabId;
         let isNewWindow = false;
         let closedTabId = null;
+        let privateFallback = false;
 
         if (claudezillaWindow) {
           // Window exists - verify it's still valid
@@ -811,6 +814,17 @@ async function handleCliCommand(message) {
         }
 
         if (claudezillaWindow) {
+          // Mode mismatch check: only when agent explicitly requests a mode
+          if (typeof requestedPrivate === 'boolean' && requestedPrivate !== claudezillaWindow.isPrivate) {
+            throw {
+              code: 'MODE_MISMATCH',
+              message: `Requested ${requestedPrivate ? 'private' : 'non-private'} mode, but existing window is ${claudezillaWindow.isPrivate ? 'private' : 'non-private'}.`,
+              currentMode: claudezillaWindow.isPrivate ? 'private' : 'normal',
+              requestedMode: requestedPrivate ? 'private' : 'normal',
+              hint: 'Close the existing window with firefox_close_window first, or omit the private parameter to use the current window.'
+            };
+          }
+
           // Reuse existing window - create new tab
           // If at max tabs, check reservations and try to evict ONLY OWN tabs
           if (claudezillaWindow.tabs.length >= MAX_TABS) {
@@ -893,12 +907,29 @@ async function handleCliCommand(message) {
         } else {
           // No window - create new window (private by default)
           isNewWindow = true;
-          const usePrivate = await isPrivateModeRequired();
-          const win = await browser.windows.create({
-            incognito: usePrivate,
-            focused: false,
-            url: url || 'about:blank'
-          });
+          const usePrivate = typeof requestedPrivate === 'boolean' ? requestedPrivate : await isPrivateModeRequired();
+          let win;
+
+          try {
+            win = await browser.windows.create({
+              incognito: usePrivate,
+              focused: false,
+              url: url || 'about:blank'
+            });
+          } catch (e) {
+            // Auto-fallback: if private was requested but permission denied, retry non-private
+            if (usePrivate && (e.message?.includes('incognito') || e.message?.includes('private') || e.message?.includes('permission'))) {
+              privateFallback = true;
+              console.log('[claudezilla] Private window failed, falling back to non-private:', e.message);
+              win = await browser.windows.create({
+                incognito: false,
+                focused: false,
+                url: url || 'about:blank'
+              });
+            } else {
+              throw e;
+            }
+          }
           tabId = win.tabs?.[0]?.id;
 
           // Create tab group for visual distinction (Firefox 138+)
@@ -920,12 +951,13 @@ async function handleCliCommand(message) {
             console.log('[claudezilla] Tab groups not available:', e.message);
           }
 
-          // Initialize window tracking with ownership
+          // Initialize window tracking with ownership and actual mode
           claudezillaWindow = {
             windowId: win.id,
             tabs: [{ tabId, ownerId }],
             createdAt: Date.now(),
-            groupId
+            groupId,
+            isPrivate: win.incognito
           };
           activeTabId = tabId;
 
@@ -947,8 +979,11 @@ async function handleCliCommand(message) {
           tabCount: claudezillaWindow.tabs.length,
           maxTabs: MAX_TABS,
           isNewWindow,
+          isPrivate: claudezillaWindow.isPrivate,
+          privateFallback,
           closedOldestTab: closedTabId,
-          message: `Tab ${claudezillaWindow.tabs.length}/${MAX_TABS}${closedTabId ? ' (closed oldest)' : ''}`
+          message: `Tab ${claudezillaWindow.tabs.length}/${MAX_TABS}${closedTabId ? ' (closed oldest)' : ''}`,
+          modeWarning: privateFallback ? 'Private window unavailable (permission not granted in Firefox settings). Fell back to non-private mode. Browsing data will persist.' : undefined
         };
         break;
       }
@@ -1793,6 +1828,16 @@ async function handleCliCommand(message) {
           throw new Error(response.error);
         }
         result = { tabId, ...response.result };
+        break;
+      }
+
+      case 'getWindowMode': {
+        const canPrivate = await canRunInPrivateWindows();
+        result = {
+          privateWindowsAvailable: canPrivate,
+          currentWindowMode: claudezillaWindow ? (claudezillaWindow.isPrivate ? 'private' : 'normal') : null,
+          windowExists: !!claudezillaWindow,
+        };
         break;
       }
 

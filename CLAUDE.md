@@ -59,10 +59,11 @@ claudezilla@boot.industries
 |---------|-------------|
 | ping | Test connection |
 | version | Get host version |
-| createWindow | Open URL in shared 12-tab pool |
+| createWindow | Open URL in shared 12-tab pool (auto-fallback on private mode failure) |
 | navigate | Navigate owned tab to URL |
 | closeTab | Close tab by ID |
 | getTabs | List tabs with ownership |
+| getWindowMode | Query private mode capability and current window state |
 
 ### Page Interaction
 | Command | Description |

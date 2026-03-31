@@ -17,6 +17,13 @@ Triggered by WHB011-014 TeamPCP campaign audit. No indicators of compromise foun
 - **Explicit Content Security Policy** — Added `content_security_policy` to `extension/manifest.json` (defense-in-depth over MV2 default).
 - **Host lockfile** — Added `pnpm-lock.yaml` to `host/` to gate future dependency additions via lockfile review.
 
+### Improvements
+
+- **Graceful private mode handling** — `firefox_create_window` now auto-falls back to non-private mode when Firefox incognito permission isn't granted, instead of hard-failing. Response includes `isPrivate`, `privateFallback`, and `modeWarning` fields so agents always know the actual mode.
+- **Per-window mode awareness** — `firefox_create_window` accepts optional `private` boolean. If the existing shared window's mode conflicts, returns a structured `MODE_MISMATCH` error. Omitting the param preserves backward-compatible behavior.
+- **Mode detection at activation** — `firefox_activate` response now includes `privateWindowsAvailable` and `currentWindowMode` so agents know capabilities upfront.
+- **New `getWindowMode` command** — lightweight query for current window state and private mode capability.
+
 ### Dependencies
 
 - **Upgraded `@modelcontextprotocol/sdk`** from 1.25.2 to 1.29.0 — patches GHSA-345p-7cg4-v4c7 (cross-client data leak via shared server/transport). Claudezilla uses stdio transport (1:1 pipe), so was not exploitable in our architecture, but upgraded for hygiene.

@@ -505,13 +505,17 @@ const TOOLS = [
   // ===== CORE BROWSER CONTROL =====
   {
     name: 'firefox_create_window',
-    description: 'Open a URL in the shared Claudezilla browser. SHARED POOL: One private window with MAX 12 TABS shared across all Claude agents. Each call creates a new tab. When limit reached, oldest tab auto-closed. OWNERSHIP: Each tab tracks its creator - only you can close tabs you created. Returns: windowId, tabId, ownerId, tabCount, maxTabs.',
+    description: 'Open a URL in the shared Claudezilla browser. SHARED POOL: One window with MAX 12 TABS shared across all Claude agents. Each call creates a new tab. When limit reached, oldest tab auto-closed. OWNERSHIP: Each tab tracks its creator - only you can close tabs you created. Auto-fallback: if private mode fails (permission not granted), automatically falls back to non-private with a warning. Returns: windowId, tabId, ownerId, tabCount, maxTabs, isPrivate.',
     inputSchema: {
       type: 'object',
       properties: {
         url: {
           type: 'string',
           description: 'URL to open in new tab (default: about:blank)',
+        },
+        private: {
+          type: 'boolean',
+          description: 'Request private (incognito) or non-private window. Only applies when creating a NEW window. If existing window mode conflicts, returns MODE_MISMATCH error. Omit to use default.',
         },
       },
     },
@@ -1320,6 +1324,18 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       console.error('[claudezilla] listChanged notification failed:', err.message);
     });
     const activatedTools = TOOLS.filter(t => activatedCategories.has(t.category)).map(t => t.name);
+
+    // Query current window mode capabilities (non-fatal)
+    let windowMode = null;
+    try {
+      const modeResponse = await sendCommand('getWindowMode', {});
+      if (modeResponse.success) {
+        windowMode = modeResponse.result;
+      }
+    } catch (e) {
+      // Non-fatal: extension may not support getWindowMode yet
+    }
+
     return {
       content: [{
         type: 'text',
@@ -1328,6 +1344,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           categories: [...activatedCategories],
           tools: activatedTools,
           count: activatedTools.length,
+          privateWindowsAvailable: windowMode?.privateWindowsAvailable ?? null,
+          currentWindowMode: windowMode?.currentWindowMode ?? null,
         }),
       }],
     };
@@ -1523,6 +1541,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         errorText = `POOL_FULL: Tab pool is full and you have no tabs to evict.\n` +
           `  Tab pool: ${response.details.tabPool}\n` +
           `  Owner breakdown: ${response.details.ownerBreakdown}\n` +
+          `  Hint: ${response.details.hint}`;
+      } else if (response.details?.code === 'MODE_MISMATCH') {
+        errorText = `MODE_MISMATCH: ${response.details.message}\n` +
+          `  Current: ${response.details.currentMode}\n` +
+          `  Requested: ${response.details.requestedMode}\n` +
           `  Hint: ${response.details.hint}`;
       }
       return {

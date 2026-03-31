@@ -90,6 +90,8 @@ const ALLOWED_COMMANDS = new Set([
   'goodbye',
   // Consent automation
   'handleConsent',
+  // Window mode query
+  'getWindowMode',
 ]);
 
 /**
