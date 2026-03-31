@@ -7,7 +7,7 @@
 
 **Supply chain hardening — closes ignore-scripts gap, hardens auth, upgrades MCP SDK.**
 
-Triggered by WHB011-014 TeamPCP campaign audit. No indicators of compromise found, but the `ignore-scripts` gap left postinstall hooks enabled — the primary CanisterWorm attack vector. This release closes all identified gaps.
+Triggered by internal supply chain security audit. No indicators of compromise found, but the `ignore-scripts` gap left postinstall hooks enabled — the primary CanisterWorm attack vector. This release closes all identified gaps.
 
 ### Security Fixes
 
