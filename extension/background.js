@@ -301,6 +301,81 @@ function validateUrlScheme(url) {
 }
 
 /**
+ * Resolve a container name to its cookieStoreId.
+ *
+ * Accepts either a human-readable container name (e.g. "Work" — matched
+ * case-insensitively, exact case wins) or a raw cookieStoreId
+ * ("firefox-container-3"). Returns null for no container, which leaves the
+ * tab in the default cookie jar (existing behaviour).
+ *
+ * Container tabs are mutually exclusive with private windows, so callers must
+ * force non-private mode when a container is requested.
+ */
+async function resolveCookieStoreId(container) {
+  if (container === undefined || container === null || container === '') return null;
+  if (typeof container !== 'string') {
+    throw new Error('container must be a string (container name or cookieStoreId)');
+  }
+  // Raw cookieStoreId passes through untouched
+  if (/^firefox-container-\d+$/.test(container)) return container;
+  if (!browser.contextualIdentities) {
+    throw new Error('Containers unavailable: contextualIdentities API not present. Enable "Container Tabs" in Firefox settings (privacy.userContext.enabled).');
+  }
+  const all = await browser.contextualIdentities.query({});
+  const exact = all.filter(c => c.name === container);
+  const matches = exact.length > 0
+    ? exact
+    : all.filter(c => c.name.toLowerCase() === container.toLowerCase());
+  if (matches.length === 0) {
+    const names = all.map(c => c.name).join(', ');
+    throw new Error(`Container not found: "${container}". Available containers: ${names || '(none)'}`);
+  }
+  if (matches.length > 1) {
+    const ids = matches.map(c => `"${c.name}" (${c.cookieStoreId})`).join(', ');
+    throw new Error(`Container name "${container}" is ambiguous: ${ids}. Pass a cookieStoreId instead.`);
+  }
+  return matches[0].cookieStoreId;
+}
+
+/**
+ * Multi-Account Containers (and similar add-ons) enforce site->container
+ * assignments by closing the tab we just opened and re-opening the same URL in
+ * the assigned container. That silently orphans our tracked tabId.
+ *
+ * Detect it and adopt the replacement tab so ownership and the pool survive.
+ * Returns the tabId to track (original, or its replacement).
+ */
+async function adoptReassignedTab(tabId, windowId, url) {
+  try {
+    await browser.tabs.get(tabId);
+    return tabId; // Tab survived - no reassignment happened
+  } catch (e) {
+    // Tab vanished - look for the replacement in the same window
+    if (!url) return tabId;
+    let wanted;
+    try {
+      wanted = new URL(url);
+    } catch (_) {
+      return tabId;
+    }
+    const candidates = await browser.tabs.query({ windowId });
+    const match = candidates.find(t => {
+      try {
+        const got = new URL(t.url);
+        return got.origin === wanted.origin && got.pathname === wanted.pathname;
+      } catch (_) {
+        return false;
+      }
+    });
+    if (match) {
+      console.log(`[claudezilla] Tab ${tabId} was reassigned to a container by another extension; adopted replacement ${match.id}`);
+      return match.id;
+    }
+    return tabId;
+  }
+}
+
+/**
  * SECURITY: Verify agent owns the target tab before operations
  * Prevents cross-agent tab interference
  */
@@ -914,7 +989,7 @@ async function handleCliCommand(message) {
       }
 
       case 'navigate': {
-        const { url, tabId: rawNavTabId, windowId, agentId } = params;
+        const { url, tabId: rawNavTabId, windowId, agentId, container } = params;
         const targetTabId = rawNavTabId ? Number(rawNavTabId) : null;
         if (!url) throw new Error('url is required');
 
@@ -925,6 +1000,18 @@ async function handleCliCommand(message) {
         // while managed tabs retain their ownership check.
         if (targetTabId) {
           const tabId = await resolveTargetTab(targetTabId, windowId, agentId, 'navigate');
+          // A tab's container is fixed at creation - tabs.update cannot move it
+          if (container) {
+            const wantStore = await resolveCookieStoreId(container);
+            const existing = await browser.tabs.get(tabId);
+            if (wantStore && existing.cookieStoreId !== wantStore) {
+              throw {
+                code: 'CONTAINER_IMMUTABLE',
+                message: `Tab ${tabId} is in "${existing.cookieStoreId}"; a tab cannot be moved into container "${container}" after creation.`,
+                hint: 'Call firefox_create_window with the container parameter to open a new tab in that container.'
+              };
+            }
+          }
           await browser.tabs.update(tabId, { url });
           const tab = await browser.tabs.get(tabId);
           result = { tabId, url: tab.url, title: tab.title, navigated: true };
@@ -942,6 +1029,30 @@ async function handleCliCommand(message) {
         const currentTab = await requirePrivateWindow();
         await browser.tabs.update(currentTab.id, { url });
         result = { tabId: currentTab.id, url };
+        break;
+      }
+
+      case 'listContainers': {
+        // List available Firefox containers (contextual identities)
+        if (!browser.contextualIdentities) {
+          result = {
+            containers: [],
+            available: false,
+            message: 'Container Tabs are disabled in this Firefox profile (privacy.userContext.enabled).'
+          };
+          break;
+        }
+        const identities = await browser.contextualIdentities.query({});
+        result = {
+          containers: identities.map(c => ({
+            name: c.name,
+            cookieStoreId: c.cookieStoreId,
+            colour: c.color,
+            icon: c.icon
+          })),
+          available: true,
+          count: identities.length
+        };
         break;
       }
 
@@ -966,7 +1077,8 @@ async function handleCliCommand(message) {
                 url: tab.url,
                 title: tab.title,
                 active: tab.active,
-                ownerId: entry.ownerId
+                ownerId: entry.ownerId,
+                cookieStoreId: tab.cookieStoreId
               };
             } catch (e) {
               return { tabId: entry.tabId, ownerId: entry.ownerId, error: 'Tab not found' };
@@ -994,6 +1106,7 @@ async function handleCliCommand(message) {
             active: tab.active,
             pinned: tab.pinned,
             private: tab.incognito,
+            cookieStoreId: tab.cookieStoreId,
             pool: poolTabIds.has(tab.id),
             attached: isAttachedTab(tab.id)
           })),
@@ -1026,7 +1139,7 @@ async function handleCliCommand(message) {
         // Single window mode: reuse existing window or create new one
         // Max 12 tabs - oldest tab closed when limit reached
         // Tab ownership: each tab tracks its creator agent for close permission
-        const { url, agentId, private: requestedPrivate } = params;
+        const { url, agentId, private: requestedPrivate, container } = params;
         const ownerId = agentId || 'unknown';
 
         // SECURITY: Validate URL scheme (blocks javascript:, data:)
@@ -1037,6 +1150,17 @@ async function handleCliCommand(message) {
         let isNewWindow = false;
         let closedTabId = null;
         let privateFallback = false;
+
+        // Containers live in the persistent cookie jar, so they cannot coexist
+        // with private windows. Resolve first, then force non-private mode.
+        const cookieStoreId = await resolveCookieStoreId(container);
+        if (cookieStoreId && requestedPrivate === true) {
+          throw {
+            code: 'CONTAINER_PRIVATE_CONFLICT',
+            message: `Cannot open container "${container}" in a private window - containers require persistent cookies.`,
+            hint: 'Omit private:true, or drop the container parameter.'
+          };
+        }
 
         if (claudezillaWindow) {
           // Window exists - verify it's still valid
@@ -1129,14 +1253,26 @@ async function handleCliCommand(message) {
             }
           }
 
+          // A container tab cannot be created inside a private window
+          if (cookieStoreId && claudezillaWindow.isPrivate) {
+            throw {
+              code: 'CONTAINER_PRIVATE_CONFLICT',
+              message: `Existing Claudezilla window is private; container "${container}" needs a non-private window.`,
+              hint: 'Call firefox_close_window first, or firefox_set_private_mode with enabled:false, then retry.'
+            };
+          }
+
           // Create new tab in existing window
           const newTab = await browser.tabs.create({
             windowId: claudezillaWindow.windowId,
             url: url || 'about:blank',
-            active: true
+            active: true,
+            ...(cookieStoreId ? { cookieStoreId } : {})
           });
           tabId = newTab.id;
-          claudezillaWindow.tabs.push({ tabId, ownerId });
+          // Another extension may reassign the tab to its assigned container
+          tabId = await adoptReassignedTab(tabId, claudezillaWindow.windowId, url);
+          claudezillaWindow.tabs.push({ tabId, ownerId, cookieStoreId });
           activeTabId = tabId;
 
         } else {
@@ -1146,7 +1282,10 @@ async function handleCliCommand(message) {
           // Toggle via the popup's "Reuse current window" setting (Window
           // section), backed by storage.local { adoptCurrentWindow: false }.
           isNewWindow = true;
-          const usePrivate = typeof requestedPrivate === 'boolean' ? requestedPrivate : await isPrivateModeRequired();
+          // A container forces non-private mode: container cookie jars are persistent
+          const usePrivate = cookieStoreId
+            ? false
+            : (typeof requestedPrivate === 'boolean' ? requestedPrivate : await isPrivateModeRequired());
           let win;
           let adoptedWindow = false;
 
@@ -1167,18 +1306,26 @@ async function handleCliCommand(message) {
           }
 
           if (adoptedWindow) {
+            // tabs.create() accepts cookieStoreId directly, so a container tab
+            // opens in the adopted window without any placeholder dance.
             const newTab = await browser.tabs.create({
               windowId: win.id,
               url: url || 'about:blank',
-              active: false
+              active: false,
+              ...(cookieStoreId ? { cookieStoreId } : {})
             });
-            tabId = newTab.id;
+            // Another extension may reassign the tab to its assigned container
+            tabId = await adoptReassignedTab(newTab.id, win.id, url);
           } else {
+            // windows.create() has no cookieStoreId option, so for a container we
+            // open the window blank and create the contained tab inside it below.
+            const initialUrl = cookieStoreId ? 'about:blank' : (url || 'about:blank');
+
             try {
               win = await browser.windows.create({
                 incognito: usePrivate,
                 focused: false,
-                url: url || 'about:blank'
+                url: initialUrl
               });
             } catch (e) {
               // Auto-fallback: if private was requested but permission denied, retry non-private
@@ -1188,13 +1335,32 @@ async function handleCliCommand(message) {
                 win = await browser.windows.create({
                   incognito: false,
                   focused: false,
-                  url: url || 'about:blank'
+                  url: initialUrl
                 });
               } else {
                 throw e;
               }
             }
             tabId = win.tabs?.[0]?.id;
+
+            // Open the real URL in the requested container, then drop the placeholder
+            if (cookieStoreId) {
+              const placeholderId = tabId;
+              const contained = await browser.tabs.create({
+                windowId: win.id,
+                url: url || 'about:blank',
+                active: true,
+                cookieStoreId
+              });
+              tabId = await adoptReassignedTab(contained.id, win.id, url);
+              if (placeholderId && placeholderId !== tabId) {
+                try {
+                  await browser.tabs.remove(placeholderId);
+                } catch (e) {
+                  console.log('[claudezilla] Could not close placeholder tab:', e.message);
+                }
+              }
+            }
           }
 
           // Create tab group for visual distinction (Firefox 138+)
@@ -1221,7 +1387,7 @@ async function handleCliCommand(message) {
           // remove tracked tabs there, never the window itself.
           claudezillaWindow = {
             windowId: win.id,
-            tabs: [{ tabId, ownerId }],
+            tabs: [{ tabId, ownerId, cookieStoreId }],
             createdAt: Date.now(),
             groupId,
             isPrivate: adoptedWindow ? false : win.incognito,
@@ -1246,6 +1412,8 @@ async function handleCliCommand(message) {
           isNewWindow,
           isPrivate: claudezillaWindow.isPrivate,
           privateFallback,
+          container: container || undefined,
+          cookieStoreId: cookieStoreId || undefined,
           closedOldestTab: closedTabId,
           message: `Tab ${claudezillaWindow.tabs.length}/${MAX_TABS}${closedTabId ? ' (closed oldest)' : ''}`,
           modeWarning: privateFallback ? 'Private window unavailable (permission not granted in Firefox settings). Fell back to non-private mode. Browsing data will persist.' : undefined
