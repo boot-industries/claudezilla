@@ -2029,6 +2029,35 @@ browser.tabs.onActivated.addListener((activeInfo) => {
   }
 });
 
+// DRAG-TO-ATTACH: adopt tabs the user drags INTO the Claudezilla window, and
+// release tabs dragged back OUT. This lets Claudezilla operate on a pre-existing
+// tab without a dedicated command: keep the automation window open, then drag a
+// tab into it. Dragging is treated as explicit user consent, so the adopted tab
+// gets ownerId 'unknown' — verifyTabOwnership()'s legacy-compat rule then lets
+// any agent use it. Dragging it back out (onDetached) releases it again.
+browser.tabs.onAttached.addListener((tabId, attachInfo) => {
+  if (!claudezillaWindow || attachInfo.newWindowId !== claudezillaWindow.windowId) return;
+  if (!claudezillaWindow.tabs.some(t => t.tabId === tabId)) {
+    claudezillaWindow.tabs.push({ tabId, ownerId: 'unknown' });
+    console.log(`[claudezilla] Adopted dragged-in tab ${tabId}. ${claudezillaWindow.tabs.length}/${MAX_TABS} tabs.`);
+    // Enable visuals on the newly adopted tab (content script already present via <all_urls>)
+    browser.tabs.sendMessage(tabId, { action: 'enableClaudezillaVisuals' }).catch(() => {});
+  }
+});
+
+browser.tabs.onDetached.addListener((tabId, detachInfo) => {
+  if (!claudezillaWindow || detachInfo.oldWindowId !== claudezillaWindow.windowId) return;
+  const i = claudezillaWindow.tabs.findIndex(t => t.tabId === tabId);
+  if (i > -1) {
+    claudezillaWindow.tabs.splice(i, 1);
+    console.log(`[claudezilla] Released dragged-out tab ${tabId}. ${claudezillaWindow.tabs.length}/${MAX_TABS} tabs.`);
+  }
+  if (activeTabId === tabId) {
+    const lastTab = claudezillaWindow.tabs[claudezillaWindow.tabs.length - 1];
+    activeTabId = lastTab?.tabId || null;
+  }
+});
+
 // Connect on startup
 connect();
 
