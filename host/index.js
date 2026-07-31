@@ -68,6 +68,7 @@ const ALLOWED_COMMANDS = new Set([
   'detachTab',
   'closeTab',
   'createWindow',
+  'listContainers',
   'closeWindow',
   'getWindows',
   'resizeWindow',

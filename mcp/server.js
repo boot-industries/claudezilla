@@ -581,7 +581,19 @@ const TOOLS = [
           type: 'boolean',
           description: 'Request private (incognito) or non-private window. Only applies when creating a NEW window. If existing window mode conflicts, returns MODE_MISMATCH error. Omit to use default.',
         },
+        container: {
+          type: 'string',
+          description: 'Open the tab in a Firefox container (contextual identity), e.g. "Work" or "Banking". Accepts a container name (case-insensitive) or a raw cookieStoreId ("firefox-container-3"). The tab uses that container\'s cookie jar, so logins already established in it apply. Forces non-private mode (containers require persistent cookies). Use firefox_list_containers to see available names.',
+        },
       },
+    },
+  },
+  {
+    name: 'firefox_list_containers',
+    description: 'List the Firefox containers (contextual identities) available in this profile, with their names and cookieStoreIds. Use before firefox_create_window to pick the container holding the logged-in session a site needs.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
     },
   },
   {
@@ -597,6 +609,10 @@ const TOOLS = [
         tabId: {
           type: 'number',
           description: 'Target tab ID. If provided, navigates this tab (ownership enforced). Without tabId, navigates active tab.',
+        },
+        container: {
+          type: 'string',
+          description: 'Assert the tab is in this container. A tab\'s container is fixed at creation, so this cannot move it - a mismatch returns CONTAINER_IMMUTABLE. To open a URL in a container, use firefox_create_window.',
         },
       },
       required: ['url'],
@@ -1273,6 +1289,7 @@ const TOOL_CATEGORIES = {
   firefox_attach_tab: 'core',
   firefox_detach_tab: 'core',
   firefox_close_tab: 'core',
+  firefox_list_containers: 'core',
   firefox_get_content: 'inspection',
   firefox_get_element: 'inspection',
   firefox_wait_for: 'inspection',
@@ -1347,6 +1364,7 @@ const TOOL_TO_COMMAND = {
   firefox_attach_tab: 'attachTab',
   firefox_detach_tab: 'detachTab',
   firefox_close_tab: 'closeTab',
+  firefox_list_containers: 'listContainers',
   firefox_close_window: 'closeWindow',
   firefox_resize_window: 'resizeWindow',
   firefox_set_viewport: 'setViewport',
