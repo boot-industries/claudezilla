@@ -21,7 +21,9 @@
     "activeTab",
     "<all_urls>",
     "webRequest",
-    "storage"
+    "storage",
+    "cookies",
+    "contextualIdentities"
   ],
   "background": {
     "scripts": [
