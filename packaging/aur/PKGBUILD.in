@@ -1,0 +1,64 @@
+# Maintainer: Chris Lyons <support@boot.industries>
+# This file is a template: @PKGVER@ and @REPO@ are substituted by
+# .github/workflows/aur-publish.yml before deployment to the AUR.
+pkgname=claudezilla
+pkgver=@PKGVER@
+pkgrel=1
+pkgdesc="Firefox browser automation for Claude Code — MCP server and native messaging host"
+arch=('any')
+url="https://github.com/@REPO@"
+license=('MIT')
+depends=('nodejs>=18')
+makedepends=('npm' 'zip')
+optdepends=('firefox: run the automation browser locally'
+            'jq: automatic Claude Code config merging in claudezilla-setup')
+install=claudezilla.install
+source=("$pkgname-$pkgver.tar.gz::https://github.com/@REPO@/archive/refs/tags/v$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+build() {
+    cd "$pkgname-$pkgver"
+    ( cd mcp && npm install --omit=dev --ignore-scripts --no-fund --no-audit )
+    ( cd extension && zip -qr ../claudezilla.xpi . )
+}
+
+package() {
+    cd "$pkgname-$pkgver"
+    local lib=/usr/lib/claudezilla
+
+    # Native messaging host (no runtime npm dependencies)
+    install -d "$pkgdir$lib/host"
+    install -m644 host/index.js host/ipc.js host/protocol.js host/cli.js \
+        host/package.json "$pkgdir$lib/host/"
+
+    # MCP server with vendored dependencies
+    install -d "$pkgdir$lib/mcp"
+    cp -r mcp/server.js mcp/package.json mcp/node_modules "$pkgdir$lib/mcp/"
+
+    # Extension XPI, sideloaded into the headless profile by claudezilla-setup
+    install -m644 claudezilla.xpi "$pkgdir$lib/claudezilla.xpi"
+
+    # Executables
+    install -d "$pkgdir/usr/bin"
+    cat > "$pkgdir/usr/bin/claudezilla-host" <<'EOF'
+#!/bin/sh
+exec /usr/bin/node /usr/lib/claudezilla/host/index.js "$@"
+EOF
+    cat > "$pkgdir/usr/bin/claudezilla-mcp" <<'EOF'
+#!/bin/sh
+exec /usr/bin/node /usr/lib/claudezilla/mcp/server.js "$@"
+EOF
+    chmod 755 "$pkgdir/usr/bin/claudezilla-host" "$pkgdir/usr/bin/claudezilla-mcp"
+    install -Dm755 packaging/common/claudezilla-setup "$pkgdir/usr/bin/claudezilla-setup"
+
+    # System-wide Firefox native messaging manifest
+    install -Dm644 packaging/common/claudezilla.json \
+        "$pkgdir/usr/lib/mozilla/native-messaging-hosts/claudezilla.json"
+
+    # systemd user service for the headless automation browser
+    install -Dm644 packaging/common/claudezilla-browser.service \
+        "$pkgdir/usr/lib/systemd/user/claudezilla-browser.service"
+
+    install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+    install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
+}

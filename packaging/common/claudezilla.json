@@ -1,0 +1,7 @@
+{
+  "name": "claudezilla",
+  "description": "Claude Code Firefox browser automation bridge",
+  "path": "/usr/bin/claudezilla-host",
+  "type": "stdio",
+  "allowed_extensions": ["claudezilla@boot.industries"]
+}

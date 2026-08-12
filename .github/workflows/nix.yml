@@ -1,0 +1,56 @@
+name: Nix package
+
+# The flake itself is the distribution channel
+# (nix profile install github:boot-industries/claudezilla) — this workflow
+# validates that it builds, and commits flake.lock if it is missing.
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    paths:
+      - 'flake.nix'
+      - 'flake.lock'
+      - 'packaging/nix/**'
+      - 'mcp/package-lock.json'
+      - '.github/workflows/nix.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: nix build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+
+      - name: Generate flake.lock if missing
+        run: nix flake lock
+
+      - name: Build package
+        run: nix build .#claudezilla -L
+
+      - name: Smoke test
+        run: |
+          ls -l result/bin/
+          test -f result/lib/mozilla/native-messaging-hosts/claudezilla.json
+          test -f result/lib/claudezilla/claudezilla.xpi
+          test -d result/lib/claudezilla/mcp/node_modules/@modelcontextprotocol/sdk
+
+      - name: Commit flake.lock if new
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          if ! git diff --quiet -- flake.lock 2>/dev/null || \
+             [ -n "$(git status --porcelain flake.lock)" ]; then
+            git config user.name 'github-actions[bot]'
+            git config user.email 'github-actions[bot]@users.noreply.github.com'
+            git add flake.lock
+            git commit -m 'nix: commit flake.lock [skip ci]'
+            git push
+          fi
