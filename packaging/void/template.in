@@ -1,0 +1,22 @@
+# Template file for 'claudezilla'
+pkgname=claudezilla
+version=@VERSION@
+revision=1
+build_style=fetch
+hostmakedepends="nodejs zip"
+depends="nodejs"
+short_desc="Firefox browser automation for Claude Code"
+maintainer="@MAINTAINER@"
+license="MIT"
+homepage="https://github.com/@REPO@"
+distfiles="https://github.com/@REPO@/archive/refs/tags/v${version}.tar.gz"
+checksum=@SHA256@
+
+do_build() {
+	( cd mcp && npm install --omit=dev --ignore-scripts --no-fund --no-audit )
+	( cd extension && zip -qr ../claudezilla.xpi . )
+}
+
+do_install() {
+	DESTDIR="${DESTDIR}" ./packaging/common/install-tree.sh
+}

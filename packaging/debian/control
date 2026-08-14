@@ -1,0 +1,21 @@
+Source: claudezilla
+Section: web
+Priority: optional
+Maintainer: @MAINTAINER@
+Build-Depends: debhelper-compat (= 13), nodejs (>= 18), npm, zip
+Standards-Version: 4.6.2
+Homepage: https://github.com/@REPO@
+Rules-Requires-Root: no
+
+Package: claudezilla
+Architecture: all
+Depends: ${misc:Depends}, nodejs (>= 18)
+Recommends: firefox-esr | firefox
+Suggests: jq, bun
+Description: Firefox browser automation for Claude Code
+ Claudezilla gives Claude Code control of Firefox through a native messaging
+ host and an MCP server: navigation, page inspection, screenshots, console and
+ network logs.
+ .
+ Run claudezilla-setup once per user to register the MCP server with Claude
+ Code and sideload the extension into a dedicated Firefox profile.

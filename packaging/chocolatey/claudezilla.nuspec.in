@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>claudezilla</id>
+    <version>@VERSION@</version>
+    <title>Claudezilla</title>
+    <authors>@MAINTAINER@</authors>
+    <projectUrl>https://github.com/@REPO@</projectUrl>
+    <licenseUrl>https://github.com/@REPO@/blob/main/LICENSE</licenseUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>
+      Firefox browser automation for Claude Code: a native messaging host and
+      MCP server giving Claude Code navigation, page inspection, screenshots,
+      and console and network logs.
+    </description>
+    <summary>Firefox browser automation for Claude Code</summary>
+    <tags>claude firefox automation mcp</tags>
+    <dependencies>
+      <dependency id="nodejs" version="18.0.0" />
+    </dependencies>
+  </metadata>
+  <files>
+    <file src="tools\\**" target="tools" />
+  </files>
+</package>
