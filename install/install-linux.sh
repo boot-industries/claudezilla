@@ -14,6 +14,9 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 HOST_PATH="$PROJECT_DIR/host/index.js"
 NATIVE_HOSTS_DIR="$HOME/.mozilla/native-messaging-hosts"
 
+# shellcheck source=lib/common.sh
+. "$SCRIPT_DIR/lib/common.sh"
+
 echo "Claudezilla Installer (Linux)"
 echo "=============================="
 echo ""
@@ -34,37 +37,30 @@ fi
 chmod 755 "$HOST_PATH"
 echo "Set host permissions to 755: $HOST_PATH"
 
-# Resolve absolute node path (GUI-launched Firefox may not have full PATH)
-NODE_PATH="$(command -v node 2>/dev/null)"
-if [ -z "$NODE_PATH" ]; then
-    echo "Error: node not found in PATH. Please install Node.js first."
-    exit 1
-fi
-echo "Found Node.js at: $NODE_PATH"
+# Resolve an absolute runtime path, preferring Bun (GUI-launched Firefox may
+# not have full PATH)
+RUNTIME_PATH="$(clz_require_runtime)"
+echo "Found runtime: $RUNTIME_PATH"
 
-# Create wrapper script with absolute node path
+# Create the wrappers Firefox and Claude Code execute
 WRAPPER_PATH="$PROJECT_DIR/host/run.sh"
-cat > "$WRAPPER_PATH" << WRAPPER_EOF
-#!/bin/bash
-exec "$NODE_PATH" "$HOST_PATH" "\$@"
-WRAPPER_EOF
-chmod 755 "$WRAPPER_PATH"
+clz_write_wrapper "$WRAPPER_PATH" "index.js" "$RUNTIME_PATH"
 echo "Created host wrapper: $WRAPPER_PATH"
 
-mkdir -p "$NATIVE_HOSTS_DIR"
+MCP_WRAPPER_PATH="$PROJECT_DIR/mcp/run.sh"
+clz_write_wrapper "$MCP_WRAPPER_PATH" "server.js" "$RUNTIME_PATH"
+echo "Created MCP wrapper: $MCP_WRAPPER_PATH"
 
-MANIFEST_PATH="$NATIVE_HOSTS_DIR/claudezilla.json"
-cat > "$MANIFEST_PATH" << EOF
-{
-  "name": "claudezilla",
-  "description": "Claude Code Firefox browser automation bridge",
-  "path": "$WRAPPER_PATH",
-  "type": "stdio",
-  "allowed_extensions": ["claudezilla@boot.industries"]
-}
-EOF
-chmod 644 "$MANIFEST_PATH"
-echo "Native manifest: $MANIFEST_PATH"
+clz_write_manifest "$NATIVE_HOSTS_DIR" "$WRAPPER_PATH"
+echo "Native manifest: $NATIVE_HOSTS_DIR/claudezilla.json"
+
+# Firefox forks read native messaging hosts from their own data directory.
+for fork_dir in "$HOME/.zen" "$HOME/.librewolf" "$HOME/.waterfox"; do
+    if [ -d "$fork_dir" ]; then
+        clz_write_manifest "$fork_dir/native-messaging-hosts" "$WRAPPER_PATH"
+        echo "Native manifest: $fork_dir/native-messaging-hosts/claudezilla.json"
+    fi
+done
 
 # ---------------------------------------------------------------------------
 # 3. MCP dependencies
@@ -72,10 +68,7 @@ echo "Native manifest: $MANIFEST_PATH"
 
 MCP_DIR="$PROJECT_DIR/mcp"
 if [ -f "$MCP_DIR/package.json" ]; then
-    command -v npm >/dev/null 2>&1 || { echo "Error: npm not found. Please install Node.js and npm first."; exit 1; }
-    echo "Installing MCP dependencies..."
-    cd "$MCP_DIR" && npm install --quiet --ignore-scripts
-    cd "$PROJECT_DIR"
+    clz_install_mcp_deps "$MCP_DIR"
     echo "MCP dependencies installed."
 fi
 
@@ -99,7 +92,7 @@ if command -v jq &> /dev/null; then
     fi
     echo "  Permissions: $SETTINGS_FILE"
 
-    MCP_SERVER_CONFIG="{\"command\":\"node\",\"args\":[\"$PROJECT_DIR/mcp/server.js\"]}"
+    MCP_SERVER_CONFIG="{\"command\":\"$MCP_WRAPPER_PATH\",\"args\":[]}"
     if [ -f "$MCP_FILE" ]; then
         jq --argjson cfg "$MCP_SERVER_CONFIG" '.mcpServers.claudezilla = $cfg' \
             "$MCP_FILE" > "$MCP_FILE.tmp" && mv "$MCP_FILE.tmp" "$MCP_FILE"
@@ -126,8 +119,8 @@ SETTINGS_EOF
 {
   "mcpServers": {
     "claudezilla": {
-      "command": "node",
-      "args": ["$PROJECT_DIR/mcp/server.js"]
+      "command": "$MCP_WRAPPER_PATH",
+      "args": []
     }
   }
 }

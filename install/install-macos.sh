@@ -9,6 +9,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 HOST_PATH="$PROJECT_DIR/host/index.js"
 
+# shellcheck source=lib/common.sh
+. "$SCRIPT_DIR/lib/common.sh"
+
 # Firefox native messaging hosts directory (macOS path)
 NATIVE_HOSTS_DIR="$HOME/Library/Application Support/Mozilla/NativeMessagingHosts"
 
@@ -26,53 +29,40 @@ fi
 chmod 755 "$HOST_PATH"
 echo "Set host script permissions to 755: $HOST_PATH"
 
-# Resolve absolute node path (GUI apps like Firefox don't inherit shell PATH)
-NODE_PATH="$(command -v node 2>/dev/null)"
-if [ -z "$NODE_PATH" ]; then
-    echo "Error: node not found in PATH. Please install Node.js first."
-    exit 1
-fi
-echo "Found Node.js at: $NODE_PATH"
+# Resolve an absolute runtime path, preferring Bun (GUI apps like Firefox
+# don't inherit shell PATH)
+RUNTIME_PATH="$(clz_require_runtime)"
+echo "Found runtime: $RUNTIME_PATH"
 
-# Create wrapper script that Firefox will execute
-# This ensures node is found even when Firefox lacks /opt/homebrew/bin in PATH
+# Create the wrappers Firefox and Claude Code execute
 WRAPPER_PATH="$PROJECT_DIR/host/run.sh"
-cat > "$WRAPPER_PATH" << WRAPPER_EOF
-#!/bin/bash
-exec "$NODE_PATH" "$HOST_PATH" "\$@"
-WRAPPER_EOF
-chmod 755 "$WRAPPER_PATH"
+clz_write_wrapper "$WRAPPER_PATH" "index.js" "$RUNTIME_PATH"
 echo "Created host wrapper: $WRAPPER_PATH"
+
+MCP_WRAPPER_PATH="$PROJECT_DIR/mcp/run.sh"
+clz_write_wrapper "$MCP_WRAPPER_PATH" "server.js" "$RUNTIME_PATH"
+echo "Created MCP wrapper: $MCP_WRAPPER_PATH"
 
 # Install MCP server dependencies
 MCP_DIR="$PROJECT_DIR/mcp"
 if [ -f "$MCP_DIR/package.json" ]; then
-    command -v npm >/dev/null 2>&1 || { echo "Error: npm not found. Please install Node.js and npm first."; exit 1; }
-    echo "Installing MCP dependencies..."
-    cd "$MCP_DIR" && npm install --quiet --ignore-scripts
+    clz_install_mcp_deps "$MCP_DIR"
     echo "MCP dependencies installed."
 fi
 
-# Create native messaging hosts directory if it doesn't exist
-mkdir -p "$NATIVE_HOSTS_DIR"
-echo "Created native hosts directory: $NATIVE_HOSTS_DIR"
-
 # Create native manifest with correct path
-MANIFEST_PATH="$NATIVE_HOSTS_DIR/claudezilla.json"
+clz_write_manifest "$NATIVE_HOSTS_DIR" "$WRAPPER_PATH"
+echo "Created native manifest with permissions 644: $NATIVE_HOSTS_DIR/claudezilla.json"
 
-cat > "$MANIFEST_PATH" << EOF
-{
-  "name": "claudezilla",
-  "description": "Claude Code Firefox browser automation bridge",
-  "path": "$WRAPPER_PATH",
-  "type": "stdio",
-  "allowed_extensions": ["claudezilla@boot.industries"]
-}
-EOF
-
-# SECURITY: Set manifest file permissions explicitly
-chmod 644 "$MANIFEST_PATH"
-echo "Created native manifest with permissions 644: $MANIFEST_PATH"
+# Firefox forks read native messaging hosts from their own data directory, not
+# Mozilla's, so install the manifest for any that are present.
+APP_SUPPORT="$HOME/Library/Application Support"
+for fork in Zen LibreWolf Waterfox; do
+    if [ -d "$APP_SUPPORT/$fork" ]; then
+        clz_write_manifest "$APP_SUPPORT/$fork/NativeMessagingHosts" "$WRAPPER_PATH"
+        echo "Created native manifest for $fork: $APP_SUPPORT/$fork/NativeMessagingHosts/claudezilla.json"
+    fi
+done
 echo ""
 echo "Installation complete!"
 echo ""
@@ -126,7 +116,7 @@ fi
 
 # Update mcp.json to register Claudezilla MCP server
 if command -v jq &> /dev/null; then
-    MCP_SERVER_CONFIG="{\"command\":\"node\",\"args\":[\"$PROJECT_DIR/mcp/server.js\"]}"
+    MCP_SERVER_CONFIG="{\"command\":\"$MCP_WRAPPER_PATH\",\"args\":[]}"
     if [ -f "$MCP_FILE" ]; then
         # Merge with existing config
         jq --argjson cfg "$MCP_SERVER_CONFIG" '.mcpServers.claudezilla = $cfg' "$MCP_FILE" > "$MCP_FILE.tmp" && mv "$MCP_FILE.tmp" "$MCP_FILE"
@@ -141,8 +131,8 @@ else
 {
   "mcpServers": {
     "claudezilla": {
-      "command": "node",
-      "args": ["$PROJECT_DIR/mcp/server.js"]
+      "command": "$MCP_WRAPPER_PATH",
+      "args": []
     }
   }
 }

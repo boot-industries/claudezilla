@@ -114,7 +114,7 @@ Claude, get all the links on this page
 ## Requirements
 
 - Firefox 91+
-- Node.js 18+
+- Node.js 18+ (or [Bun](https://bun.sh), used automatically when installed)
 - [Claude Code CLI](https://claude.com/claude-code)
 
 ## Privacy & Security

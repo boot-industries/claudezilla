@@ -29,12 +29,14 @@ claudezilla-debug.log
 install/claudezilla.json
 host/host.bat
 host/run.sh
+mcp/run.sh
 
 # Runtime files
 /tmp/claudezilla.sock
 
 # Lock files (keep root package-lock if added)
 mcp/package-lock.json
+mcp/bun.lock
 host/package-lock.json
 
 # Private documentation (PREFIX docs for local use only)
