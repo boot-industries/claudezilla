@@ -509,6 +509,8 @@ function updateVisuals() {
 /**
  * Load settings from storage
  */
+let settingsLoaded = null;  // Promise resolved once storage has been read
+
 async function loadSettings() {
   try {
     const stored = await browser.storage.local.get('claudezilla');
@@ -522,13 +524,23 @@ async function loadSettings() {
 }
 
 /**
+ * Ensure settings have been read from storage at least once.
+ * Gated actions (evaluate) must await this, otherwise the first command
+ * on a tab can race the async load and see the default allowEvaluate=false.
+ */
+function ensureSettingsLoaded() {
+  if (!settingsLoaded) settingsLoaded = loadSettings();
+  return settingsLoaded;
+}
+
+/**
  * Initialize visual effects
  */
 function initVisuals() {
   // Only initialize in top frame
   if (window !== window.top) return;
 
-  loadSettings();
+  ensureSettingsLoaded();
   initWatermark();
   initFocusglow();
   updateVisuals();
@@ -1137,7 +1149,9 @@ const BLOCKED_EXPRESSION_PATTERNS = [
  * @param {string} params.expression - JavaScript expression to evaluate
  * @returns {object} Result
  */
-function evaluate(params) {
+async function evaluate(params) {
+  await ensureSettingsLoaded();
+
   const { expression } = params;
 
   if (!expression) {
@@ -2179,7 +2193,7 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
           break;
 
         case 'evaluate':
-          result = evaluate(params);
+          result = await evaluate(params);
           break;
 
         case 'getElementInfo':
