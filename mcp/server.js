@@ -168,7 +168,13 @@ function diffPageState(before, after) {
 
 // Agent heartbeat tracking for orphaned tab cleanup
 const agentHeartbeats = new Map(); // agentId -> lastSeenTimestamp
-const AGENT_TIMEOUT_MS = 600000; // 10 minutes - agent is considered dead after this
+// Agent is considered dead after this. Override with CLAUDEZILLA_AGENT_TIMEOUT_MS
+// (milliseconds) for setups where a person works inside a tab while the agent
+// stays idle, which otherwise looks identical to a crashed agent.
+const AGENT_TIMEOUT_ENV = Number(process.env.CLAUDEZILLA_AGENT_TIMEOUT_MS);
+const AGENT_TIMEOUT_MS = Number.isFinite(AGENT_TIMEOUT_ENV) && AGENT_TIMEOUT_ENV > 0
+  ? AGENT_TIMEOUT_ENV
+  : 600000; // 10 minutes default
 const CLEANUP_INTERVAL_MS = 60000; // 1 minute - check for orphaned agents every minute
 
 /**
@@ -1065,7 +1071,7 @@ const TOOLS = [
   // ===== PAGE ANALYSIS (FAST ALTERNATIVES TO SCREENSHOTS) =====
   {
     name: 'firefox_get_page_state',
-    description: 'Get structured page state as JSON. Much faster than screenshots for understanding page content. Returns: URL, title, viewport, errors, headings, links, buttons, inputs, images, landmarks with counts. Works on background tabs.',
+    description: 'Get structured page state as JSON. Much faster than screenshots for understanding page content. Returns: URL, title, viewport, errors, headings, links, buttons, inputs, images, landmarks with counts. Individual string values are length-capped (headings: 100, links: 50/100, buttons: 50, inputs: 50, images: 100) with explicit `truncated: true` and `rawLength` metadata when shortened. Password fields are always masked ("***"). Works on background tabs.',
     inputSchema: {
       type: 'object',
       properties: {

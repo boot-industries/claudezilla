@@ -1488,7 +1488,7 @@ async function handleCliCommand(message) {
 
       case 'cleanupOrphanedTabs': {
         // Close all tabs owned by a specific agent (for orphaned agent cleanup)
-        // Called by MCP server when an agent hasn't been seen in >2 minutes
+        // Called by MCP server when an agent hasn't been seen in >10 minutes (or CLAUDEZILLA_AGENT_TIMEOUT_MS)
         const { agentId } = params;
 
         if (!agentId) {
@@ -2035,9 +2035,9 @@ async function handleCliCommand(message) {
       }
 
       case 'getPageState': {
-        const { windowId, tabId: targetTab, agentId } = params;
+        const { windowId, tabId: targetTab, agentId, ...pageStateParams } = params;
         const tabId = await resolveTargetTab(targetTab, windowId, agentId, 'read page state from');
-        const response = await executeInTab(tabId, 'getPageState', {});
+        const response = await executeInTab(tabId, 'getPageState', pageStateParams);
         if (!response.success) {
           throw new Error(response.error);
         }

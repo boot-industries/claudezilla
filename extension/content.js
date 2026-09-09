@@ -1458,63 +1458,82 @@ function getPageState(params = {}) {
   const allImages = [];
   const allLandmarks = [];
 
-  // Headings
+  // Headings (truncate text at 100 chars, flag if truncated)
   document.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach(el => {
     const text = el.textContent?.trim();
     if (text) {
-      allHeadings.push({ level: el.tagName.toLowerCase(), text: text.slice(0, 100) });
+      const isTruncated = text.length > 100;
+      allHeadings.push({
+        level: el.tagName.toLowerCase(),
+        text: text.slice(0, 100),
+        ...(isTruncated ? { truncated: true, rawLength: text.length } : {}),
+      });
     }
   });
 
-  // Links (visible, with text)
+  // Links (visible, with text; text capped at 50, href at 100)
   document.querySelectorAll('a[href]').forEach(el => {
     const rect = el.getBoundingClientRect();
     if (rect.width > 0 && rect.height > 0) {
       const text = el.textContent?.trim() || el.getAttribute('aria-label') || '';
       if (text) {
+        const rawHref = el.getAttribute('href') || '';
+        const isTruncated = text.length > 50 || rawHref.length > 100;
         allLinks.push({
           text: text.slice(0, 50),
-          href: el.getAttribute('href')?.slice(0, 100),
+          href: rawHref.slice(0, 100),
+          ...(isTruncated ? { truncated: true } : {}),
         });
       }
     }
   });
 
-  // Buttons
+  // Buttons (text capped at 50)
   document.querySelectorAll('button, [role="button"], input[type="submit"], input[type="button"]').forEach(el => {
     const rect = el.getBoundingClientRect();
     if (rect.width > 0 && rect.height > 0) {
+      const rawText = el.textContent?.trim() || el.value || el.getAttribute('aria-label') || '';
+      const isTruncated = rawText.length > 50;
       allButtons.push({
-        text: (el.textContent?.trim() || el.value || el.getAttribute('aria-label') || '').slice(0, 50),
+        text: rawText.slice(0, 50),
         disabled: el.disabled || el.getAttribute('aria-disabled') === 'true',
         type: el.type || 'button',
+        ...(isTruncated ? { truncated: true } : {}),
       });
     }
   });
 
-  // Form inputs
+  // Form inputs (non-password value capped at 50; password always masked as '***' without leak)
   document.querySelectorAll('input, textarea, select').forEach(el => {
     if (el.type === 'hidden') return;
     const rect = el.getBoundingClientRect();
     if (rect.width > 0 && rect.height > 0) {
+      const isPassword = el.type === 'password';
+      const rawVal = el.value || '';
+      const isTruncated = !isPassword && rawVal.length > 50;
       allInputs.push({
         type: el.type || el.tagName.toLowerCase(),
         name: el.name || el.id || '',
         label: el.getAttribute('aria-label') || el.placeholder || document.querySelector(`label[for="${el.id}"]`)?.textContent?.trim() || '',
-        value: el.type === 'password' ? '***' : (el.value?.slice(0, 50) || ''),
+        value: isPassword ? '***' : rawVal.slice(0, 50),
         required: el.required,
         disabled: el.disabled,
+        ...(isTruncated ? { truncated: true } : {}),
       });
     }
   });
 
-  // Images with alt text
+  // Images with alt text (alt capped at 100, src at 100)
   document.querySelectorAll('img[alt]').forEach(el => {
     const rect = el.getBoundingClientRect();
     if (rect.width > 20 && rect.height > 20) {
+      const rawAlt = el.alt || '';
+      const rawSrc = el.src || '';
+      const isTruncated = rawAlt.length > 100 || rawSrc.length > 100;
       allImages.push({
-        alt: el.alt.slice(0, 100),
-        src: el.src?.slice(0, 100),
+        alt: rawAlt.slice(0, 100),
+        src: rawSrc.slice(0, 100),
+        ...(isTruncated ? { truncated: true } : {}),
       });
     }
   });
