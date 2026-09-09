@@ -30,18 +30,20 @@ const MCP_VERSION = JSON.parse(
 const SOCKET_PATH = getSocketPath();
 const AUTH_TOKEN_FILE = getAuthTokenPath();
 
-// Claude Code 2.1.154+ passes the resumed session ID as `--resume <id>` when
-// re-spawning the stdio MCP server (in addition to CLAUDE_CODE_SESSION_ID env).
-// Parse once at startup; getClaudeCodeSessionId() prefers this over env so
-// loop state buckets stay correlated across /clear and process restarts.
-const CLI_SESSION_ID = (() => {
-  const i = process.argv.indexOf('--resume');
+// Session resolution across coding harnesses (Claude Code, OMP, Pi, Hermes, etc.)
+// CLI arguments:
+//   --resume <id>      Claude Code 2.1.154+ passes this on session resume
+//   --session-id <id>  Generic / multi-harness session identifier
+function parseCliArg(flag) {
+  const i = process.argv.indexOf(flag);
   if (i === -1 || i + 1 >= process.argv.length) return undefined;
   const v = process.argv[i + 1];
   if (typeof v !== 'string' || !v || v.length > 128) return undefined;
   if (!/^[A-Za-z0-9_\-:.]+$/.test(v)) return undefined;
   return v;
-})();
+}
+const CLI_RESUME_ID = parseCliArg('--resume');
+const CLI_SESSION_ID = parseCliArg('--session-id');
 
 // Log unhandled rejections without killing the MCP server mid-session.
 // A single missed .catch() (e.g. on a fire-and-forget setTimeout) previously
@@ -85,23 +87,38 @@ function truncateAgentId(id) {
 const agentConfig = new Map(); // agentId -> { allowedDomains: [...], handleConsent: boolean }
 
 /**
- * Resolve the Claude Code session ID for loop scoping.
+ * Resolve the active session ID for loop scoping across multiple harnesses.
  *
- * Lookup order:
- *   1. `--resume <id>` CLI arg (Claude Code 2.1.154+ passes on resume)
- *   2. CLAUDE_CODE_SESSION_ID env var (2.1.132+)
- *   3. undefined → host buckets us under DEFAULT_SESSION (pre-v0.6.5 behavior)
+ * Lookup order (unambiguous precedence):
+ *   1. `--resume <id>` CLI arg (Claude Code resume compatibility)
+ *   2. `--session-id <id>` CLI arg (harness-neutral CLI parameter)
+ *   3. CLAUDEZILLA_SESSION_ID env var (explicit engine override)
+ *   4. OMP_SESSION_ID env var (Oh My Pi)
+ *   5. PI_SESSION_ID env var (Pi Agent)
+ *   6. HERMES_SESSION_ID env var (Hermes Agent)
+ *   7. CLAUDE_CODE_SESSION_ID env var (Claude Code)
+ *   8. undefined → host buckets under DEFAULT_SESSION (__default__)
  *
  * @returns {string|undefined} session ID, or undefined when unavailable
  */
-function getClaudeCodeSessionId() {
+function getSessionId() {
+  if (CLI_RESUME_ID) return CLI_RESUME_ID;
   if (CLI_SESSION_ID) return CLI_SESSION_ID;
-  const v = process.env.CLAUDE_CODE_SESSION_ID;
-  if (typeof v !== 'string' || !v) return undefined;
-  if (v.length > 128) return undefined;
-  if (!/^[A-Za-z0-9_\-:.]+$/.test(v)) return undefined;
-  return v;
+  const candidates = [
+    process.env.CLAUDEZILLA_SESSION_ID,
+    process.env.OMP_SESSION_ID,
+    process.env.PI_SESSION_ID,
+    process.env.HERMES_SESSION_ID,
+    process.env.CLAUDE_CODE_SESSION_ID,
+  ];
+  for (const v of candidates) {
+    if (typeof v === 'string' && v && v.length <= 128 && /^[A-Za-z0-9_\-:.]+$/.test(v)) {
+      return v;
+    }
+  }
+  return undefined;
 }
+const getClaudeCodeSessionId = getSessionId; // Backward-compatible alias
 
 /**
  * Check if a URL is allowed for the given agent based on their allowedDomains config
@@ -1305,10 +1322,6 @@ for (const tool of TOOLS) {
   tool.category = TOOL_CATEGORIES[tool.name] || 'core';
 }
 
-// Lazy loading activation state
-let activatedCategories = new Set();
-let isActivated = false;
-
 // Category groups — 'all' expands to every category
 const CATEGORY_GROUPS = {
   core: ['core'],
@@ -1320,6 +1333,28 @@ const CATEGORY_GROUPS = {
   diagnose: ['diagnose'],
   all: ['core', 'inspection', 'devtools', 'multiagent', 'loop', 'config', 'diagnose'],
 };
+
+// Tool discovery policy: 'lazy' (default for Claude Code) vs 'all' (eager for OMP, Hermes, Pi, Claude Desktop)
+// Precedence: CLI argument (--tools all | --all-tools) > Env var (CLAUDEZILLA_TOOL_MODE=all) > default 'lazy'
+const TOOL_MODE = (() => {
+  if (process.argv.includes('--all-tools')) return 'all';
+  const toolsArgIdx = process.argv.indexOf('--tools');
+  if (toolsArgIdx !== -1 && process.argv[toolsArgIdx + 1] === 'all') return 'all';
+  if (toolsArgIdx !== -1 && process.argv[toolsArgIdx + 1] === 'lazy') return 'lazy';
+  const envMode = process.env.CLAUDEZILLA_TOOL_MODE?.toLowerCase();
+  if (envMode === 'all') return 'all';
+  return 'lazy';
+})();
+
+let activatedCategories = new Set();
+let isActivated = false;
+
+if (TOOL_MODE === 'all') {
+  for (const cat of Object.keys(CATEGORY_GROUPS)) {
+    for (const c of CATEGORY_GROUPS[cat]) activatedCategories.add(c);
+  }
+  isActivated = true;
+}
 
 // Gateway tool — the only tool exposed before activation
 const GATEWAY_TOOLS = [
@@ -1410,6 +1445,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
   const navigateAllowed = await canNavigate();
 
   let availableTools = TOOLS.filter(tool => activatedCategories.has(tool.category));
+  if (TOOL_MODE === 'all') {
+    // In eager mode, retain firefox_activate in tool list as a compatible no-op
+    availableTools = [...GATEWAY_TOOLS, ...availableTools];
+  }
   if (!navigateAllowed) {
     availableTools = availableTools.filter(tool => tool.name !== 'firefox_navigate');
   }

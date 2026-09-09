@@ -105,13 +105,16 @@ const ALLOWED_COMMANDS = new Set([
 ]);
 
 /**
- * Loop state storage (in-memory), keyed by Claude Code session ID.
+ * Loop state storage (in-memory), keyed by harness session ID.
  *
- * Claude Code 2.1.132+ exposes CLAUDE_CODE_SESSION_ID to bash subprocesses.
- * The stop hook and the MCP server forward this so concurrent sessions
- * don't collide. Older callers that don't provide a sessionId are bucketed
- * under DEFAULT_SESSION (preserves pre-v0.6.5 behavior).
+ * Supports multiple coding harnesses:
+ * - Claude Code (CLAUDE_CODE_SESSION_ID / --resume)
+ * - Oh My Pi (OMP_SESSION_ID / --session-id)
+ * - Pi Agent (PI_SESSION_ID)
+ * - Hermes Agent (HERMES_SESSION_ID)
+ * - Explicit override (CLAUDEZILLA_SESSION_ID)
  *
+ * Callers that do not supply a session ID are bucketed under DEFAULT_SESSION.
  * Reset on host restart - by design to prevent orphaned loops.
  */
 const DEFAULT_SESSION = '__default__';

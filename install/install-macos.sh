@@ -5,6 +5,20 @@
 
 set -e
 
+# Target harness: claude (default), omp, hermes, pi, all
+TARGET="claude"
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --target|-t)
+            TARGET="${2:-claude}"
+            shift 2
+            ;;
+        *)
+            shift
+            ;;
+    esac
+done
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 HOST_PATH="$PROJECT_DIR/host/index.js"
@@ -12,10 +26,10 @@ HOST_PATH="$PROJECT_DIR/host/index.js"
 # Firefox native messaging hosts directory (macOS path)
 NATIVE_HOSTS_DIR="$HOME/Library/Application Support/Mozilla/NativeMessagingHosts"
 
-echo "Claudezilla Native Host Installer"
-echo "=================================="
+echo "Claudezilla Multi-Harness Installer (macOS)"
+echo "=========================================="
+echo "Target: $TARGET"
 echo ""
-
 # Check if host script exists
 if [ ! -f "$HOST_PATH" ]; then
     echo "Error: Host script not found at $HOST_PATH"
@@ -87,72 +101,109 @@ echo "The extension should now be loaded. Click the Claudezilla icon"
 echo "in the toolbar to test the connection."
 echo ""
 
-# Configure Claude Code permissions for autonomous operation
-CLAUDE_DIR="$HOME/.claude"
-SETTINGS_FILE="$CLAUDE_DIR/settings.json"
-MCP_FILE="$CLAUDE_DIR/mcp.json"
+# ---------------------------------------------------------------------------
+# Client Registration by Target
+# ---------------------------------------------------------------------------
 
-echo "Configuring Claude Code for autonomous Claudezilla operations..."
+install_claude() {
+    echo "Configuring Claude Code for autonomous Claudezilla operations..."
+    local CLAUDE_DIR="$HOME/.claude"
+    local SETTINGS_FILE="$CLAUDE_DIR/settings.json"
+    local MCP_FILE="$CLAUDE_DIR/mcp.json"
+    mkdir -p "$CLAUDE_DIR"
 
-# Create .claude directory if it doesn't exist
-mkdir -p "$CLAUDE_DIR"
-
-# Update settings.json to allow Claudezilla tools without prompts
-if command -v jq &> /dev/null; then
-    # Use jq for safe JSON manipulation
-    if [ -f "$SETTINGS_FILE" ]; then
-        # Merge with existing settings
-        jq '.permissions.allow = ((.permissions.allow // []) + ["mcp__claudezilla__*"] | unique)' "$SETTINGS_FILE" > "$SETTINGS_FILE.tmp" && mv "$SETTINGS_FILE.tmp" "$SETTINGS_FILE"
+    if command -v jq &> /dev/null; then
+        if [ -f "$SETTINGS_FILE" ]; then
+            jq '.permissions.allow = ((.permissions.allow // []) + ["mcp__claudezilla__*"] | unique)' "$SETTINGS_FILE" > "$SETTINGS_FILE.tmp" && mv "$SETTINGS_FILE.tmp" "$SETTINGS_FILE"
+        else
+            echo '{"permissions":{"allow":["mcp__claudezilla__*"]}}' | jq '.' > "$SETTINGS_FILE"
+        fi
+        local MCP_SERVER_CONFIG="{\"command\":\"node\",\"args\":[\"$PROJECT_DIR/mcp/server.js\"]}"
+        if [ -f "$MCP_FILE" ]; then
+            jq --argjson cfg "$MCP_SERVER_CONFIG" '.mcpServers.claudezilla = $cfg' "$MCP_FILE" > "$MCP_FILE.tmp" && mv "$MCP_FILE.tmp" "$MCP_FILE"
+        else
+            echo "{\"mcpServers\":{\"claudezilla\":$MCP_SERVER_CONFIG}}" | jq '.' > "$MCP_FILE"
+        fi
+        echo "Updated Claude Code configuration: $MCP_FILE"
     else
-        # Create new settings file
-        echo '{"permissions":{"allow":["mcp__claudezilla__*"]}}' | jq '.' > "$SETTINGS_FILE"
+        echo "[WARN] jq not found; skipping automated Claude Code config merge. Please add claudezilla to $MCP_FILE manually."
     fi
-    echo "Updated Claude Code permissions: $SETTINGS_FILE"
-else
-    # Fallback: create settings if doesn't exist
-    if [ ! -f "$SETTINGS_FILE" ]; then
-        cat > "$SETTINGS_FILE" << 'SETTINGS_EOF'
-{
-  "permissions": {
-    "allow": ["mcp__claudezilla__*"]
-  }
 }
-SETTINGS_EOF
-        echo "Created Claude Code permissions: $SETTINGS_FILE"
-    else
-        echo "[WARN] jq not found. Please manually add 'mcp__claudezilla__*' to permissions.allow in $SETTINGS_FILE"
-    fi
-fi
 
-# Update mcp.json to register Claudezilla MCP server
-if command -v jq &> /dev/null; then
-    MCP_SERVER_CONFIG="{\"command\":\"node\",\"args\":[\"$PROJECT_DIR/mcp/server.js\"]}"
-    if [ -f "$MCP_FILE" ]; then
-        # Merge with existing config
-        jq --argjson cfg "$MCP_SERVER_CONFIG" '.mcpServers.claudezilla = $cfg' "$MCP_FILE" > "$MCP_FILE.tmp" && mv "$MCP_FILE.tmp" "$MCP_FILE"
+install_omp() {
+    echo "Configuring Oh My Pi (OMP)..."
+    local OMP_DIR="$HOME/.omp"
+    local MCP_FILE="$OMP_DIR/mcp.json"
+    mkdir -p "$OMP_DIR"
+
+    # OMP uses eager tool loading (--all-tools) and 120s timeout
+    local MCP_SERVER_CONFIG="{\"command\":\"node\",\"args\":[\"$PROJECT_DIR/mcp/server.js\",\"--all-tools\"],\"timeout\":120000}"
+    if command -v jq &> /dev/null; then
+        if [ -f "$MCP_FILE" ]; then
+            jq --argjson cfg "$MCP_SERVER_CONFIG" '.mcpServers.claudezilla = $cfg' "$MCP_FILE" > "$MCP_FILE.tmp" && mv "$MCP_FILE.tmp" "$MCP_FILE"
+        else
+            echo "{\"mcpServers\":{\"claudezilla\":$MCP_SERVER_CONFIG}}" | jq '.' > "$MCP_FILE"
+        fi
+        echo "Updated OMP configuration: $MCP_FILE"
     else
-        # Create new mcp.json
-        echo "{\"mcpServers\":{\"claudezilla\":$MCP_SERVER_CONFIG}}" | jq '.' > "$MCP_FILE"
+        echo "[WARN] jq not found; skipping automated OMP config merge."
     fi
-    echo "Updated Claude Code MCP config: $MCP_FILE"
-else
-    if [ ! -f "$MCP_FILE" ]; then
-        cat > "$MCP_FILE" << MCP_EOF
-{
-  "mcpServers": {
-    "claudezilla": {
-      "command": "node",
-      "args": ["$PROJECT_DIR/mcp/server.js"]
-    }
-  }
 }
-MCP_EOF
-        echo "Created Claude Code MCP config: $MCP_FILE"
-    else
-        echo "[WARN] jq not found. Please manually add claudezilla to mcpServers in $MCP_FILE"
-    fi
-fi
+
+install_hermes() {
+    echo "Configuring Hermes Agent..."
+    local HERMES_DIR="${HERMES_HOME:-$HOME/.hermes}"
+    echo "For Hermes Agent, add Claudezilla to mcp_servers in your Hermes configuration ($HERMES_DIR/config.yaml):"
+    echo ""
+    echo "mcp_servers:"
+    echo "  claudezilla:"
+    echo "    command: node"
+    echo "    args:"
+    echo "      - $PROJECT_DIR/mcp/server.js"
+    echo "      - --all-tools"
+    echo ""
+}
+
+install_pi() {
+    echo "Configuring Pi Agent..."
+    local PI_DIR="${PI_HOME:-$HOME/.pi}"
+    echo "For Pi Agent, register Claudezilla MCP server in $PI_DIR/config.json or active profile:"
+    echo ""
+    echo "{"
+    echo "  \"mcpServers\": {"
+    echo "    \"claudezilla\": {"
+    echo "      \"command\": \"node\","
+    echo "      \"args\": [\"$PROJECT_DIR/mcp/server.js\", \"--all-tools\"]"
+    echo "    }"
+    echo "  }"
+    echo "}"
+    echo ""
+}
+
+case "$TARGET" in
+    claude)
+        install_claude
+        ;;
+    omp)
+        install_omp
+        ;;
+    hermes)
+        install_hermes
+        ;;
+    pi)
+        install_pi
+        ;;
+    all)
+        install_claude
+        install_omp
+        install_hermes
+        install_pi
+        ;;
+    *)
+        echo "Unknown target: $TARGET. Choose from: claude, omp, hermes, pi, all."
+        exit 1
+        ;;
+esac
 
 echo ""
-echo "Claudezilla is now configured for autonomous operation."
-echo "All mcp__claudezilla__* tools will run without permission prompts."
+echo "Claudezilla installation complete for target: $TARGET."
