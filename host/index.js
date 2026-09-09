@@ -25,7 +25,8 @@ import {
   setWindowsFileACL,
   ensureParentDir,
   isWindows,
-  commandTimeoutMs
+  commandTimeoutMs,
+  socketTimeoutMs
 } from './ipc.js';
 
 // Single source of truth for the host version. Reading from package.json at
@@ -388,11 +389,11 @@ function startSocketServer() {
   const server = createServer((socket) => {
     log('CLI client connected');
 
-    // Baseline idle timeout — close sockets that connect but never send commands.
-    // Per-command timeouts override this via socket.setTimeout() in handleCliCommand.
+    // Baseline idle timeout — close sockets that connect but never send
+    // commands. Raised below, once a command arrives, to cover that command.
     socket.setTimeout(60000);
     socket.on('timeout', () => {
-      log('Socket idle timeout (60s) — closing');
+      log(`Socket idle timeout (${socket.timeout}ms) — closing`);
       socket.destroy();
     });
 
@@ -430,6 +431,14 @@ function startSocketServer() {
           const { command, params = {}, authToken } = parsed;
 
           log(`CLI command: ${command}`);
+
+          // Extend the socket's idle timeout to cover this command. The 60s
+          // baseline above is only meant for sockets that connect and never
+          // send anything; without this, a command the extension is slow to
+          // answer (or never answers) has its socket destroyed at 60s BEFORE
+          // the per-request timer in handleCliCommand can report the timeout,
+          // and the MCP client is left holding a closed socket.
+          socket.setTimeout(socketTimeoutMs(params));
 
           handleCliCommand(command, params, authToken, (response) => {
             socket.write(JSON.stringify(response) + '\n');
