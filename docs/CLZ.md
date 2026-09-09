@@ -1,11 +1,15 @@
 # CLZ — Claudezilla Documentation Index
 
-**Last Updated:** 2026-03-24
+**Last Updated:** 2026-09-09
 
 ---
 
 ## Recent Documents
 
+- [[CLZ026 v0.7.0 Multi-Harness Release Reference]] (2026-09-09) — The multi-harness release: Oh My Pi, Hermes, Pi, eager tool discovery, PR #22 evaluate race fix, truncation metadata
+- [[CLZ025 Community Review Findings for v0.7.0 Planning]] (2026-09-05) — Architectural evaluation of PR #21 and Issue #19, multi-harness surface requirements
+- [[CLZ024 v0.6.7 Release Reference]] (2026-08-07) — Community release: tab attach, window persistence, screenshot save-to-disk
+- [[CLZ023 v0.6.7 Community Contributions Review]] (2026-08-07) — Pre-merge review of PRs #8, #11, #12, #13, #14
 - [[CLZ020 v0.6.2 Release Reference]] (2026-03-24) — Socket path reliability (macOS ~/.claudezilla/ fallback), Windows bat wrapper, community PRs #4 and #5
 - [[CLZ019 v0.6.1 Release Reference]] (2026-03-22) — Definitive v0.6.1 release doc: consent automation, lazy loading, Linux support, red-team audit, reliability fixes
 - [[CLZ018 Consent Overlay Automation Sprint]] (2026-03-08) — GDPR consent handling, MCP tool + config
@@ -19,6 +23,8 @@
 ## By Topic
 
 ### Release References
+- [[CLZ026 v0.7.0 Multi-Harness Release Reference]]
+- [[CLZ024 v0.6.7 Release Reference]]
 - [[CLZ019 v0.6.1 Release Reference]]
 
 ### Core Architecture
@@ -38,6 +44,10 @@
 
 | Doc | Date | Status | Topic |
 |-----|------|--------|-------|
+| CLZ026 | 2026-09-09 | Complete | v0.7.0 multi-harness release (OMP, Hermes, Pi, eager tools, PR #22 fix) |
+| CLZ025 | 2026-09-05 | Complete | Community review findings for v0.7.0 planning |
+| CLZ024 | 2026-08-07 | Complete | v0.6.7 release reference (tab attach, window persistence, screenshot save) |
+| CLZ023 | 2026-08-07 | Complete | v0.6.7 community contributions review |
 | CLZ020 | 2026-03-24 | Complete | v0.6.2 release reference (socket path, Windows bat wrapper, community PRs) |
 | CLZ019 | 2026-03-22 | Complete | v0.6.1 release reference (consent, lazy loading, Linux, red-team, audit) |
 | CLZ018 | 2026-03-08 | Complete | Consent automation (MCP tool + config) |

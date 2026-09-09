@@ -1,7 +1,36 @@
 # CLZ002 Changelog
 
 **Project:** Claudezilla
-**Current Version:** 0.6.9
+**Current Version:** 0.7.0
+
+## v0.7.0 (2026-09-09)
+
+**The Multi-Harness Release — Oh My Pi, Hermes, and Pi support, eager tool catalog, PR #22 evaluate race fix.**
+
+Expanded Claudezilla into a harness-neutral browser automation engine supporting Oh My Pi (OMP), Hermes Agent, and Pi Agent alongside Claude Code. Merged community PR #22 fixing an async settings race on `firefox_evaluate`, resolved Issue #19 page state parameter forwarding and truncation metadata contracts, and added configurable idle agent timeouts.
+
+### Multi-Harness Architecture
+
+- **Eager Tool Discovery Policy** — Added `--all-tools` CLI argument and `CLAUDEZILLA_TOOL_MODE=all` environment variable. Eagerly exposes the full browser automation tool catalog on startup for harnesses that query tools once during initialization (Oh My Pi, Hermes Agent, Pi Agent). Claude Code continues using lazy activation by default via `firefox_activate` to preserve session context token efficiency.
+- **Neutral Session Resolution** — MCP server and native host generalize session scoping for focus loops. Evaluates candidate session IDs in priority order: `--resume <id>` (Claude Code resume compatibility), `--session-id <id>`, `CLAUDEZILLA_SESSION_ID`, `OMP_SESSION_ID`, `PI_SESSION_ID`, `HERMES_SESSION_ID`, `CLAUDE_CODE_SESSION_ID`, falling back to `__default__`.
+- **Multi-Harness Installers** — `install/install-macos.sh` and `install/install-linux.sh` accept `--target <claude|omp|hermes|pi|all>`. Configures `~/.omp/mcp.json` with `--all-tools` and a 120s timeout, provides configuration blueprints for Hermes Agent (`mcp_servers`) and Pi Agent (`mcpServers`), and performs non-destructive configuration merges via `jq`.
+
+### Community Contributions & Fixes
+
+- **Evaluate Settings Load Race (PR #22)** — Merged PR #22 from `@axiomvx-source`. In `extension/content.js`, `evaluate()` now awaits a memoized `ensureSettingsLoaded()` promise before checking `settings.allowEvaluate`, eliminating intermittent "firefox_evaluate is disabled" errors when browser storage reads race the tab's first command. Added dedicated VM regression test suite in `tests/content-evaluate-settings.test.mjs`.
+- **Page State Parameter Forwarding & Truncation Metadata (#19)** — `extension/background.js` now forwards user-supplied count parameters (`maxHeadings`, `maxLinks`, `maxButtons`, `maxInputs`, `maxImages`) in `getPageState` instead of discarding them with an empty object `{}`. `extension/content.js` adds explicit `truncated: true` flags and `rawLength` metadata on all length-capped strings while keeping password inputs strictly masked as `'***'`. Added regression test suite in `tests/page-state-forwarding.test.mjs`.
+- **Configurable Agent Timeout Override (PR #21, #20)** — `mcp/server.js` reads `CLAUDEZILLA_AGENT_TIMEOUT_MS` env variable to override the default 10-minute (600,000 ms) idle agent reaper threshold, supporting human-in-the-loop workflows where tabs are edited between agent turns.
+- **Background Cleanup Comment** — Corrected stale "two minutes" comment in `extension/background.js` `cleanupOrphanedTabs` to 10 minutes.
+
+### Maintenance
+
+- Version `0.6.9` → `0.7.0` across `package.json`, `host/package.json`, `mcp/package.json`, `extension/manifest.json`, `extension/popup/popup.html`, `CLAUDE.md`, `README.md`, `website/changelog.html`, and `website/extension.html`.
+- Web extension artifact built at `web-ext-artifacts/claudezilla-0.7.0.zip`.
+
+### References
+
+- [[CLZ025 Community Review Findings for v0.7.0 Planning]]
+- [[CLZ026 v0.7.0 Multi-Harness Release Reference]]
 
 ## v0.6.9 (2026-08-07)
 

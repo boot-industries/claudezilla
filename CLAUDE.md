@@ -1,6 +1,6 @@
 # Claudezilla — Claude Code Firefox Extension
 
-**Version:** 0.6.9
+**Version:** 0.7.0
 **Documentation PREFIX:** CLZ
 
 ## Overview

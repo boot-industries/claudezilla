@@ -256,12 +256,75 @@
     <!-- Releases -->
     <div class="releases">
 
-      <!-- v0.6.9 -->
+      <!-- v0.7.0 -->
       <div class="release latest">
+        <div class="release-header">
+          <span class="release-version">v0.7.0</span>
+          <span class="release-date">2026-09-09</span>
+          <span class="release-badge">Latest</span>
+        </div>
+        <p class="release-tagline">The Multi-Harness Release — Oh My Pi, Hermes, and Pi support, eager tool catalog, PR #22 evaluate race fix</p>
+
+        <div class="change-section">
+          <h3>New Features</h3>
+          <ul class="change-list">
+            <li class="change-item">
+              <span class="change-tag tag-feat">feat</span>
+              <div class="change-text">
+                <strong>Multi-Harness Eager Tool Discovery</strong>
+                <span class="detail">Added <code>--all-tools</code> CLI flag and <code>CLAUDEZILLA_TOOL_MODE=all</code> environment setting, eagerly exposing the complete tool catalog at startup for harnesses that discover tools once (Oh My Pi, Hermes Agent, Pi Agent). Default lazy loading preserved for Claude Code.</span>
+              </div>
+            </li>
+            <li class="change-item">
+              <span class="change-tag tag-feat">feat</span>
+              <div class="change-text">
+                <strong>Multi-Harness Session Resolution</strong>
+                <span class="detail">Neutral session ID resolution supporting <code>--resume</code>, <code>--session-id</code>, and environment variables across Claude Code, OMP, Pi, and Hermes for focus-loop isolation.</span>
+              </div>
+            </li>
+            <li class="change-item">
+              <span class="change-tag tag-feat">feat</span>
+              <div class="change-text">
+                <strong>Multi-Harness Installers</strong>
+                <span class="detail">Installers now accept <code>--target &lt;claude|omp|hermes|pi|all&gt;</code> with automated non-destructive configuration of OMP and Claude Code.</span>
+              </div>
+            </li>
+          </ul>
+        </div>
+
+        <div class="change-section">
+          <h3>Fixes & Improvements</h3>
+          <ul class="change-list">
+            <li class="change-item">
+              <span class="change-tag tag-fix">fix</span>
+              <div class="change-text">
+                <strong>Evaluate Settings Load Race (PR #22)</strong>
+                <span class="detail">Thanks @axiomvx-source. <code>firefox_evaluate</code> now awaits settings initialization before checking the <code>allowEvaluate</code> gate, eliminating false-disabled errors on tab attachment.</span>
+              </div>
+            </li>
+            <li class="change-item">
+              <span class="change-tag tag-fix">fix</span>
+              <div class="change-text">
+                <strong>Page State Parameter Forwarding & Truncation Metadata</strong>
+                <span class="detail"><code>firefox_get_page_state</code> now forwards parameter limits to the content script and provides explicit <code>truncated: true</code> flags and <code>rawLength</code> metadata on length-capped items while keeping password fields masked.</span>
+              </div>
+            </li>
+            <li class="change-item">
+              <span class="change-tag tag-fix">fix</span>
+              <div class="change-text">
+                <strong>Configurable Agent Timeout</strong>
+                <span class="detail">Added <code>CLAUDEZILLA_AGENT_TIMEOUT_MS</code> environment override for extended human-in-the-loop tab interactions without premature reaper cleanup.</span>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- v0.6.9 -->
+      <div class="release">
         <div class="release-header">
           <span class="release-version">v0.6.9</span>
           <span class="release-date">2026-08-07</span>
-          <span class="release-badge">Latest</span>
         </div>
         <p class="release-tagline">Community contributions — tab attach, window persistence, screenshot save-to-disk</p>
 
