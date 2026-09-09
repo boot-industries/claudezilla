@@ -13,11 +13,11 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
-import { connect } from 'net';
 import { randomBytes } from 'crypto';
 import { readFileSync, existsSync, statSync, writeFileSync } from 'fs';
 import { resolve as resolvePath, extname } from 'path';
 import { getSocketPath, getAuthTokenPath } from '../host/ipc.js';
+import { requestOverSocket } from './socket-request.js';
 
 // Single source of truth for the MCP server version. Reading from
 // package.json at module load keeps the version response in sync with the
@@ -433,87 +433,20 @@ function buildErrorMessage(errCode, socketPath, authTokenFile) {
  * SECURITY: Includes auth token read from host-created file
  */
 function sendCommandOnce(command, params = {}) {
-  return new Promise((resolve, reject) => {
-    // SECURITY: Load auth token on each command (handles host restarts)
-    const authToken = loadAuthToken();
-    if (!authToken) {
-      const err = new Error(buildErrorMessage('NO_AUTH_TOKEN', SOCKET_PATH, AUTH_TOKEN_FILE));
-      err.code = 'NO_AUTH_TOKEN';
-      reject(err);
-      return;
-    }
+  // SECURITY: Load auth token on each command (handles host restarts)
+  const authToken = loadAuthToken();
+  if (!authToken) {
+    const err = new Error(buildErrorMessage('NO_AUTH_TOKEN', SOCKET_PATH, AUTH_TOKEN_FILE));
+    err.code = 'NO_AUTH_TOKEN';
+    return Promise.reject(err);
+  }
 
-    const socket = connect(SOCKET_PATH);
-    let buffer = '';
-    let resolved = false;
-
-    // Per-operation timeout support (default: 150s)
-    const socketTimeoutMs = (params._timeout && params._timeout >= 5000 && params._timeout <= 300000)
-      ? params._timeout + 5000 // Add 5s buffer above the operation timeout
-      : 155000;
-    socket.setTimeout(socketTimeoutMs);
-
-    function cleanup() {
-      socket.removeAllListeners();
-      socket.destroy();
-    }
-
-    socket.on('connect', () => {
-      const message = JSON.stringify({ command, params, authToken }) + '\n';
-      socket.write(message);
-    });
-
-    socket.on('data', (data) => {
-      buffer += data.toString();
-
-      // Check if we have a complete JSON response (newline-delimited)
-      const newlineIndex = buffer.indexOf('\n');
-      if (newlineIndex !== -1 && !resolved) {
-        const jsonStr = buffer.slice(0, newlineIndex);
-        try {
-          const response = JSON.parse(jsonStr);
-          resolved = true;
-          cleanup();
-          resolve(response);
-        } catch (e) {
-          resolved = true;
-          cleanup();
-          reject(new Error('Invalid response from Claudezilla host: ' + e.message));
-        }
-      }
-    });
-
-    socket.on('error', (err) => {
-      if (resolved) return;
-      resolved = true;
-      // Preserve the error code for retry logic
-      const wrappedErr = new Error(buildErrorMessage(err.code, SOCKET_PATH, AUTH_TOKEN_FILE));
-      wrappedErr.code = err.code;
-      cleanup();
-      reject(wrappedErr);
-    });
-
-    socket.on('close', () => {
-      // If socket closes before we got a response, try parsing buffer
-      if (!resolved && buffer) {
-        try {
-          const response = JSON.parse(buffer.trim());
-          resolved = true;
-          resolve(response);
-        } catch (e) {
-          console.error('Parse error in close handler:', e.message);
-        }
-      }
-    });
-
-    socket.on('timeout', () => {
-      if (!resolved) {
-        resolved = true;
-        const err = new Error(`Connection timed out after ${socketTimeoutMs}ms (command: ${command})`);
-        cleanup();
-        reject(err);
-      }
-    });
+  return requestOverSocket({
+    command,
+    params,
+    authToken,
+    socketPath: SOCKET_PATH,
+    describeError: (errCode) => buildErrorMessage(errCode, SOCKET_PATH, AUTH_TOKEN_FILE),
   });
 }
 

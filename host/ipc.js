@@ -14,6 +14,46 @@ import { existsSync, unlinkSync, chmodSync, mkdirSync } from 'fs';
 const IS_WINDOWS = platform() === 'win32';
 
 /**
+ * Per-operation timeout policy, shared by the host and the MCP server so the
+ * two ends of the socket cannot disagree about how long a command may take.
+ * Tools accept an optional `_timeout` in the 5s-300s range; anything outside
+ * that (or absent) falls back to the default.
+ */
+export const DEFAULT_COMMAND_TIMEOUT_MS = 150000;
+export const MIN_COMMAND_TIMEOUT_MS = 5000;
+export const MAX_COMMAND_TIMEOUT_MS = 300000;
+
+/**
+ * Grace period added on top of a command's own timeout before the socket
+ * carrying it is considered idle. The per-request timer must be allowed to
+ * fire and report first; the socket timeout is only a backstop.
+ */
+export const SOCKET_TIMEOUT_GRACE_MS = 5000;
+
+/**
+ * Resolve the operation timeout for a command's params
+ *
+ * @param {Object} [params] - Command params, possibly carrying `_timeout`
+ * @returns {number} Timeout in milliseconds
+ */
+export function commandTimeoutMs(params) {
+  const requested = params && params._timeout;
+  return (requested && requested >= MIN_COMMAND_TIMEOUT_MS && requested <= MAX_COMMAND_TIMEOUT_MS)
+    ? requested
+    : DEFAULT_COMMAND_TIMEOUT_MS;
+}
+
+/**
+ * Resolve the socket idle timeout for a command's params
+ *
+ * @param {Object} [params] - Command params, possibly carrying `_timeout`
+ * @returns {number} Timeout in milliseconds
+ */
+export function socketTimeoutMs(params) {
+  return commandTimeoutMs(params) + SOCKET_TIMEOUT_GRACE_MS;
+}
+
+/**
  * SECURITY: Validate a path for safety
  * Prevents null bytes, path traversal, and UNC network paths
  *

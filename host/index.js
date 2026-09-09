@@ -24,7 +24,8 @@ import {
   setSecurePermissions,
   setWindowsFileACL,
   ensureParentDir,
-  isWindows
+  isWindows,
+  commandTimeoutMs
 } from './ipc.js';
 
 // Single source of truth for the host version. Reading from package.json at
@@ -323,9 +324,7 @@ function handleCliCommand(command, params, authToken, callback, socketRequests) 
   if (socketRequests) socketRequests.add(id);
 
   // Per-operation timeout support (default: 150s, range: 5s-300s)
-  const timeoutMs = (params._timeout && params._timeout >= 5000 && params._timeout <= 300000)
-    ? params._timeout
-    : 150000;
+  const timeoutMs = commandTimeoutMs(params);
   const timer = setTimeout(() => {
     pendingRequestTimers.delete(id);
     if (pendingCliRequests.has(id)) {
