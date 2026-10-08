@@ -1,0 +1,92 @@
+name: Alpine package
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    paths:
+      - 'packaging/**'
+      - '.github/workflows/alpine-publish.yml'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing git tag to publish (e.g. v0.6.9)'
+        required: false
+        type: string
+
+jobs:
+  build:
+    name: Build apk and publish repo to Pages
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Determine version
+        id: ver
+        run: |
+          TAG="${{ inputs.tag || github.ref_name }}"
+          case "$TAG" in
+            v*) PKGVER="${TAG#v}" ;;
+            *)  PKGVER="$(node -p "require('./package.json').version")" ;;
+          esac
+          echo "pkgver=${PKGVER}" >> "$GITHUB_OUTPUT"
+
+      - name: Seed existing Pages repo
+        run: |
+          mkdir -p dist/keys
+          if git clone --branch gh-pages --depth 1 \
+              "https://github.com/${GITHUB_REPOSITORY}" pages-prev 2>/dev/null; then
+            cp -r pages-prev/. dist/
+            rm -rf dist/.git pages-prev
+          fi
+
+      - name: Set up signing key
+        id: key
+        env:
+          ABUILD_PRIVKEY: ${{ secrets.ABUILD_PRIVKEY }}
+        run: |
+          if [ -n "$ABUILD_PRIVKEY" ]; then
+            printf '%s\n' "$ABUILD_PRIVKEY" > dist/keys/claudezilla-apk.rsa
+            echo "have_key=true" >> "$GITHUB_OUTPUT"
+          else
+            # No secret: generate a throwaway key so validation builds still run
+            openssl genrsa -out dist/keys/claudezilla-apk.rsa 4096 2>/dev/null
+            echo "have_key=false" >> "$GITHUB_OUTPUT"
+          fi
+          chmod 600 dist/keys/claudezilla-apk.rsa
+
+      - name: Build apk and assemble repo (alpine container)
+        run: |
+          docker run --rm \
+            -v "$PWD:/work" \
+            -e PKGVER='${{ steps.ver.outputs.pkgver }}' \
+            -e GITHUB_REPOSITORY \
+            alpine:3.22 \
+            sh /work/packaging/alpine/ci-build.sh
+
+      - name: Remove private key from publish tree
+        run: rm -rf dist/keys
+
+      - name: Upload apk artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: alpine-apk-${{ steps.ver.outputs.pkgver }}
+          path: dist/alpine/x86_64/claudezilla-*.apk
+          if-no-files-found: error
+
+      - name: Publish to GitHub Pages
+        if: >-
+          steps.key.outputs.have_key == 'true' &&
+          (startsWith(github.ref, 'refs/tags/') || inputs.tag != '')
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: ./dist
+          commit_message: 'alpine: publish ${{ steps.ver.outputs.pkgver }}'

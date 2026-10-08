@@ -1,0 +1,90 @@
+# Template: @VERSION@ and @REPO@ are substituted by
+# .github/workflows/copr-publish.yml. Source0 is a vendored tarball
+# (mcp/node_modules included) built by the workflow, so no network access
+# is needed inside the COPR builder.
+
+%global _lib_claudezilla %{_prefix}/lib/claudezilla
+
+Name:           claudezilla
+Version:        @VERSION@
+Release:        1%{?dist}
+Summary:        Firefox browser automation for Claude Code
+License:        MIT
+URL:            https://github.com/@REPO@
+Source0:        claudezilla-%{version}-vendored.tar.gz
+BuildArch:      noarch
+
+BuildRequires:  zip
+Requires:       nodejs >= 18
+
+%description
+The only Firefox-native MCP server for Claude Code. Navigate, automate,
+screenshot, and extract data on any system that runs Firefox — no Chrome
+dependency. Ships the native messaging host, the MCP server with vendored
+dependencies, the browser extension XPI, and a per-user setup helper
+(claudezilla-setup).
+
+%prep
+%autosetup -n claudezilla-%{version}
+
+%build
+(cd extension && zip -qr ../claudezilla.xpi .)
+
+%install
+install -d %{buildroot}%{_lib_claudezilla}/host
+install -m644 host/index.js host/ipc.js host/protocol.js host/cli.js \
+    host/package.json %{buildroot}%{_lib_claudezilla}/host/
+
+install -d %{buildroot}%{_lib_claudezilla}/mcp
+cp -r mcp/server.js mcp/package.json mcp/node_modules \
+    %{buildroot}%{_lib_claudezilla}/mcp/
+
+install -m644 claudezilla.xpi %{buildroot}%{_lib_claudezilla}/claudezilla.xpi
+
+install -d %{buildroot}%{_bindir}
+cat > %{buildroot}%{_bindir}/claudezilla-host << 'EOF'
+#!/bin/sh
+exec /usr/bin/node /usr/lib/claudezilla/host/index.js "$@"
+EOF
+cat > %{buildroot}%{_bindir}/claudezilla-mcp << 'EOF'
+#!/bin/sh
+exec /usr/bin/node /usr/lib/claudezilla/mcp/server.js "$@"
+EOF
+chmod 755 %{buildroot}%{_bindir}/claudezilla-host %{buildroot}%{_bindir}/claudezilla-mcp
+install -m755 packaging/common/claudezilla-setup %{buildroot}%{_bindir}/claudezilla-setup
+
+# Firefox checks /usr/lib/mozilla on all arches and /usr/lib64/mozilla on
+# 64-bit Fedora builds; install the manifest in both.
+install -Dm644 packaging/common/claudezilla.json \
+    %{buildroot}%{_prefix}/lib/mozilla/native-messaging-hosts/claudezilla.json
+install -Dm644 packaging/common/claudezilla.json \
+    %{buildroot}%{_prefix}/lib64/mozilla/native-messaging-hosts/claudezilla.json
+
+install -Dm644 packaging/common/claudezilla-browser.service \
+    %{buildroot}%{_prefix}/lib/systemd/user/claudezilla-browser.service
+
+install -Dm644 LICENSE %{buildroot}%{_datadir}/licenses/%{name}/LICENSE
+install -Dm644 README.md %{buildroot}%{_datadir}/doc/%{name}/README.md
+
+%files
+%license %{_datadir}/licenses/%{name}/LICENSE
+%doc %{_datadir}/doc/%{name}/README.md
+%{_lib_claudezilla}
+%{_bindir}/claudezilla-host
+%{_bindir}/claudezilla-mcp
+%{_bindir}/claudezilla-setup
+%{_prefix}/lib/mozilla/native-messaging-hosts/claudezilla.json
+%{_prefix}/lib64/mozilla/native-messaging-hosts/claudezilla.json
+%{_prefix}/lib/systemd/user/claudezilla-browser.service
+
+%post
+cat << 'EOF'
+==> Claudezilla installed.
+    1. Per-user setup:  claudezilla-setup
+    2. Headless browser: systemctl --user enable --now claudezilla-browser
+    Signed extension alternative: https://addons.mozilla.org/firefox/addon/claudezilla/
+EOF
+
+%changelog
+* @DATE@ Chris Lyons <support@boot.industries> - @VERSION@-1
+- Automated release (https://github.com/@REPO@)
