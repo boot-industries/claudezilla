@@ -1318,10 +1318,8 @@ async function click(params) {
   // Scroll element into view
   element.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
-  // Wait for scroll to settle
-  await new Promise(resolve => {
-    requestAnimationFrame(() => requestAnimationFrame(resolve));
-  });
+  // Wait for the smooth scroll to finish before aiming the click
+  await waitForStableRect(element);
 
   // Full pointer/mouse sequence, not a lone click event (pointer-click.js)
   const dispatch = dispatchPointerClick(element);
@@ -1949,7 +1947,7 @@ async function handleConsent(params = {}) {
   // Click mechanics (reuse pattern from click() function)
   async function clickElement(el, buttonText, method = 'cmp-selector') {
     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+    await waitForStableRect(el);
     dispatchPointerClick(el);
     return { found: true, clicked: true, buttonText, method, elapsed: Date.now() - startTime };
   }

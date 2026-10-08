@@ -34,8 +34,33 @@ function describeClickTarget(el) {
 }
 
 /**
+ * Wait until the element stops moving, e.g. after
+ * scrollIntoView({ behavior: 'smooth' }). Two animation frames are not
+ * enough for a smooth scroll; measuring mid-scroll aims the click at
+ * whatever is under a stale position.
+ *
+ * @param {Element} element
+ * @param {number} maxFrames - Upper bound (~1s at 60 fps)
+ * @returns {Promise<void>}
+ */
+async function waitForStableRect(element, maxFrames = 60) {
+  let prev = null;
+  let stableFrames = 0;
+  for (let i = 0; i < maxFrames; i++) {
+    await new Promise(resolve => requestAnimationFrame(resolve));
+    const r = element.getBoundingClientRect();
+    if (prev && r.top === prev.top && r.left === prev.left) {
+      if (++stableFrames >= 2) return;
+    } else {
+      stableFrames = 0;
+    }
+    prev = r;
+  }
+}
+
+/**
  * Dispatch a full pointer/mouse click sequence on an element.
- * The element should already be scrolled into view.
+ * The element should already be scrolled into view (see waitForStableRect).
  *
  * @param {Element} element - Element selected by the caller
  * @returns {object} { method, trusted, x, y, target, obscuredBy, defaultPrevented }

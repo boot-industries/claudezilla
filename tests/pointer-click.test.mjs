@@ -187,3 +187,33 @@ describe('dispatchPointerClick', () => {
     assert.equal(h.context.dispatchPointerClick(el).defaultPrevented, true);
   });
 });
+
+describe('waitForStableRect', () => {
+  it('waits until the element stops moving (smooth scroll), not just two frames', async () => {
+    const tops = [900, 700, 500, 350, 300, 300, 300, 300];
+    let frame = 0;
+    const context = {
+      requestAnimationFrame: (cb) => { frame += 1; setImmediate(cb); },
+    };
+    vm.createContext(context);
+    vm.runInContext(source, context);
+    const el = { getBoundingClientRect: () => ({ top: tops[Math.min(frame, tops.length - 1)], left: 10 }) };
+
+    await context.waitForStableRect(el);
+
+    assert.ok(frame >= 6, `returned after ${frame} frames, while still moving`);
+    assert.equal(el.getBoundingClientRect().top, 300);
+  });
+
+  it('gives up after maxFrames when the element never settles', async () => {
+    let frame = 0;
+    const context = { requestAnimationFrame: (cb) => { frame += 1; setImmediate(cb); } };
+    vm.createContext(context);
+    vm.runInContext(source, context);
+    const el = { getBoundingClientRect: () => ({ top: frame, left: 0 }) };
+
+    await context.waitForStableRect(el, 10);
+
+    assert.equal(frame, 10);
+  });
+});
