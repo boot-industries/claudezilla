@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+  <title id="title">Claudezilla</title>
+  <desc id="desc">Firefox browser automation without Google.</desc>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#090909"/>
+      <stop offset="0.62" stop-color="#120d0d"/>
+      <stop offset="1" stop-color="#1b1110"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#D14D32"/>
+      <stop offset="1" stop-color="#FCD34D"/>
+    </linearGradient>
+    <radialGradient id="heroGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#D14D32" stop-opacity="0.42"/>
+      <stop offset="0.55" stop-color="#D14D32" stop-opacity="0.12"/>
+      <stop offset="1" stop-color="#D14D32" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="eyeGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#FFF7E0"/>
+      <stop offset="0.5" stop-color="#FCD34D"/>
+      <stop offset="1" stop-color="#F59E0B"/>
+    </radialGradient>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M40 0H0V40" fill="none" stroke="#D14D32" stroke-opacity="0.11"/>
+    </pattern>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#background)"/>
+  <rect width="1200" height="630" fill="url(#grid)" opacity="0.55"/>
+  <path d="M0 566H1200" stroke="#D14D32" stroke-opacity="0.35"/>
+  <path d="M0 567H660" stroke="url(#accent)" stroke-width="3"/>
+
+  <g font-family="Arial, Helvetica, sans-serif">
+    <text x="84" y="100" fill="#FCD34D" font-size="18" font-weight="700" letter-spacing="5">CLAUDEZILLA / FIREFOX</text>
+    <text x="80" y="208" fill="#F1F1F1" font-size="78" font-weight="700" letter-spacing="2">CLAUDEZILLA</text>
+    <text x="84" y="264" fill="#D14D32" font-size="27" font-weight="700" letter-spacing="4">BROWSER AUTOMATION WITHOUT GOOGLE</text>
+    <text x="84" y="356" fill="#FFFFFF" font-size="44" font-weight="700">Firefox-native MCP server</text>
+    <text x="84" y="407" fill="#C8C8C8" font-size="24">Claude Code  •  Zero Telemetry  •  Fully Local</text>
+    <text x="84" y="486" fill="#8F8F8F" font-size="22">Navigate. Interact. Inspect. Automate.</text>
+  </g>
+
+  <g transform="translate(930 315)">
+    <circle r="255" fill="url(#heroGlow)"/>
+    <path d="M0 -195L178 -105L178 105L0 195L-178 105L-178 -105Z" fill="none" stroke="#D14D32" stroke-width="7" stroke-linejoin="round" opacity="0.92"/>
+    <path d="M0 -195V195M-178 -105L178 105M178 -105L-178 105" fill="none" stroke="#D14D32" stroke-width="4" stroke-linecap="round" opacity="0.62"/>
+    <circle cx="0" cy="-195" r="7" fill="#FCD34D"/>
+    <circle cx="178" cy="-105" r="7" fill="#FCD34D"/>
+    <circle cx="-178" cy="105" r="7" fill="#FCD34D"/>
+
+    <g transform="scale(6)">
+      <path d="M-1.2 -9L0 -15L1.2 -9" fill="#D14D32" opacity="0.9"/>
+      <path d="M2 -6L5 -12L5 -5" fill="#D14D32" opacity="0.9"/>
+      <path d="M-2 -6L-5 -12L-5 -5" fill="#D14D32" opacity="0.9"/>
+      <path d="M-1 -9L0 -15L1 -9ZM2.5 -6L5 -12L4.5 -5ZM-2.5 -6L-5 -12L-4.5 -5Z" fill="#1A1A1A"/>
+      <path d="M-5 0Q-8 -0.5 -11 -3M5 0Q8 0.8 11 -1" fill="none" stroke="#D14D32" stroke-width="3" stroke-linecap="round" opacity="0.85"/>
+      <path d="M-5 0Q-8 -0.5 -11 -3M5 0Q8 0.8 11 -1" fill="none" stroke="#1A1A1A" stroke-width="2" stroke-linecap="round"/>
+      <path d="M-6 9Q-6.2 5.5 -6 2L-8 -1L-8 -5L-6 -7L-3 -7L0 -11L3 -7L6 -7L8 -5L8 -1L6 2Q6.2 5.5 6 9A1.5 1.5 0 0 1 3 9Q2.8 6.5 3 4L1.5 6Q0 7 -1.5 6L-3 4Q-2.8 6.5 -3 9A1.5 1.5 0 0 1 -6 9Z" fill="#1A1A1A"/>
+      <ellipse cx="0" cy="-4" rx="4" ry="3.5" fill="#D14D32" opacity="0.55"/>
+      <circle cx="0" cy="-4" r="3" fill="url(#eyeGlow)"/>
+      <circle cx="0.8" cy="-4.8" r="1" fill="#FFF7E0"/>
+    </g>
+  </g>
+</svg>
