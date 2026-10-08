@@ -1,0 +1,140 @@
+name: Packaging Validate
+
+# Checks the packaging recipes on every change to them. Nothing here needs
+# credentials or publishes anything — it validates that the shared install
+# layout produces the tree the recipes promise.
+
+on:
+  push:
+    paths:
+      - 'packaging/**'
+      - 'flake.nix'
+      - '.github/workflows/packaging-validate.yml'
+  pull_request:
+    paths:
+      - 'packaging/**'
+      - 'flake.nix'
+      - '.github/workflows/packaging-validate.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint recipes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+
+      - name: Shell syntax
+        run: |
+          sh -n packaging/common/install-tree.sh
+          sh -n packaging/common/claudezilla-setup
+
+      - name: ShellCheck
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
+          shellcheck packaging/common/install-tree.sh packaging/common/claudezilla-setup
+
+      - name: Manifests parse
+        run: |
+          python3 - <<'PY'
+          import glob, json, sys
+          import xml.dom.minidom as minidom
+          import yaml
+
+          # Templates must parse both as-is and after substitution, since the
+          # publishing step edits them in place.
+          def substitute(text):
+              return (text.replace('@VERSION@', '0.0.0')
+                          .replace('@REPO@', 'owner/name')
+                          .replace('@SHA256@', 'a' * 64)
+                          .replace('@MAINTAINER@', 'Someone <someone@example.com>'))
+
+          failures = []
+          for path in sorted(glob.glob('packaging/winget/*.yaml.in')):
+              for label, text in (('template', open(path).read()),
+                                  ('substituted', substitute(open(path).read()))):
+                  try:
+                      yaml.safe_load(text)
+                  except Exception as exc:
+                      failures.append(f'{path} ({label}): {exc}')
+
+          for path in sorted(glob.glob('packaging/scoop/*.json.in')):
+              for label, text in (('template', open(path).read()),
+                                  ('substituted', substitute(open(path).read()))):
+                  try:
+                      json.loads(text)
+                  except Exception as exc:
+                      failures.append(f'{path} ({label}): {exc}')
+
+          for path in sorted(glob.glob('packaging/chocolatey/*.nuspec.in')):
+              try:
+                  minidom.parseString(substitute(open(path).read()))
+              except Exception as exc:
+                  failures.append(f'{path}: {exc}')
+
+          if failures:
+              print('\n'.join(failures))
+              sys.exit(1)
+          print('all manifests parse')
+          PY
+
+      - name: Ruby syntax (Homebrew formula)
+        run: ruby -c packaging/homebrew/claudezilla.rb.in
+
+  stage:
+    name: Stage install tree
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
+        with:
+          node-version: '20'
+
+      - name: Build inputs
+        run: |
+          (cd mcp && npm install --omit=dev --ignore-scripts --no-fund --no-audit)
+          (cd extension && zip -qr ../claudezilla.xpi .)
+
+      - name: Stage system layout
+        run: |
+          DESTDIR="$PWD/stage-usr" ./packaging/common/install-tree.sh
+          for f in \
+            usr/bin/claudezilla-host \
+            usr/bin/claudezilla-mcp \
+            usr/bin/claudezilla-setup \
+            usr/lib/claudezilla/host/index.js \
+            usr/lib/claudezilla/mcp/server.js \
+            usr/lib/claudezilla/claudezilla.xpi \
+            usr/lib/mozilla/native-messaging-hosts/claudezilla.json \
+            usr/lib/systemd/user/claudezilla-browser.service
+          do
+            test -e "stage-usr/$f" || { echo "missing: $f"; exit 1; }
+          done
+          test -x stage-usr/usr/bin/claudezilla-host
+          echo "system layout complete"
+
+      - name: Stage unprivileged layout
+        run: |
+          DESTDIR="$PWD/stage-local" PREFIX="" LIBDIR=/lib/claudezilla BINDIR=/bin \
+            DOCDIR=/share/doc/claudezilla LICENSEDIR=/share/licenses/claudezilla \
+            WITH_SYSTEMD=0 WITH_MOZDIR=0 ./packaging/common/install-tree.sh
+          test ! -e stage-local/lib/systemd
+          test ! -e stage-local/lib/mozilla
+          test -x stage-local/bin/claudezilla-host
+          echo "unprivileged layout complete"
+
+      - name: Launchers run from the staged tree
+        run: |
+          # The native host answers a framed ping; the MCP server completes an
+          # initialize handshake. Both are launched exactly as a package would.
+          sed -i "s#/usr/lib/claudezilla#$PWD/stage-usr/usr/lib/claudezilla#g" \
+            stage-usr/usr/bin/claudezilla-host stage-usr/usr/bin/claudezilla-mcp
+          printf '' | ./stage-usr/usr/bin/claudezilla-host 2>&1 | grep -q "Host started"
+          echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"ci","version":"0"}}}' \
+            | timeout 30 ./stage-usr/usr/bin/claudezilla-mcp 2>/dev/null \
+            | grep -q '"serverInfo"'
+          echo "launchers work from the packaged layout"

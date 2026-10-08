@@ -1,0 +1,44 @@
+# Homebrew formula. @VERSION@, @REPO@ and @SHA256@ are substituted before the
+# formula is pushed to the tap.
+class Claudezilla < Formula
+  desc "Firefox browser automation for Claude Code"
+  homepage "https://github.com/@REPO@"
+  url "https://github.com/@REPO@/archive/refs/tags/v@VERSION@.tar.gz"
+  sha256 "@SHA256@"
+  license "MIT"
+
+  depends_on "node"
+  depends_on "zip" => :build
+
+  def install
+    system "npm", "install", "--omit=dev", "--ignore-scripts", "--no-fund",
+           "--no-audit", "--prefix", "mcp"
+    system "zip", "-qr", "../claudezilla.xpi", ".", { chdir: "extension" }
+
+    # Homebrew installs unprivileged, so there is no system-wide Mozilla
+    # directory to write and no systemd. claudezilla-setup writes the per-user
+    # manifest instead.
+    ENV["DESTDIR"] = prefix
+    ENV["PREFIX"] = ""
+    ENV["LIBDIR"] = "/lib/claudezilla"
+    ENV["BINDIR"] = "/bin"
+    ENV["DOCDIR"] = "/share/doc/claudezilla"
+    ENV["LICENSEDIR"] = "/share/licenses/claudezilla"
+    ENV["NODE_BIN"] = Formula["node"].opt_bin/"node"
+    ENV["WITH_SYSTEMD"] = "0"
+    ENV["WITH_MOZDIR"] = "0"
+    system "./packaging/common/install-tree.sh"
+  end
+
+  def caveats
+    <<~EOS
+      Finish setup for your user with:
+        claudezilla-setup
+    EOS
+  end
+
+  test do
+    assert_predicate bin/"claudezilla-host", :executable?
+    assert_match "claudezilla", shell_output("#{bin}/claudezilla-mcp --help 2>&1", 1)
+  end
+end

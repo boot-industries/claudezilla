@@ -1,0 +1,23 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.6.0.schema.json
+PackageIdentifier: BootIndustries.Claudezilla
+PackageVersion: "@VERSION@"
+PackageLocale: en-US
+Publisher: Boot Industries
+PublisherUrl: https://github.com/@REPO@
+PackageName: Claudezilla
+PackageUrl: https://github.com/@REPO@
+License: MIT
+LicenseUrl: https://github.com/@REPO@/blob/main/LICENSE
+ShortDescription: Firefox browser automation for Claude Code
+Description: >-
+  Claudezilla gives Claude Code control of Firefox through a native messaging
+  host and an MCP server: navigation, page inspection, screenshots, and console
+  and network logs. Run claudezilla-setup once to register the MCP server with
+  Claude Code.
+Tags:
+  - claude
+  - firefox
+  - automation
+  - mcp
+ManifestType: defaultLocale
+ManifestVersion: 1.6.0

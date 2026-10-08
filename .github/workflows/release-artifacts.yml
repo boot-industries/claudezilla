@@ -1,0 +1,100 @@
+name: Release Artifacts
+
+# Builds the artifacts the packaging recipes consume and attaches them to the
+# GitHub release, along with their checksums.
+#
+#   claudezilla-<version>-vendored.tar.gz  source with mcp/node_modules and the
+#                                          built extension, so distro builds
+#                                          need no network access
+#   claudezilla-<version>-win.zip          portable Windows layout referenced by
+#                                          the winget, Scoop and Chocolatey
+#                                          recipes
+#
+# Needs no credentials beyond the automatic GITHUB_TOKEN. Publishing to package
+# registries is a separate concern and lives outside this workflow.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build, without the v prefix (e.g. 0.6.9)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
+        with:
+          node-version: '20'
+
+      - name: Resolve version
+        id: version
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            version="${{ github.event.inputs.version }}"
+          else
+            version="${GITHUB_REF_NAME#v}"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Building $version"
+
+      - name: Vendor dependencies and build the extension
+        run: |
+          (cd mcp && npm install --omit=dev --ignore-scripts --no-fund --no-audit)
+          (cd extension && zip -qr ../claudezilla.xpi .)
+
+      - name: Source tarball with vendored dependencies
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          name="claudezilla-$version"
+          mkdir -p "dist/$name"
+          # Everything a distro recipe needs, and nothing else.
+          cp -R host mcp extension packaging install LICENSE README.md package.json "dist/$name/"
+          cp claudezilla.xpi "dist/$name/"
+          tar -czf "dist/$name-vendored.tar.gz" -C dist "$name"
+          rm -rf "dist/$name"
+
+      - name: Windows portable zip
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          root="dist/claudezilla-$version"
+          # Same layout install-tree.sh produces, arranged for a portable
+          # unpack: bin/ next to lib/, which is what the .cmd shims expect.
+          mkdir -p "$root/bin" "$root/lib/host" "$root/lib/mcp"
+          cp host/index.js host/ipc.js host/protocol.js host/cli.js host/package.json "$root/lib/host/"
+          cp mcp/server.js mcp/package.json "$root/lib/mcp/"
+          cp -R mcp/node_modules "$root/lib/mcp/node_modules"
+          cp claudezilla.xpi "$root/lib/claudezilla.xpi"
+          cp packaging/common/win/claudezilla-host.cmd packaging/common/win/claudezilla-mcp.cmd "$root/bin/"
+          cp packaging/common/claudezilla-setup.ps1 "$root/bin/"
+          (cd dist && zip -qr "claudezilla-$version-win.zip" "claudezilla-$version")
+          rm -rf "$root"
+
+      - name: Checksums
+        run: |
+          cd dist
+          sha256sum ./*.tar.gz ./*.zip | tee SHA256SUMS
+          echo
+          echo "Substitute these into the @SHA256@ placeholders in packaging/."
+
+      - name: Attach to the release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${GITHUB_REF_NAME}" dist/* --clobber
+
+      - name: Upload as workflow artifacts
+        if: github.event_name != 'release'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+        with:
+          name: claudezilla-${{ steps.version.outputs.version }}
+          path: dist/

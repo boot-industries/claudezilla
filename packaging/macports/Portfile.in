@@ -1,0 +1,37 @@
+# -*- coding: utf-8; mode: tcl; tab-width: 4; indent-tabs-mode: nil; -*-
+
+PortSystem          1.0
+
+name                claudezilla
+version             @VERSION@
+categories          www
+platforms           darwin
+license             MIT
+maintainers         @MAINTAINER@
+description         Firefox browser automation for Claude Code
+long_description    Claudezilla gives Claude Code control of Firefox through a \
+                    native messaging host and an MCP server.
+homepage            https://github.com/@REPO@
+master_sites        https://github.com/@REPO@/archive/refs/tags/
+distname            v${version}
+checksums           sha256 @SHA256@
+
+depends_lib         port:nodejs20
+depends_build       port:zip
+
+use_configure       no
+
+build {
+    system -dir ${worksrcpath}/mcp "npm install --omit=dev --ignore-scripts"
+    system -dir ${worksrcpath}/extension "zip -qr ../claudezilla.xpi ."
+}
+
+destroot {
+    system -dir ${worksrcpath} "DESTDIR=${destroot}${prefix} PREFIX= \
+        LIBDIR=/lib/claudezilla BINDIR=/bin \
+        DOCDIR=/share/doc/claudezilla LICENSEDIR=/share/licenses/claudezilla \
+        NODE_BIN=${prefix}/bin/node WITH_SYSTEMD=0 WITH_MOZDIR=0 \
+        ./packaging/common/install-tree.sh"
+}
+
+notes "Finish setup for your user with: claudezilla-setup"

@@ -1,0 +1,17 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.6.0.schema.json
+PackageIdentifier: BootIndustries.Claudezilla
+PackageVersion: "@VERSION@"
+MinimumOSVersion: 10.0.0.0
+InstallerType: zip
+NestedInstallerType: portable
+NestedInstallerFiles:
+  - RelativeFilePath: claudezilla-@VERSION@\bin\claudezilla-host.cmd
+    PortableCommandAlias: claudezilla-host
+  - RelativeFilePath: claudezilla-@VERSION@\bin\claudezilla-mcp.cmd
+    PortableCommandAlias: claudezilla-mcp
+Installers:
+  - Architecture: neutral
+    InstallerUrl: https://github.com/@REPO@/releases/download/v@VERSION@/claudezilla-@VERSION@-win.zip
+    InstallerSha256: "@SHA256@"
+ManifestType: installer
+ManifestVersion: 1.6.0
