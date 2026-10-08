@@ -256,12 +256,48 @@
     <!-- Releases -->
     <div class="releases">
 
-      <!-- v0.7.0 -->
+      <!-- v0.7.1 -->
       <div class="release latest">
+        <div class="release-header">
+          <span class="release-version">v0.7.1</span>
+          <span class="release-date">2026-10-08</span>
+          <span class="release-badge">Latest</span>
+        </div>
+        <p class="release-tagline">Pointer-sequence clicks, IPC hang fix, evaluate race fix — community PRs #22, #23, #25</p>
+
+        <div class="change-section">
+          <h3>Fixes & Improvements</h3>
+          <ul class="change-list">
+            <li class="change-item">
+              <span class="change-tag tag-fix">fix</span>
+              <div class="change-text">
+                <strong>Full Pointer/Mouse Sequence in <code>firefox_click</code> (PR #25)</strong>
+                <span class="detail">Thanks @braklo. New <code>extension/pointer-click.js</code> dispatches the real 11-event pointer/mouse sequence at the element centre, so div-based and Blazor-style controls that listen for pointer events now respond (fixes #9). Results report <code>trusted: false</code>.</span>
+              </div>
+            </li>
+            <li class="change-item">
+              <span class="change-tag tag-fix">fix</span>
+              <div class="change-text">
+                <strong>MCP Requests Settle When the Host Closes the Socket (PR #23)</strong>
+                <span class="detail">Thanks @andrei-rizoiu. New <code>mcp/socket-request.js</code> rejects unanswered host closes with <code>HOST_CLOSED</code> instead of hanging forever; host idle socket timeout raised to <code>commandTimeoutMs + 5s</code> so long commands are no longer killed at 60 s.</span>
+              </div>
+            </li>
+            <li class="change-item">
+              <span class="change-tag tag-fix">fix</span>
+              <div class="change-text">
+                <strong>Evaluate Settings Race (PR #22) and Agent Timeout Override (PR #21)</strong>
+                <span class="detail">Thanks @axiomvx-source and @braklo. Code shipped in AMO 0.7.0; both pull requests are merged to GitHub with this release.</span>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- v0.7.0 -->
+      <div class="release">
         <div class="release-header">
           <span class="release-version">v0.7.0</span>
           <span class="release-date">2026-09-09</span>
-          <span class="release-badge">Latest</span>
         </div>
         <p class="release-tagline">The Multi-Harness Release — Oh My Pi, Hermes, and Pi support, eager tool catalog, PR #22 evaluate race fix</p>
 

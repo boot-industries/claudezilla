@@ -1,11 +1,12 @@
 # CLZ — Claudezilla Documentation Index
 
-**Last Updated:** 2026-09-09
+**Last Updated:** 2026-10-08
 
 ---
 
 ## Recent Documents
 
+- [[CLZ027 v0.7.1 Release Reference]] (2026-10-08) — v0.7.1 release: pointer-sequence clicks (PR #25), IPC settle (PR #23), community PRs merged, retroactive v0.7.0 tag, AMO push
 - [[CLZ026 v0.7.0 Multi-Harness Release Reference]] (2026-09-09) — The multi-harness release: Oh My Pi, Hermes, Pi, eager tool discovery, PR #22 evaluate race fix, truncation metadata
 - [[CLZ025 Community Review Findings for v0.7.0 Planning]] (2026-09-05) — Architectural evaluation of PR #21 and Issue #19, multi-harness surface requirements
 - [[CLZ024 v0.6.7 Release Reference]] (2026-08-07) — Community release: tab attach, window persistence, screenshot save-to-disk
@@ -23,6 +24,7 @@
 ## By Topic
 
 ### Release References
+- [[CLZ027 v0.7.1 Release Reference]]
 - [[CLZ026 v0.7.0 Multi-Harness Release Reference]]
 - [[CLZ024 v0.6.7 Release Reference]]
 - [[CLZ019 v0.6.1 Release Reference]]
@@ -44,6 +46,7 @@
 
 | Doc | Date | Status | Topic |
 |-----|------|--------|-------|
+| CLZ027 | 2026-10-08 | Complete | v0.7.1 release (pointer-sequence click, IPC settle, AMO push) |
 | CLZ026 | 2026-09-09 | Complete | v0.7.0 multi-harness release (OMP, Hermes, Pi, eager tools, PR #22 fix) |
 | CLZ025 | 2026-09-05 | Complete | Community review findings for v0.7.0 planning |
 | CLZ024 | 2026-08-07 | Complete | v0.6.7 release reference (tab attach, window persistence, screenshot save) |

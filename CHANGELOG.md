@@ -1,7 +1,49 @@
 # CLZ002 Changelog
 
 **Project:** Claudezilla
-**Current Version:** 0.7.0
+**Current Version:** 0.7.1
+
+## v0.7.1 (2026-10-08)
+
+**Pointer-sequence clicks, IPC hang fix, evaluate race fix — community PRs #22, #23, #25.**
+
+Post-0.7.0 release incorporating community fixes that landed on `main` after the
+0.7.0 AMO upload (2026-09-09), plus the full multi-harness codebase finally pushed
+to GitHub with this release.
+
+### Community Contributions
+
+- **Full Pointer/Mouse Sequence in `firefox_click` (PR #25, @braklo, fixes #9)** — New
+  `extension/pointer-click.js` dispatches the real 11-event sequence
+  (pointerover → pointerenter → mouseover → mouseenter → pointermove → mousemove →
+  pointerdown → mousedown → focus → pointerup → mouseup → click) at the element centre
+  with stable-rect scroll polling and `obscuredBy` overlay reporting. Div-based and
+  Blazor-style controls that listen for pointer/mouse events now respond; result reports
+  `trusted: false` (synthetic events are never trusted). Regression suite
+  `tests/pointer-click.test.mjs`.
+- **MCP Requests Settle When the Host Closes the Socket (PR #23, @andrei-rizoiu)** — New
+  `mcp/socket-request.js` replaces the inline socket state machine in `mcp/server.js`;
+  an unanswered host close now rejects with `HOST_CLOSED` instead of hanging forever, and
+  the host raises its idle socket timeout to `commandTimeoutMs + 5s` so long commands are
+  no longer killed at 60 s. Regression suites `tests/mcp-socket-request.test.mjs`,
+  `tests/ipc.test.mjs`.
+- **Evaluate Settings Race (PR #22, @axiomvx-source) and Agent Timeout Override
+  (PR #21, @braklo)** — code shipped in AMO 0.7.0; their pull requests are merged to
+  GitHub with this release.
+
+### Maintenance
+
+- Version `0.7.0` → `0.7.1` across `package.json`, `host/package.json`, `mcp/package.json`,
+  `extension/manifest.json`, `extension/popup/popup.html`, `CLAUDE.md`, `README.md`,
+  `website/extension.html`, `website/changelog.html`.
+- Annotated tag `v0.7.0` added retroactively on release commit `7f6a841` (AMO 0.7.0 was
+  published 2026-09-09 from unpushed git state; tags previously stopped at v0.6.9).
+- Website social-card and og-image refresh.
+- Web extension artifact built at `web-ext-artifacts/claudezilla-0.7.1.zip`.
+
+### References
+
+- [[CLZ027 v0.7.1 Release Reference]]
 
 ## v0.7.0 (2026-09-09)
 
