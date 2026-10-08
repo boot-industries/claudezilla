@@ -29,6 +29,7 @@ function createHarness({ storage: initialStorage = {}, windowGetGate = Promise.r
       active: true,
       pinned: false,
       incognito: false,
+      cookieStoreId: 'firefox-default',
     }],
   ]);
   const calls = { tabsCreated: 0, windowsCreated: 0, contentActions: [] };
@@ -212,6 +213,7 @@ describe('attached user tabs', () => {
       active: true,
       pinned: false,
       private: false,
+      cookieStoreId: 'firefox-default',
       pool: false,
       attached: true,
     }]);
