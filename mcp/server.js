@@ -629,7 +629,7 @@ const TOOLS = [
   },
   {
     name: 'firefox_click',
-    description: 'Click an element by CSS selector. Works on background tabs.',
+    description: 'Click an element by CSS selector. Dispatches the full pointer/mouse sequence (pointerdown, mousedown, pointerup, mouseup, click) at the element centre. Events are synthetic (isTrusted=false): pages that check isTrusted will ignore them. Result reports obscuredBy when another element covers the click point. Works on background tabs.',
     inputSchema: {
       type: 'object',
       properties: {

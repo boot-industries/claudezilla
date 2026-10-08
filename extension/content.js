@@ -1323,12 +1323,19 @@ async function click(params) {
     requestAnimationFrame(() => requestAnimationFrame(resolve));
   });
 
-  // Simulate click
-  element.click();
+  // Full pointer/mouse sequence, not a lone click event (pointer-click.js)
+  const dispatch = dispatchPointerClick(element);
 
   return {
     selector,
     clicked: true,
+    method: dispatch.method,
+    trusted: dispatch.trusted,
+    x: dispatch.x,
+    y: dispatch.y,
+    target: dispatch.target,
+    obscuredBy: dispatch.obscuredBy,
+    defaultPrevented: dispatch.defaultPrevented,
     tagName: element.tagName.toLowerCase(),
     text: element.textContent?.trim().slice(0, 100) || '',
     id: element.id || null,
@@ -1943,7 +1950,7 @@ async function handleConsent(params = {}) {
   async function clickElement(el, buttonText, method = 'cmp-selector') {
     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-    el.click();
+    dispatchPointerClick(el);
     return { found: true, clicked: true, buttonText, method, elapsed: Date.now() - startTime };
   }
 
