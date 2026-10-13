@@ -18,7 +18,7 @@ function event() {
   };
 }
 
-function createHarness({ storage: initialStorage = {}, windowGetGate = Promise.resolve() } = {}) {
+function createHarness({ storage: initialStorage = {}, windowGetGate = Promise.resolve(), allowTabCreate = false } = {}) {
   const storage = structuredClone(initialStorage);
   const tabs = new Map([
     [42, {
@@ -31,7 +31,7 @@ function createHarness({ storage: initialStorage = {}, windowGetGate = Promise.r
       incognito: false,
     }],
   ]);
-  const calls = { tabsCreated: 0, windowsCreated: 0, contentActions: [] };
+  const calls = { tabsCreated: 0, windowsCreated: 0, contentActions: [], tabCreateOptions: [] };
   let resolveWindowGetStarted;
   const windowGetStarted = new Promise((resolve) => { resolveWindowGetStarted = resolve; });
   const nativeMessages = event();
@@ -128,9 +128,27 @@ function createHarness({ storage: initialStorage = {}, windowGetGate = Promise.r
           .filter((tab) => !query.active || tab.active)
           .map((tab) => ({ ...tab }));
       },
-      async create() {
+      async create(options = {}) {
         calls.tabsCreated += 1;
-        throw new Error('test forbids creating tabs');
+        if (!allowTabCreate) throw new Error('test forbids creating tabs');
+        calls.tabCreateOptions.push(structuredClone(options));
+        const id = 100 + calls.tabsCreated;
+        const tab = {
+          id,
+          windowId: options.windowId,
+          url: options.url,
+          title: '',
+          active: options.active !== false,
+          pinned: false,
+          incognito: false,
+        };
+        if (tab.active) {
+          for (const other of tabs.values()) {
+            if (other.windowId === tab.windowId) other.active = false;
+          }
+        }
+        tabs.set(id, tab);
+        return { ...tab };
       },
       async update(tabId, changes) {
         const tab = tabs.get(Number(tabId));
@@ -355,5 +373,31 @@ describe('attached user tabs', () => {
 
     assert.equal(response.success, false);
     assert.match(response.error, /managed Claudezilla pool/);
+  });
+
+  it('does not switch the user\'s selected tab when adding an agent tab to an adopted window', async () => {
+    const harness = createHarness({
+      allowTabCreate: true,
+      storage: {
+        claudezillaWindowState: {
+          windowId: 7,
+          tabs: [{ tabId: 42, ownerId: 'agent-a' }],
+          createdAt: 1,
+          groupId: null,
+          isPrivate: false,
+          adopted: true,
+        },
+      },
+    });
+
+    const created = await harness.command('createWindow', {
+      url: 'https://example.test/agent',
+      agentId: 'agent-b',
+    });
+
+    assert.equal(created.success, true, created.error);
+    assert.equal(harness.calls.tabCreateOptions.length, 1);
+    assert.equal(harness.calls.tabCreateOptions[0].active, false);
+    assert.equal((await harness.browser.tabs.get(42)).active, true);
   });
 });

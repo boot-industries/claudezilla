@@ -1129,11 +1129,12 @@ async function handleCliCommand(message) {
             }
           }
 
-          // Create new tab in existing window
+          // Create new tab in existing window. In an ADOPTED window the
+          // selected tab is the user's: never switch it away.
           const newTab = await browser.tabs.create({
             windowId: claudezillaWindow.windowId,
             url: url || 'about:blank',
-            active: true
+            active: !claudezillaWindow.adopted
           });
           tabId = newTab.id;
           claudezillaWindow.tabs.push({ tabId, ownerId });
