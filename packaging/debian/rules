@@ -1,0 +1,14 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	cd mcp && npm install --omit=dev --ignore-scripts --no-fund --no-audit
+	cd extension && zip -qr ../claudezilla.xpi .
+
+override_dh_auto_install:
+	DESTDIR=$(CURDIR)/debian/claudezilla ./packaging/common/install-tree.sh
+
+override_dh_auto_test:
+	sh -n packaging/common/install-tree.sh
