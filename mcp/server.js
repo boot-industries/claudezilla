@@ -477,7 +477,48 @@ function sendCommandOnce(command, params = {}) {
  * Send command to Claudezilla with automatic retry for transient failures
  * Retries with exponential backoff for ENOENT, ECONNREFUSED, ECONNRESET
  */
+/**
+ * Optional on-demand browser start.
+ *
+ * When CLAUDEZILLA_AUTOSTART_CMD is set and no host socket exists, run that
+ * command once (e.g. `systemctl --user start claudezilla-background`) and
+ * wait until the host has bound its socket and written its token. Lets a
+ * second, normally stopped browser (see CLAUDEZILLA_IPC_DIR) start itself on
+ * the first tool call. Concurrent calls share one launch.
+ */
+const AUTOSTART_CMD = process.env.CLAUDEZILLA_AUTOSTART_CMD || '';
+const AUTOSTART_WAIT_MS = Number(process.env.CLAUDEZILLA_AUTOSTART_WAIT_MS) || 45000;
+let autostartInFlight = null;
+
+async function ensureBrowserStarted() {
+  if (!AUTOSTART_CMD || existsSync(SOCKET_PATH)) return;
+  if (!autostartInFlight) {
+    autostartInFlight = (async () => {
+      console.error(`[claudezilla] No host socket at ${SOCKET_PATH}; starting browser: ${AUTOSTART_CMD}`);
+      const { exec } = await import('child_process');
+      await new Promise((resolve) => {
+        exec(AUTOSTART_CMD, { timeout: 20000 }, (err, _stdout, stderr) => {
+          if (err) console.error(`[claudezilla] Autostart command failed: ${err.message} ${stderr || ''}`);
+          resolve();
+        });
+      });
+      const deadline = Date.now() + AUTOSTART_WAIT_MS;
+      while (Date.now() < deadline) {
+        if (existsSync(SOCKET_PATH) && existsSync(AUTH_TOKEN_FILE)) {
+          // The extension connects to the host a moment after the bind
+          await sleep(1500);
+          return;
+        }
+        await sleep(500);
+      }
+      console.error(`[claudezilla] Browser did not come up within ${AUTOSTART_WAIT_MS} ms`);
+    })().finally(() => { autostartInFlight = null; });
+  }
+  await autostartInFlight;
+}
+
 async function sendCommand(command, params = {}) {
+  await ensureBrowserStarted();
   let lastError;
   let delay = RETRY_CONFIG.initialDelayMs;
 
