@@ -379,7 +379,7 @@ cd claudezilla
                 <div class="check">✓</div>
                 <div class="details">
                   <strong>MCP Server Registration</strong>
-                  <span>Auto-adds to ~/.claude/mcp.json</span>
+                  <span>Runs <code>claude mcp add --scope user</code></span>
                 </div>
               </div>
               <div class="config-item">
@@ -423,15 +423,8 @@ cd claudezilla
             If the installer couldn't auto-configure Claude Code, add these manually:
           </p>
 
-          <h4 style="color: var(--terracotta); margin-bottom: 12px; font-family: 'Orbitron', sans-serif; font-size: 14px;">~/.claude/mcp.json</h4>
-          <pre><code>{
-  "mcpServers": {
-    "claudezilla": {
-      "command": "node",
-      "args": ["/path/to/claudezilla/mcp/server.js"]
-    }
-  }
-}</code></pre>
+          <h4 style="color: var(--terracotta); margin-bottom: 12px; font-family: 'Orbitron', sans-serif; font-size: 14px;">Register the MCP server</h4>
+          <pre><code>claude mcp add --scope user claudezilla -- node /path/to/claudezilla/mcp/server.js</code></pre>
 
           <h4 style="color: var(--terracotta); margin: 24px 0 12px; font-family: 'Orbitron', sans-serif; font-size: 14px;">~/.claude/settings.json</h4>
           <pre><code>{
@@ -518,7 +511,7 @@ cd claudezilla
         <strong>🔄 MCP Not Loading?</strong>
         <p>
           Run <code>/mcp</code> in Claude Code to reconnect. If Claudezilla isn't listed,
-          check that <code>~/.claude/mcp.json</code> has the correct path to <code>server.js</code>.
+          run <code>claude mcp get claudezilla</code> to check the path to <code>server.js</code>, or re-register it with <code>claude mcp add --scope user claudezilla -- node /path/to/claudezilla/mcp/server.js</code>.
         </p>
       </div>
 

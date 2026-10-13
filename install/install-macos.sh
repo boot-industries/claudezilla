@@ -106,27 +106,37 @@ echo ""
 # ---------------------------------------------------------------------------
 
 install_claude() {
-    echo "Configuring Claude Code for autonomous Claudezilla operations..."
+    echo "Configuring Claude Code..."
     local CLAUDE_DIR="$HOME/.claude"
     local SETTINGS_FILE="$CLAUDE_DIR/settings.json"
-    local MCP_FILE="$CLAUDE_DIR/mcp.json"
+    local MCP_SERVER_PATH="$PROJECT_DIR/mcp/server.js"
     mkdir -p "$CLAUDE_DIR"
 
     if command -v jq &> /dev/null; then
         if [ -f "$SETTINGS_FILE" ]; then
-            jq '.permissions.allow = ((.permissions.allow // []) + ["mcp__claudezilla__*"] | unique)' "$SETTINGS_FILE" > "$SETTINGS_FILE.tmp" && mv "$SETTINGS_FILE.tmp" "$SETTINGS_FILE"
+            jq '.permissions.allow = ((.permissions.allow // []) + ["mcp__claudezilla__*"] | unique)' \
+                "$SETTINGS_FILE" > "$SETTINGS_FILE.tmp" && mv "$SETTINGS_FILE.tmp" "$SETTINGS_FILE"
         else
             echo '{"permissions":{"allow":["mcp__claudezilla__*"]}}' | jq '.' > "$SETTINGS_FILE"
         fi
-        local MCP_SERVER_CONFIG="{\"command\":\"node\",\"args\":[\"$PROJECT_DIR/mcp/server.js\"]}"
-        if [ -f "$MCP_FILE" ]; then
-            jq --argjson cfg "$MCP_SERVER_CONFIG" '.mcpServers.claudezilla = $cfg' "$MCP_FILE" > "$MCP_FILE.tmp" && mv "$MCP_FILE.tmp" "$MCP_FILE"
-        else
-            echo "{\"mcpServers\":{\"claudezilla\":$MCP_SERVER_CONFIG}}" | jq '.' > "$MCP_FILE"
-        fi
-        echo "Updated Claude Code configuration: $MCP_FILE"
+        echo "  Permissions: $SETTINGS_FILE"
     else
-        echo "[WARN] jq not found; skipping automated Claude Code config merge. Please add claudezilla to $MCP_FILE manually."
+        echo "  [WARN] jq not found — manually add \"mcp__claudezilla__*\" to permissions.allow in $SETTINGS_FILE"
+    fi
+
+    # Register the MCP server via the Claude Code CLI (user scope -> ~/.claude.json).
+    # ~/.claude/mcp.json is not read by Claude Code (see issue #24).
+    if command -v claude &> /dev/null; then
+        claude mcp remove --scope user claudezilla &> /dev/null || true
+        if claude mcp add --scope user claudezilla -- node "$MCP_SERVER_PATH"; then
+            echo "  MCP server registered (user scope)"
+        else
+            echo "  [WARN] 'claude mcp add' failed — run manually:"
+            echo "    claude mcp add --scope user claudezilla -- node \"$MCP_SERVER_PATH\""
+        fi
+    else
+        echo "  [WARN] claude CLI not found — after installing Claude Code, run:"
+        echo "    claude mcp add --scope user claudezilla -- node \"$MCP_SERVER_PATH\""
     fi
 }
 
