@@ -12,7 +12,12 @@ import {
   socketTimeoutMs,
   DEFAULT_COMMAND_TIMEOUT_MS,
   SOCKET_TIMEOUT_GRACE_MS,
+  getSocketPath,
+  getAuthTokenPath,
 } from '../host/ipc.js';
+import { mkdtempSync, rmSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
 
 describe('validatePath', () => {
   it('accepts a plain absolute Unix path', () => {
@@ -82,5 +87,33 @@ describe('command timeout policy', () => {
     assert.equal(socketTimeoutMs({ _timeout: 30000 }), 30000 + SOCKET_TIMEOUT_GRACE_MS);
     assert.equal(socketTimeoutMs(), DEFAULT_COMMAND_TIMEOUT_MS + SOCKET_TIMEOUT_GRACE_MS);
     assert.ok(socketTimeoutMs({ _timeout: 30000 }) > commandTimeoutMs({ _timeout: 30000 }));
+  });
+});
+
+describe('CLAUDEZILLA_IPC_DIR', { skip: isWindows() }, () => {
+  it('puts the socket and token in the override directory, creating it', () => {
+    const base = mkdtempSync(join(tmpdir(), 'cz-ipc-'));
+    const dir = join(base, 'second-browser');
+    const saved = process.env.CLAUDEZILLA_IPC_DIR;
+    process.env.CLAUDEZILLA_IPC_DIR = dir;
+    try {
+      assert.equal(getSocketPath(), join(dir, 'claudezilla.sock'));
+      assert.equal(getAuthTokenPath(), join(dir, 'claudezilla-auth.token'));
+    } finally {
+      if (saved === undefined) delete process.env.CLAUDEZILLA_IPC_DIR;
+      else process.env.CLAUDEZILLA_IPC_DIR = saved;
+      rmSync(base, { recursive: true, force: true });
+    }
+  });
+
+  it('falls back to the default location when the override is invalid', () => {
+    const saved = process.env.CLAUDEZILLA_IPC_DIR;
+    process.env.CLAUDEZILLA_IPC_DIR = '/tmp/../etc';
+    try {
+      assert.notEqual(getSocketPath(), '/tmp/../etc/claudezilla.sock');
+    } finally {
+      if (saved === undefined) delete process.env.CLAUDEZILLA_IPC_DIR;
+      else process.env.CLAUDEZILLA_IPC_DIR = saved;
+    }
   });
 });

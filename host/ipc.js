@@ -108,6 +108,22 @@ export function getSafeTempDir() {
     throw new Error('No valid temp directory found');
   }
 
+  // Explicit override: lets two browsers run side by side, each with its own
+  // host, socket, token and log (e.g. a visible and a headless profile), and
+  // an MCP server pointed at either one. Both sides must set the same value.
+  const ipcDir = process.env.CLAUDEZILLA_IPC_DIR;
+  if (ipcDir) {
+    try {
+      validatePath(ipcDir, 'CLAUDEZILLA_IPC_DIR');
+      if (!existsSync(ipcDir)) {
+        mkdirSync(ipcDir, { recursive: true, mode: 0o700 });
+      }
+      return ipcDir;
+    } catch (e) {
+      console.error(`[claudezilla] Skipping invalid CLAUDEZILLA_IPC_DIR: ${e.message}`);
+    }
+  }
+
   // On macOS/Linux, prefer XDG_RUNTIME_DIR if available (per-user, secure)
   const xdgRuntime = process.env.XDG_RUNTIME_DIR;
   if (xdgRuntime) {
