@@ -749,12 +749,9 @@ async function smartQuerySelector(selector, options = {}) {
   const pollInterval = 100;
 
   while (Date.now() - startTime < timeout) {
-    // Wait for next frame
-    await new Promise(resolve => {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(resolve);
-      });
-    });
+    // Wait for next frame (bounded: no frames come in an unpainted tab)
+    await nextFrame();
+    await nextFrame();
 
     // Check again
     element = document.querySelector(selector);
@@ -1100,11 +1097,8 @@ async function checkPageReadiness(params = {}) {
   // Wait for double RAF (ensures paint cycle complete)
   // First RAF schedules after current frame, second RAF after next frame
   const rafStart = performance.now();
-  await new Promise(resolve => {
-    requestAnimationFrame(() => {
-      requestAnimationFrame(resolve);
-    });
-  });
+  await nextFrame();
+  await nextFrame();
   result.rafWaitMs = Math.round((performance.now() - rafStart) * 100) / 100;
 
   // Check for running animations

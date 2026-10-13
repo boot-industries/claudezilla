@@ -34,6 +34,26 @@ function describeClickTarget(el) {
 }
 
 /**
+ * Resolve on the next animation frame, or after timeoutMs if no frame comes.
+ * Firefox stops firing requestAnimationFrame in a tab or window the
+ * compositor is not painting (background tab, minimised window, another
+ * workspace on Wayland); an unbounded rAF wait then never settles and the
+ * command hangs until the host timeout.
+ *
+ * @param {number} timeoutMs
+ * @returns {Promise<void>}
+ */
+function nextFrame(timeoutMs = 100) {
+  return new Promise(resolve => {
+    const timer = setTimeout(resolve, timeoutMs);
+    requestAnimationFrame(() => {
+      clearTimeout(timer);
+      resolve();
+    });
+  });
+}
+
+/**
  * Wait until the element stops moving, e.g. after
  * scrollIntoView({ behavior: 'smooth' }). Two animation frames are not
  * enough for a smooth scroll; measuring mid-scroll aims the click at
@@ -47,7 +67,7 @@ async function waitForStableRect(element, maxFrames = 60) {
   let prev = null;
   let stableFrames = 0;
   for (let i = 0; i < maxFrames; i++) {
-    await new Promise(resolve => requestAnimationFrame(resolve));
+    await nextFrame();
     const r = element.getBoundingClientRect();
     if (prev && r.top === prev.top && r.left === prev.left) {
       if (++stableFrames >= 2) return;
