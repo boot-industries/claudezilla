@@ -40,7 +40,7 @@ cd claudezilla
 The installer automatically:
 - Installs the native messaging host
 - Runs `npm install` for MCP dependencies
-- Configures Claude Code MCP settings (`~/.claude/mcp.json`)
+- Registers the MCP server with Claude Code (`claude mcp add --scope user`)
 
 No manual config required — restart Claude Code and you're ready.
 

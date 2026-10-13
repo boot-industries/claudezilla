@@ -27,6 +27,16 @@ function Test-SafePath {
     return $true
 }
 
+# Write UTF-8 without BOM. Windows PowerShell 5.1's "Set-Content -Encoding UTF8"
+# prepends a BOM, which breaks JSON.parse on the file (see issue #24).
+function Write-Utf8NoBom {
+    param(
+        [Parameter(Mandatory=$true)][string]$Path,
+        [Parameter(Mandatory=$true)][string]$Content
+    )
+    [IO.File]::WriteAllText($Path, $Content, (New-Object Text.UTF8Encoding $false))
+}
+
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectDir = Split-Path -Parent $ScriptDir
 $HostPath = Join-Path $ProjectDir "host\index.js"
@@ -99,7 +109,7 @@ $ManifestObject = @{
 }
 $ManifestContent = $ManifestObject | ConvertTo-Json -Depth 10
 
-Set-Content -Path $ManifestPath -Value $ManifestContent -Encoding UTF8
+Write-Utf8NoBom -Path $ManifestPath -Content $ManifestContent
 Write-Host "[OK] Created manifest: $ManifestPath"
 
 # Create registry key pointing to manifest
@@ -141,7 +151,6 @@ Write-Host ""
 # Configure Claude Code for autonomous Claudezilla operations
 $ClaudeDir = Join-Path $env:USERPROFILE ".claude"
 $SettingsFile = Join-Path $ClaudeDir "settings.json"
-$McpFile = Join-Path $ClaudeDir "mcp.json"
 
 Write-Host "Configuring Claude Code for autonomous Claudezilla operations..."
 
@@ -163,45 +172,40 @@ try {
         if ($settings.permissions.allow -notcontains "mcp__claudezilla__*") {
             $settings.permissions.allow = @($settings.permissions.allow) + @("mcp__claudezilla__*")
         }
-        $settings | ConvertTo-Json -Depth 10 | Set-Content $SettingsFile -Encoding UTF8
+        Write-Utf8NoBom -Path $SettingsFile -Content ($settings | ConvertTo-Json -Depth 10)
     } else {
-        @{
+        $settingsJson = @{
             permissions = @{
                 allow = @("mcp__claudezilla__*")
             }
-        } | ConvertTo-Json -Depth 10 | Set-Content $SettingsFile -Encoding UTF8
+        } | ConvertTo-Json -Depth 10
+        Write-Utf8NoBom -Path $SettingsFile -Content $settingsJson
     }
     Write-Host "[OK] Updated Claude Code permissions: $SettingsFile"
 } catch {
     Write-Host "[WARN] Could not update settings.json: $_" -ForegroundColor Yellow
 }
 
-# Update mcp.json to register Claudezilla MCP server
-try {
-    $McpServerPath = "$($ProjectDir -replace '\\', '/')/mcp/server.js"
-    if (Test-Path $McpFile) {
-        $mcpConfig = Get-Content $McpFile -Raw | ConvertFrom-Json
-        if (-not $mcpConfig.mcpServers) {
-            $mcpConfig | Add-Member -NotePropertyName "mcpServers" -NotePropertyValue @{} -Force
-        }
-        $mcpConfig.mcpServers | Add-Member -NotePropertyName "claudezilla" -NotePropertyValue @{
-            command = "node"
-            args = @($McpServerPath)
-        } -Force
-        $mcpConfig | ConvertTo-Json -Depth 10 | Set-Content $McpFile -Encoding UTF8
+# Register Claudezilla MCP server via the Claude Code CLI (user scope -> ~/.claude.json).
+# ~/.claude/mcp.json is not read by Claude Code (see issue #24).
+$McpServerPath = Join-Path $ProjectDir "mcp\server.js"
+$ManualMcpCmd = "claude mcp add --scope user claudezilla -- node `"$McpServerPath`""
+if (Get-Command claude -ErrorAction SilentlyContinue) {
+    $PrevErrorAction = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    & claude mcp remove --scope user claudezilla 2>&1 | Out-Null
+    & claude mcp add --scope user claudezilla -- node $McpServerPath
+    $McpAddExit = $LASTEXITCODE
+    $ErrorActionPreference = $PrevErrorAction
+    if ($McpAddExit -eq 0) {
+        Write-Host "[OK] Registered Claudezilla MCP server (user scope)"
     } else {
-        @{
-            mcpServers = @{
-                claudezilla = @{
-                    command = "node"
-                    args = @($McpServerPath)
-                }
-            }
-        } | ConvertTo-Json -Depth 10 | Set-Content $McpFile -Encoding UTF8
+        Write-Host "[WARN] 'claude mcp add' failed. Run manually:" -ForegroundColor Yellow
+        Write-Host "  $ManualMcpCmd"
     }
-    Write-Host "[OK] Updated Claude Code MCP config: $McpFile"
-} catch {
-    Write-Host "[WARN] Could not update mcp.json: $_" -ForegroundColor Yellow
+} else {
+    Write-Host "[WARN] claude CLI not found. After installing Claude Code, run:" -ForegroundColor Yellow
+    Write-Host "  $ManualMcpCmd"
 }
 
 Write-Host ""
