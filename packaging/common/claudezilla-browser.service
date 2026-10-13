@@ -1,0 +1,12 @@
+[Unit]
+Description=Claudezilla Firefox Headless Browser
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/firefox --headless --no-remote --profile %h/.mozilla/firefox/claudezilla-headless
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=default.target

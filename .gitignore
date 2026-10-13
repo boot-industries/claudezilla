@@ -34,7 +34,7 @@ host/run.sh
 /tmp/claudezilla.sock
 
 # Lock files (keep root package-lock if added)
-mcp/package-lock.json
+# mcp/package-lock.json is committed: the Nix build derives dependency hashes from it
 host/package-lock.json
 
 # Private documentation (PREFIX docs for local use only)

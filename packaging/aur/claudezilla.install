@@ -1,0 +1,29 @@
+post_install() {
+    cat << 'EOF'
+==> Claudezilla installed.
+
+    1. Run the per-user setup (Firefox headless profile + Claude Code config):
+         claudezilla-setup
+
+    2. Start the headless automation browser:
+         systemctl --user enable --now claudezilla-browser
+
+    Alternatively, install the signed extension in your own Firefox:
+         https://addons.mozilla.org/firefox/addon/claudezilla/
+
+    The MCP server binary is: claudezilla-mcp
+EOF
+}
+
+post_upgrade() {
+    echo '==> Re-run claudezilla-setup to refresh the sideloaded extension in the headless profile.'
+}
+
+post_remove() {
+    cat << 'EOF'
+==> Claudezilla removed. Per-user data was left in place:
+      ~/.mozilla/firefox/claudezilla-headless (headless profile)
+      ~/.claude/mcp.json + ~/.claude/settings.json (claudezilla entries)
+    Remove these manually if no longer wanted.
+EOF
+}

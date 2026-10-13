@@ -1,0 +1,112 @@
+name: Fedora COPR
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    paths:
+      - 'packaging/**'
+      - '.github/workflows/copr-publish.yml'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing git tag to publish (e.g. v0.6.9)'
+        required: false
+        type: string
+
+jobs:
+  srpm:
+    name: Build SRPM
+    runs-on: ubuntu-latest
+    outputs:
+      pkgver: ${{ steps.ver.outputs.pkgver }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Determine version
+        id: ver
+        run: |
+          TAG="${{ inputs.tag || github.ref_name }}"
+          case "$TAG" in
+            v*) PKGVER="${TAG#v}" ;;
+            *)  PKGVER="$(node -p "require('./package.json').version")" ;;
+          esac
+          echo "pkgver=${PKGVER}" >> "$GITHUB_OUTPUT"
+
+      - name: Install rpmbuild
+        run: sudo apt-get update -q && sudo apt-get install -y -q rpm
+
+      - name: Build vendored source tarball
+        run: |
+          PKGVER='${{ steps.ver.outputs.pkgver }}'
+          (cd mcp && npm install --omit=dev --ignore-scripts --no-fund --no-audit)
+          mkdir -p /tmp/srpm
+          tar --exclude-vcs --exclude='./web-ext-artifacts' \
+              --transform "s,^\.,claudezilla-${PKGVER}," \
+              -czf "/tmp/srpm/claudezilla-${PKGVER}-vendored.tar.gz" .
+
+      - name: Build SRPM
+        run: |
+          PKGVER='${{ steps.ver.outputs.pkgver }}'
+          sed -e "s|@VERSION@|${PKGVER}|g" \
+              -e "s|@REPO@|${GITHUB_REPOSITORY}|g" \
+              -e "s|@DATE@|$(LC_ALL=C date +'%a %b %d %Y')|g" \
+              packaging/fedora/claudezilla.spec.in > /tmp/srpm/claudezilla.spec
+          rpmbuild -bs /tmp/srpm/claudezilla.spec \
+              --define "_sourcedir /tmp/srpm" \
+              --define "_srcrpmdir $PWD/srpm-out"
+          ls -l srpm-out/
+
+      - name: Upload SRPM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: srpm-${{ steps.ver.outputs.pkgver }}
+          path: srpm-out/*.src.rpm
+          if-no-files-found: error
+
+  copr:
+    name: Submit to COPR
+    needs: srpm
+    runs-on: ubuntu-latest
+    if: >-
+      (startsWith(github.ref, 'refs/tags/') || inputs.tag != '')
+    steps:
+      - name: Check for COPR credentials
+        id: creds
+        env:
+          COPR_API_CONFIG: ${{ secrets.COPR_API_CONFIG }}
+        run: |
+          if [ -n "$COPR_API_CONFIG" ]; then
+            echo "have=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "have=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::COPR_API_CONFIG secret not set — skipping COPR upload."
+          fi
+
+      - name: Download SRPM
+        if: steps.creds.outputs.have == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: srpm-${{ needs.srpm.outputs.pkgver }}
+          path: srpm
+
+      - name: Submit build
+        if: steps.creds.outputs.have == 'true'
+        env:
+          COPR_API_CONFIG: ${{ secrets.COPR_API_CONFIG }}
+        run: |
+          pipx install copr-cli
+          mkdir -p ~/.config
+          printf '%s\n' "$COPR_API_CONFIG" > ~/.config/copr
+          chmod 600 ~/.config/copr
+          # Create the project on first use; harmless failure if it exists.
+          copr-cli create claudezilla \
+              --chroot fedora-rawhide-x86_64 \
+              --description 'Firefox browser automation for Claude Code' \
+              --instructions 'dnf install claudezilla, then run claudezilla-setup' \
+              2>/dev/null || true
+          copr-cli build claudezilla srpm/*.src.rpm
