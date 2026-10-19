@@ -14,5 +14,10 @@
   "license": "MIT",
   "engines": {
     "node": ">=18.17"
+  },
+  "pnpm": {
+    "overrides": {
+      "proxy-addr": "2.0.8"
+    }
   }
 }
