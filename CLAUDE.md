@@ -61,8 +61,9 @@ claudezilla@boot.industries
 |---------|-------------|
 | ping | Test connection |
 | version | Get host version |
-| createWindow | Open URL in shared 12-tab pool (auto-fallback on private mode failure) |
-| navigate | Navigate owned tab to URL |
+| createWindow | Open URL in shared 12-tab pool (auto-fallback on private mode failure); `container` opens the tab in a Firefox container and forces non-private mode |
+| navigate | Navigate owned tab to URL; `container` asserts the tab's container (`CONTAINER_IMMUTABLE` on mismatch) |
+| listContainers | List Firefox containers (name, cookieStoreId, color, icon) |
 | closeTab | Close tab by ID |
 | getTabs | List tabs with ownership |
 | getWindowMode | Query private mode capability and current window state |
