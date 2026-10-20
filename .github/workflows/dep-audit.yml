@@ -1,7 +1,8 @@
 # dep-audit.yml — Reusable dependency audit workflow
 # Copy to .github/workflows/dep-audit.yml in any repo with CI.
 # Triggers on PRs that modify dependency files, audits for vulnerabilities
-# and suspicious new packages, then posts a summary comment on the PR.
+# and suspicious new packages, then writes a summary to the job summary and,
+# for pull requests from this repository, posts it as a PR comment.
 
 name: Dependency Audit
 
@@ -336,6 +337,7 @@ jobs:
           AUDIT_STATUS: ${{ steps.audit.outputs.audit_status }}
           FINDINGS: ${{ steps.audit.outputs.findings }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
           IS_BOT: ${{ steps.bot_check.outputs.is_bot }}
         run: |
           if [ "${AUDIT_STATUS}" = "pass" ]; then
@@ -368,6 +370,16 @@ jobs:
           > Audits: \`npm audit\` (HIGH/CRITICAL), \`pip-audit\` (any CVE), lockfile age check (packages < 7 days old).
           COMMENT
           )
+
+          # The job summary needs no token and is always visible on the run page.
+          printf '%s\n' "$BODY" >> "$GITHUB_STEP_SUMMARY"
+
+          # On a pull request from a fork the token is read-only, so posting a
+          # comment fails and would turn a passing audit into a failed check.
+          if [ "${HEAD_REPO}" != "${GITHUB_REPOSITORY}" ]; then
+            echo "::notice::PR #${PR_NUMBER} comes from ${HEAD_REPO}: the token cannot comment on fork PRs, see the job summary."
+            exit 0
+          fi
 
           gh pr comment "${PR_NUMBER}" \
             --repo "$GITHUB_REPOSITORY" \
