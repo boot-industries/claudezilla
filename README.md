@@ -83,6 +83,7 @@ CLAUDEZILLA_IPC_DIR=/run/user/1000/claudezilla-bg claude
   CLAUDEZILLA_AUTOSTART_CMD='systemctl --user start claudezilla-background'
   ```
 - The browser is started only when the host is **not reachable**. The check is a connection attempt, not a file check, so it also works on Windows, where the host socket is a named pipe rather than a file.
+- Listing the tools never starts the browser; the first tool call does. A client that lists the tools at session start does not launch a browser it may never use.
 - Concurrent calls share a single launch, and a failed start is not retried for `CLAUDEZILLA_AUTOSTART_RETRY_COOLDOWN_MS` — a browser that cannot start does not turn every tool call into another process.
 - The start command must publish the host socket and auth token where the MCP server looks for them. When the browser and the MCP server are different processes, give both the same `CLAUDEZILLA_IPC_DIR`.
 

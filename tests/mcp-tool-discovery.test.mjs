@@ -1,8 +1,20 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { isWindows } from '../host/ipc.js';
 
-function runServerRpc(args = [], env = {}) {
+function parseResponses(stdout) {
+  return stdout.split('\n').filter(Boolean).map(l => {
+    try { return JSON.parse(l); } catch { return null; }
+  }).filter(Boolean);
+}
+
+// Sends initialize + tools/list, then `requests`. Resolves as soon as the last
+// request is answered, or after `waitMs` at the latest.
+function runServerRpc(args = [], env = {}, { requests = [], waitMs = 400 } = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn('node', ['mcp/server.js', ...args], {
       cwd: new URL('../', import.meta.url).pathname,
@@ -38,14 +50,25 @@ function runServerRpc(args = [], env = {}) {
       params: {},
     };
 
-    child.stdin.write(JSON.stringify(initReq) + '\n');
-    child.stdin.write(JSON.stringify(listReq) + '\n');
-
-    setTimeout(() => {
+    const allRequests = [initReq, listReq, ...requests];
+    const lastId = allRequests[allRequests.length - 1].id;
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
       child.stdin.end();
       child.kill();
       resolve({ stdout, stderr });
-    }, 400);
+    };
+    const timer = setTimeout(finish, waitMs);
+    child.stdout.on('data', () => {
+      if (parseResponses(stdout).some(r => r.id === lastId)) finish();
+    });
+
+    for (const req of allRequests) {
+      child.stdin.write(JSON.stringify(req) + '\n');
+    }
   });
 }
 
@@ -89,5 +112,59 @@ describe('mcp server tool discovery policy', () => {
     const toolNames = listResp.result.tools.map(t => t.name);
     assert.ok(toolNames.includes('firefox_screenshot'));
     assert.ok(toolNames.length > 20);
+  });
+});
+
+// POSIX only: the socket location is driven by CLAUDEZILLA_IPC_DIR, which
+// Windows ignores (fixed named pipe).
+describe('mcp server autostart and tool discovery', { skip: isWindows() }, () => {
+  // A fresh, empty IPC dir: no host socket, no auth token. The start command
+  // writes a marker file, so "did the browser get started" is a file check.
+  function autostartEnv() {
+    const ipcDir = mkdtempSync(join(tmpdir(), 'cz-discovery-'));
+    const marker = join(ipcDir, 'started');
+    const env = {
+      CLAUDEZILLA_TOOL_MODE: 'all',
+      CLAUDEZILLA_IPC_DIR: ipcDir,
+      CLAUDEZILLA_AUTOSTART_CMD: JSON.stringify([
+        process.execPath, '-e', "require('fs').writeFileSync(process.argv[1], 'started')", marker,
+      ]),
+      CLAUDEZILLA_AUTOSTART_WAIT_MS: '200',
+      CLAUDEZILLA_AUTOSTART_RETRY_COOLDOWN_MS: '0',
+    };
+    return { env, marker, cleanup: () => rmSync(ipcDir, { recursive: true, force: true }) };
+  }
+
+  it('tools/list never starts the browser and keeps firefox_navigate (fail open)', async () => {
+    const { env, marker, cleanup } = autostartEnv();
+    try {
+      const { stdout } = await runServerRpc([], env, { waitMs: 5000 });
+      const listResp = parseResponses(stdout).find(l => l.id === 2);
+      assert.ok(listResp, 'Did not receive response for tools/list');
+      const toolNames = listResp.result.tools.map(t => t.name);
+      assert.ok(toolNames.includes('firefox_navigate'), 'firefox_navigate must stay listed when the host is down');
+      assert.equal(existsSync(marker), false, 'tools/list must not run CLAUDEZILLA_AUTOSTART_CMD');
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('the first tool call starts the browser', async () => {
+    const { env, marker, cleanup } = autostartEnv();
+    try {
+      const callReq = {
+        jsonrpc: '2.0',
+        id: 3,
+        method: 'tools/call',
+        params: { name: 'firefox_get_tabs', arguments: {} },
+      };
+      const { stdout } = await runServerRpc([], env, { requests: [callReq], waitMs: 5000 });
+      const callResp = parseResponses(stdout).find(l => l.id === 3);
+      assert.ok(callResp, 'Did not receive response for tools/call');
+      // No host comes up, so the call itself fails; the start command still ran.
+      assert.equal(existsSync(marker), true, 'tools/call must run CLAUDEZILLA_AUTOSTART_CMD');
+    } finally {
+      cleanup();
+    }
   });
 });
