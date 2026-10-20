@@ -151,11 +151,12 @@ Claude, get all the links on this page
 
 ## Available Tools
 
-All 35 tools are listed by default.
+All 36 tools are listed by default.
 
 ### Browser Control
-- `firefox_create_window` — Open a URL in a new tab in the shared 12-tab pool (the tab becomes your current tab)
-- `firefox_navigate` — Navigate an existing tab (default: your current tab) to a URL
+- `firefox_create_window` — Open a URL in a new tab in the shared 12-tab pool (the tab becomes your current tab); `container` opens the tab in a Firefox container (by name or cookieStoreId)
+- `firefox_navigate` — Navigate an existing tab (default: your current tab) to a URL; `container` asserts the tab is in that container (a mismatch returns `CONTAINER_IMMUTABLE`)
+- `firefox_list_containers` — List the Firefox containers (contextual identities) in the profile, with names and cookieStoreIds
 - `firefox_get_content` — Read visible page text or one element's text (20K chars per call, `offset` paging)
 - `firefox_click` — Click an element by `ref` (from a snapshot or `firefox_find`) or CSS selector
 - `firefox_type` — Type into an input field by `ref` or selector
@@ -169,6 +170,8 @@ All 35 tools are listed by default.
 
 ### Multi-Agent
 - `firefox_request_tab_space` / `firefox_grant_tab_space` / `firefox_get_slot_requests` — Coordinate the shared 12-tab pool with 30-second slot reservations
+
+**Containers.** A tab opened with `container` lives in that container's cookie jar, so logins already established there apply. A container forces a non-private window (container cookies are persistent), and a tab's container cannot change after creation: to use another container, open a new tab. This needs the `cookies` and `contextualIdentities` permissions; neither triggers an install-time warning in Firefox.
 
 ### Configuration
 - `firefox_activate` — Only with opt-in lazy loading (`--tools lazy` or `CLAUDEZILLA_TOOL_MODE=lazy`): load tool categories on demand. By default every tool is listed.
