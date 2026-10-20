@@ -54,6 +54,22 @@ export function socketTimeoutMs(params) {
 }
 
 /**
+ * SECURITY: Whether this host may run the `quitBrowser` command
+ *
+ * The command closes every window of the browser the host runs in, so it is
+ * off unless CLAUDEZILLA_ALLOW_QUIT is `1` or `true` (case-insensitive). The
+ * host inherits its environment from the browser that launched it, not from
+ * the socket client, so only a browser started with the variable can be quit.
+ *
+ * @param {Object} [env] - Environment to read (default: process.env)
+ * @returns {boolean} True if the command is allowed
+ */
+export function quitBrowserAllowed(env = process.env) {
+  const value = env.CLAUDEZILLA_ALLOW_QUIT;
+  return value === '1' || (typeof value === 'string' && value.toLowerCase() === 'true');
+}
+
+/**
  * SECURITY: Validate a path for safety
  * Prevents null bytes, path traversal, and UNC network paths
  *

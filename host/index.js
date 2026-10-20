@@ -26,7 +26,8 @@ import {
   ensureParentDir,
   isWindows,
   commandTimeoutMs,
-  socketTimeoutMs
+  socketTimeoutMs,
+  quitBrowserAllowed
 } from './ipc.js';
 
 // Single source of truth for the host version. Reading from package.json at
@@ -100,6 +101,8 @@ const ALLOWED_COMMANDS = new Set([
   'setPrivateMode',
   // Session cleanup
   'goodbye',
+  // Clean quit (opt-in via CLAUDEZILLA_ALLOW_QUIT, see handleCliCommand)
+  'quitBrowser',
   // Consent automation
   'handleConsent',
   // Window mode query
@@ -310,6 +313,17 @@ function handleCliCommand(command, params, authToken, callback, socketRequests) 
   // SECURITY: Reject non-whitelisted commands
   if (!ALLOWED_COMMANDS.has(command)) {
     callback({ success: false, error: `Command not allowed: ${command}` });
+    return;
+  }
+
+  // SECURITY: quitBrowser closes every window of the browser this host runs in.
+  // The opt-in is read from the host's own environment, inherited from the
+  // browser that launched it, so a socket client cannot grant it to itself.
+  if (command === 'quitBrowser' && !quitBrowserAllowed()) {
+    callback({
+      success: false,
+      error: 'quitBrowser is disabled. Set CLAUDEZILLA_ALLOW_QUIT=1 in the environment of the browser process (the host inherits it from Firefox, not from the CLI) and restart that browser.',
+    });
     return;
   }
 

@@ -18,8 +18,41 @@ function event() {
   };
 }
 
-function createHarness({ storage: initialStorage = {}, windowGetGate = Promise.resolve(), allowTabCreate = false, tabs: seededTabs = null } = {}) {
+// Captures every timer background.js sets, so a test can assert on the delays
+// and run the callbacks without waiting for them.
+function createFakeTimers() {
+  const queue = [];
+  const delays = [];
+  const yieldToWork = () => new Promise((resolve) => setImmediate(resolve));
+  return {
+    delays,
+    setTimeout(callback, delay) {
+      delays.push(delay);
+      queue.push(callback);
+      return queue.length;
+    },
+    clearTimeout() {},
+    // Run the queued callbacks in order, including the ones they queue in turn.
+    async run() {
+      while (queue.length) {
+        queue.shift()();
+        await yieldToWork();
+      }
+      await yieldToWork();
+    },
+  };
+}
+
+function createHarness({
+  storage: initialStorage = {},
+  windowGetGate = Promise.resolve(),
+  allowTabCreate = false,
+  tabs: seededTabs = null,
+  windows: seededWindows = null,
+  timers = { setTimeout, clearTimeout },
+} = {}) {
   const storage = structuredClone(initialStorage);
+  const windows = new Map((seededWindows ?? [{ id: 7, incognito: false }]).map((win) => [win.id, { ...win }]));
   const tabs = new Map((seededTabs ?? [
     {
       id: 42,
@@ -31,7 +64,7 @@ function createHarness({ storage: initialStorage = {}, windowGetGate = Promise.r
       incognito: false,
     },
   ]).map((tab) => [tab.id, { ...tab }]));
-  const calls = { tabsCreated: 0, windowsCreated: 0, contentActions: [], tabCreateOptions: [], captures: { tab: [], visible: [] } };
+  const calls = { tabsCreated: 0, windowsCreated: 0, windowsRemoved: [], contentActions: [], tabCreateOptions: [], captures: { tab: [], visible: [] } };
   let resolveWindowGetStarted;
   const windowGetStarted = new Promise((resolve) => { resolveWindowGetStarted = resolve; });
   const nativeMessages = event();
@@ -104,6 +137,12 @@ function createHarness({ storage: initialStorage = {}, windowGetGate = Promise.r
       async getLastFocused() {
         return { id: 7, incognito: false, tabs: [...tabs.values()] };
       },
+      async getAll(options = {}) {
+        return [...windows.values()].map((win) => ({
+          ...win,
+          tabs: options.populate ? [...tabs.values()].filter((tab) => tab.windowId === win.id) : undefined,
+        }));
+      },
       async create() {
         calls.windowsCreated += 1;
         throw new Error('test forbids creating windows');
@@ -111,7 +150,14 @@ function createHarness({ storage: initialStorage = {}, windowGetGate = Promise.r
       async update() {
         return { id: 7, width: 1280, height: 800 };
       },
-      async remove() {},
+      async remove(windowId) {
+        if (!windows.has(windowId)) throw new Error('window not found');
+        calls.windowsRemoved.push(windowId);
+        windows.delete(windowId);
+        for (const tab of [...tabs.values()]) {
+          if (tab.windowId === windowId) tabs.delete(tab.id);
+        }
+      },
     },
     tabs: {
       onRemoved: tabsRemoved,
@@ -191,8 +237,8 @@ function createHarness({ storage: initialStorage = {}, windowGetGate = Promise.r
     crypto: { randomUUID },
     navigator: { userAgent: 'test' },
     URL,
-    setTimeout,
-    clearTimeout,
+    setTimeout: timers.setTimeout,
+    clearTimeout: timers.clearTimeout,
     structuredClone,
   });
   vm.runInContext(backgroundSource, context, { filename: 'extension/background.js' });
@@ -475,5 +521,100 @@ describe('adopted window tab selection', () => {
     assert.equal(screenshot.result.dataUrl, 'data:image/png;base64,visible');
     assert.deepEqual(harness.calls.captures.visible, [7]);
     assert.deepEqual(harness.calls.captures.tab, []);
+  });
+});
+
+describe('quitBrowser', () => {
+  const trackedWindow = {
+    claudezillaWindowState: {
+      windowId: 7,
+      tabs: [{ tabId: 42, ownerId: 'agent-a' }],
+      createdAt: 1,
+      groupId: null,
+      isPrivate: false,
+      adopted: true,
+    },
+  };
+
+  it('replies before any window is removed, then closes the others before the Claudezilla window', async () => {
+    const timers = createFakeTimers();
+    const harness = createHarness({
+      timers,
+      storage: trackedWindow,
+      windows: [{ id: 3, incognito: false }, { id: 7, incognito: false }, { id: 9, incognito: true }],
+    });
+
+    const response = await harness.command('quitBrowser');
+
+    assert.equal(response.success, true, response.error);
+    assert.deepEqual(structuredClone(response.result), { quitting: true, windows: 3 });
+    // The reply is out and nothing has been closed yet: only the grace timer is armed.
+    assert.deepEqual(harness.calls.windowsRemoved, []);
+    assert.deepEqual(timers.delays, [200]);
+
+    await timers.run();
+
+    assert.deepEqual(harness.calls.windowsRemoved, [3, 9, 7]);
+    // Grace before the first close, then the session-store pause before the last one.
+    assert.deepEqual(timers.delays, [200, 1500]);
+  });
+
+  it('closes a lone Claudezilla window without the session-store pause', async () => {
+    const timers = createFakeTimers();
+    const harness = createHarness({ timers, storage: trackedWindow });
+
+    const response = await harness.command('quitBrowser');
+    assert.deepEqual(structuredClone(response.result), { quitting: true, windows: 1 });
+
+    await timers.run();
+
+    assert.deepEqual(harness.calls.windowsRemoved, [7]);
+    assert.deepEqual(timers.delays, [200]);
+  });
+
+  it('closes every window without a pause when no Claudezilla window is tracked', async () => {
+    const timers = createFakeTimers();
+    const harness = createHarness({
+      timers,
+      windows: [{ id: 3, incognito: false }, { id: 9, incognito: false }],
+    });
+
+    const response = await harness.command('quitBrowser');
+    assert.deepEqual(structuredClone(response.result), { quitting: true, windows: 2 });
+
+    await timers.run();
+
+    assert.deepEqual(harness.calls.windowsRemoved, [3, 9]);
+    assert.deepEqual(timers.delays, [200]);
+  });
+
+  it('keeps closing when a window has already gone by the time its turn comes', async () => {
+    const timers = createFakeTimers();
+    const harness = createHarness({
+      timers,
+      storage: trackedWindow,
+      windows: [{ id: 3, incognito: false }, { id: 7, incognito: false }, { id: 9, incognito: false }],
+    });
+
+    const response = await harness.command('quitBrowser');
+    assert.deepEqual(structuredClone(response.result), { quitting: true, windows: 3 });
+    // Someone else closes window 3 before the grace timer fires.
+    await harness.browser.windows.remove(3);
+
+    await timers.run();
+
+    assert.deepEqual(harness.calls.windowsRemoved, [3, 9, 7]);
+    assert.deepEqual(timers.delays, [200, 1500]);
+  });
+
+  it('reports an error instead of claiming a quit when no window is open', async () => {
+    const timers = createFakeTimers();
+    const harness = createHarness({ timers, windows: [] });
+
+    const response = await harness.command('quitBrowser');
+
+    assert.equal(response.success, false);
+    assert.match(response.error, /No windows to close/);
+    assert.deepEqual(timers.delays, []);
   });
 });
