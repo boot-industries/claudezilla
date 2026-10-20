@@ -18,7 +18,7 @@ function event() {
   };
 }
 
-function createHarness({ storage: initialStorage = {}, windowGetGate = Promise.resolve(), allowTabCreate = false, tabs: seededTabs = null } = {}) {
+function createHarness({ storage: initialStorage = {}, windowGetGate = Promise.resolve(), allowTabCreate = false, tabs: seededTabs = null, incognitoAccess = true } = {}) {
   const storage = structuredClone(initialStorage);
   const tabs = new Map((seededTabs ?? [
     {
@@ -31,7 +31,7 @@ function createHarness({ storage: initialStorage = {}, windowGetGate = Promise.r
       incognito: false,
     },
   ]).map((tab) => [tab.id, { ...tab }]));
-  const calls = { tabsCreated: 0, windowsCreated: 0, contentActions: [], tabCreateOptions: [], captures: { tab: [], visible: [] } };
+  const calls = { tabsCreated: 0, windowsCreated: 0, contentActions: [], tabCreateOptions: [], tabUpdates: [], captures: { tab: [], visible: [] } };
   let resolveWindowGetStarted;
   const windowGetStarted = new Promise((resolve) => { resolveWindowGetStarted = resolve; });
   const nativeMessages = event();
@@ -81,7 +81,7 @@ function createHarness({ storage: initialStorage = {}, windowGetGate = Promise.r
     },
     extension: {
       async isAllowedIncognitoAccess() {
-        return true;
+        return incognitoAccess;
       },
     },
     webRequest: {
@@ -153,6 +153,7 @@ function createHarness({ storage: initialStorage = {}, windowGetGate = Promise.r
       async update(tabId, changes) {
         const tab = tabs.get(Number(tabId));
         if (!tab) throw new Error('tab not found');
+        calls.tabUpdates.push({ tabId: Number(tabId), changes: structuredClone(changes) });
         Object.assign(tab, changes);
         return { ...tab };
       },
@@ -475,5 +476,58 @@ describe('adopted window tab selection', () => {
     assert.equal(screenshot.result.dataUrl, 'data:image/png;base64,visible');
     assert.deepEqual(harness.calls.captures.visible, [7]);
     assert.deepEqual(harness.calls.captures.tab, []);
+  });
+});
+
+describe('navigate gate', () => {
+  it('with privateMode: false and private-window access allowed, canNavigate is true and navigate without a tabId drives the session tab', async () => {
+    const harness = createHarness({ allowTabCreate: true, storage: { claudezilla: { privateMode: false } } });
+
+    const probe = await harness.command('canNavigate');
+    assert.equal(probe.success, true, probe.error);
+    assert.equal(probe.result.canNavigate, true);
+
+    const created = await harness.command('createWindow', { url: 'https://example.test/agent', agentId: 'agent-a' });
+    assert.equal(created.success, true, created.error);
+    const poolTabId = created.result.tabId;
+
+    const navigated = await harness.command('navigate', { url: 'https://example.test/next' });
+    assert.equal(navigated.success, true, navigated.error);
+    assert.equal(navigated.result.tabId, poolTabId);
+    assert.equal(navigated.result.url, 'https://example.test/next');
+    assert.deepEqual(harness.calls.tabUpdates, [{ tabId: poolTabId, changes: { url: 'https://example.test/next' } }]);
+    assert.equal((await harness.browser.tabs.get(poolTabId)).url, 'https://example.test/next');
+    // The user's own tab in the adopted window was left alone.
+    assert.equal((await harness.browser.tabs.get(42)).url, 'https://example.test/already-open');
+  });
+
+  it('with privateMode: false and private-window access denied, canNavigate is true', async () => {
+    const harness = createHarness({ incognitoAccess: false, storage: { claudezilla: { privateMode: false } } });
+
+    const probe = await harness.command('canNavigate');
+
+    assert.equal(probe.success, true, probe.error);
+    assert.equal(probe.result.canNavigate, true);
+  });
+
+  it('with private mode required and private-window access allowed, canNavigate is true but navigate without a tabId is refused', async () => {
+    const harness = createHarness();
+
+    const probe = await harness.command('canNavigate');
+    const navigated = await harness.command('navigate', { url: 'https://example.test/next' });
+
+    assert.equal(probe.result.canNavigate, true);
+    assert.equal(navigated.success, false);
+    assert.match(navigated.error, /^SECURITY: firefox_navigate is disabled/);
+    assert.deepEqual(harness.calls.tabUpdates, []);
+  });
+
+  it('with private mode required and private-window access denied, canNavigate is false', async () => {
+    const harness = createHarness({ incognitoAccess: false });
+
+    const probe = await harness.command('canNavigate');
+
+    assert.equal(probe.success, true, probe.error);
+    assert.equal(probe.result.canNavigate, false);
   });
 });

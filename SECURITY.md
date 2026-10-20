@@ -86,7 +86,7 @@ The Unix socket is secured with multiple layers:
 
 ### 5. Extension Permission Gating
 
-When the user enables "Run in Private Windows" permission in Firefox (about:addons → Claudezilla → Details), the `firefox_navigate` command is automatically disabled:
+While private mode is required (the default; `privateMode: false` turns this gate off), enabling the "Run in Private Windows" permission in Firefox (about:addons → Claudezilla → Details) automatically disables the `firefox_navigate` command:
 
 - **Permission NOT enabled (default):** All commands work in private windows. Navigate works normally.
 - **Permission enabled:** All commands work in private windows. Navigate throws an error to prevent creating non-private windows.
