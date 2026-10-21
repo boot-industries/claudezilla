@@ -1,0 +1,28 @@
+# Contributor: @MAINTAINER@
+# Maintainer: @MAINTAINER@
+# Template: @VERSION@ and @REPO@ are substituted before publishing.
+pkgname=claudezilla
+pkgver=@VERSION@
+pkgrel=0
+pkgdesc="Firefox browser automation for Claude Code"
+url="https://github.com/@REPO@"
+arch="noarch"
+license="MIT"
+depends="nodejs"
+makedepends="npm zip"
+subpackages="$pkgname-doc"
+source="$pkgname-$pkgver.tar.gz::https://github.com/@REPO@/archive/refs/tags/v$pkgver.tar.gz"
+builddir="$srcdir/$pkgname-$pkgver"
+
+build() {
+	( cd mcp && npm install --omit=dev --ignore-scripts --no-fund --no-audit )
+	( cd extension && zip -qr ../claudezilla.xpi . )
+}
+
+check() {
+	sh -n packaging/common/install-tree.sh
+}
+
+package() {
+	DESTDIR="$pkgdir" ./packaging/common/install-tree.sh
+}

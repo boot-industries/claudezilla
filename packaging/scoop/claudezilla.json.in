@@ -1,0 +1,24 @@
+{
+    "version": "@VERSION@",
+    "description": "Firefox browser automation for Claude Code",
+    "homepage": "https://github.com/@REPO@",
+    "license": "MIT",
+    "url": "https://github.com/@REPO@/releases/download/v@VERSION@/claudezilla-@VERSION@-win.zip",
+    "hash": "@SHA256@",
+    "extract_dir": "claudezilla-@VERSION@",
+    "bin": [
+        "bin\\claudezilla-host.cmd",
+        "bin\\claudezilla-mcp.cmd"
+    ],
+    "post_install": [
+        "powershell -ExecutionPolicy Bypass -File \"$dir\\bin\\claudezilla-setup.ps1\""
+    ],
+    "depends": "nodejs",
+    "checkver": {
+        "github": "https://github.com/@REPO@"
+    },
+    "autoupdate": {
+        "url": "https://github.com/@REPO@/releases/download/v$version/claudezilla-$version-win.zip",
+        "extract_dir": "claudezilla-$version"
+    }
+}

@@ -1,0 +1,65 @@
+# Covers Fedora, RHEL and openSUSE. Built from a release tarball that already
+# vendors mcp/node_modules, so the build needs no network access.
+Name:           claudezilla
+Version:        @VERSION@
+Release:        1%{?dist}
+Summary:        Firefox browser automation for Claude Code
+
+License:        MIT
+URL:            https://github.com/@REPO@
+Source0:        %{url}/archive/refs/tags/v%{version}.tar.gz#/%{name}-%{version}.tar.gz
+
+BuildArch:      noarch
+BuildRequires:  zip
+%if 0%{?suse_version}
+Requires:       nodejs >= 18
+%else
+Requires:       nodejs >= 18
+%endif
+Recommends:     firefox
+Suggests:       jq
+
+%description
+Claudezilla gives Claude Code control of Firefox through a native messaging
+host and an MCP server: navigation, page inspection, screenshots, console and
+network logs.
+
+Run claudezilla-setup once per user to register the MCP server with Claude
+Code and sideload the extension into a dedicated Firefox profile.
+
+%prep
+%autosetup
+
+%build
+( cd extension && zip -qr ../claudezilla.xpi . )
+
+%install
+DESTDIR=%{buildroot} PREFIX=%{_prefix} LIBDIR=%{_prefix}/lib/%{name} \
+    BINDIR=%{_bindir} UNITDIR=%{_prefix}/lib/systemd/user \
+    DOCDIR=%{_docdir}/%{name} LICENSEDIR=%{_datadir}/licenses/%{name} \
+    ./packaging/common/install-tree.sh
+
+# Firefox checks %{_prefix}/lib/mozilla on every arch and /usr/lib64/mozilla on
+# 64-bit builds; install the manifest in both.
+%if "%{_lib}" != "lib"
+install -d %{buildroot}/%{_libdir}/mozilla/native-messaging-hosts
+cp %{buildroot}%{_prefix}/lib/mozilla/native-messaging-hosts/%{name}.json \
+   %{buildroot}/%{_libdir}/mozilla/native-messaging-hosts/%{name}.json
+%endif
+
+%files
+%license %{_datadir}/licenses/%{name}/LICENSE
+%doc %{_docdir}/%{name}/README.md
+%{_bindir}/claudezilla-host
+%{_bindir}/claudezilla-mcp
+%{_bindir}/claudezilla-setup
+%{_prefix}/lib/%{name}/
+%{_prefix}/lib/mozilla/native-messaging-hosts/%{name}.json
+%if "%{_lib}" != "lib"
+%{_libdir}/mozilla/native-messaging-hosts/%{name}.json
+%endif
+%{_prefix}/lib/systemd/user/claudezilla-browser.service
+
+%changelog
+* Thu Jan 01 1970 @MAINTAINER@ - @VERSION@-1
+- Generated from packaging/rpm/claudezilla.spec.in
