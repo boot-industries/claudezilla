@@ -1,0 +1,64 @@
+name: Publish to AUR
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing git tag to publish (e.g. v0.6.9)'
+        required: true
+        type: string
+
+jobs:
+  aur-publish:
+    name: Build and deploy AUR package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for AUR credentials
+        id: creds
+        env:
+          AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+        run: |
+          if [ -n "$AUR_SSH_PRIVATE_KEY" ]; then
+            echo "have=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "have=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::AUR_SSH_PRIVATE_KEY secret not set — skipping AUR deploy."
+          fi
+
+      - name: Checkout
+        if: steps.creds.outputs.have == 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Generate PKGBUILD from template
+        id: pkg
+        if: steps.creds.outputs.have == 'true'
+        run: |
+          TAG="${{ inputs.tag || github.ref_name }}"
+          PKGVER="${TAG#v}"
+          sed -e "s|@PKGVER@|${PKGVER}|g" \
+              -e "s|@REPO@|${GITHUB_REPOSITORY}|g" \
+              packaging/aur/PKGBUILD.in > PKGBUILD
+          cp packaging/aur/claudezilla.install .
+          echo "pkgver=${PKGVER}" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy to AUR
+        if: steps.creds.outputs.have == 'true'
+        uses: KSXGitHub/github-actions-deploy-aur@v4.1.1
+        with:
+          pkgname: claudezilla
+          pkgbuild: ./PKGBUILD
+          assets: |
+            ./claudezilla.install
+          updpkgsums: true
+          test: true
+          test_flags: --clean --cleanbuild --syncdeps --noconfirm
+          commit_username: ${{ secrets.AUR_USERNAME }}
+          commit_email: ${{ secrets.AUR_EMAIL }}
+          ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          commit_message: 'Update to ${{ steps.pkg.outputs.pkgver }}'
+          ssh_keyscan_types: rsa,ecdsa,ed25519
