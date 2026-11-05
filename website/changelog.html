@@ -392,7 +392,7 @@
             </li>
             <li class="change-item">
               <span class="change-tag tag-chore">security</span>
-              <div class="change-text"><code>savePath</code> is confined to the temp and working directories, needs a matching extension, and is written 0600 without following symlinks.</div>
+              <div class="change-text"><code>savePath</code> is confined to the temp and working directories, needs a matching extension, and is written 0600 without following symlinks (macOS/Linux).</div>
             </li>
             <li class="change-item">
               <span class="change-tag tag-fix">fix</span>
@@ -408,7 +408,7 @@
             </li>
             <li class="change-item">
               <span class="change-tag tag-chore">security</span>
-              <div class="change-text">The extension's <code>CLI command:</code> log line no longer prints command parameters (typed text, passwords), and the host log records command names only. Known gap: the extension console (about:debugging inspector) still shows raw host messages, parameters included.</div>
+              <div class="change-text">The extension's <code>CLI command:</code> log line no longer prints command parameters (typed text, passwords), and the host log records command names only (plus the first 50 characters of a focus-loop prompt). Known gap: the extension console (about:debugging inspector) still shows raw host messages, parameters included.</div>
             </li>
             <li class="change-item">
               <span class="change-tag tag-fix">fix</span>
