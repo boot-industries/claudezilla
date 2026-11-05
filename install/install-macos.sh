@@ -167,9 +167,15 @@ install_claude() {
 # Symlink the portable claudezilla-browser Agent Skill into a skills directory.
 link_skill() {
     local SKILLS_DIR="$1"
+    local DEST="$SKILLS_DIR/claudezilla-browser"
     mkdir -p "$SKILLS_DIR"
-    ln -sfn "$PROJECT_DIR/plugin/skills/claudezilla-browser" "$SKILLS_DIR/claudezilla-browser"
-    echo "  Skill: $SKILLS_DIR/claudezilla-browser"
+    # ln -sfn would create the link inside an existing real directory (a copied skill)
+    if [ -d "$DEST" ] && [ ! -L "$DEST" ]; then
+        echo "  [NOTE] $DEST is a real directory, not a link; remove it and rerun to link the skill."
+        return 0
+    fi
+    ln -sfn "$PROJECT_DIR/plugin/skills/claudezilla-browser" "$DEST"
+    echo "  Skill: $DEST"
 }
 
 install_omp() {
