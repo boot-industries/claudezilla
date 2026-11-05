@@ -1,5 +1,7 @@
 // Setup page behaviour (platform tabs, manual-config collapsible, Stripe thank-you).
 // Loaded from extension.html: the site CSP (script-src 'self') blocks inline scripts and handlers.
+// The ?session_id= thank-you only runs if this page is opened with that parameter; the worker's
+// Stripe success_url points at /extension/welcome.html?session_id=, which website/ does not serve.
 
 // Platform tab switching
 document.querySelectorAll('.platform-tab').forEach(tab => {
