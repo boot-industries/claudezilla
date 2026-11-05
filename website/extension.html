@@ -262,7 +262,7 @@
         <p class="tagline">3 steps. 2 minutes.</p>
         <p class="description">
           Install Claudezilla and connect it to Claude Code.
-          The installer auto-configures everything for you.
+          The installer configures Claude Code for you.
         </p>
         <div class="cta-row">
           <a href="https://addons.mozilla.org/firefox/addon/claudezilla/" class="firefox-badge" target="_blank" rel="noopener">
@@ -311,7 +311,7 @@
     <section class="setup-guide">
       <h2 class="section-title">Quick Start</h2>
       <p class="section-subtitle">
-        The installer configures everything automatically — MCP server, permissions, and dependencies.
+        The installer configures the MCP server, permissions, and dependencies. It needs <code>claude</code> on your PATH, and on macOS/Linux <code>jq</code> for the permission list and the omp config; without them it prints a warning with the manual steps instead.
       </p>
 
       <div class="steps">
@@ -329,7 +329,7 @@
           <div class="step-number">2</div>
           <div class="step-content">
             <h3>Run Installer <span class="auto-badge"><span class="dot"></span>Auto-Config</span></h3>
-            <p>Clone the repo and run the installer for your platform. It handles everything else.</p>
+            <p>Clone the repo and run the installer for your platform.</p>
 
             <!-- Platform Tabs -->
             <div class="platform-tabs">
@@ -360,7 +360,7 @@ cd claudezilla
 
             <!-- Windows -->
             <div class="platform-content" data-platform="windows">
-              <pre><code># In PowerShell (user-level registry and AppData only; no administrator rights needed)
+              <pre><code># In PowerShell (no administrator rights needed: it writes to your user registry hive, your user profile and the cloned folder)
 git clone https://github.com/boot-industries/claudezilla.git
 cd claudezilla
 .\install\install-windows.ps1</code></pre>
@@ -394,6 +394,13 @@ cd claudezilla
                 <div class="details">
                   <strong>Dependencies</strong>
                   <span>Installs npm packages for MCP server</span>
+                </div>
+              </div>
+              <div class="config-item">
+                <div class="check">✓</div>
+                <div class="details">
+                  <strong>Linux only: Headless Browser</strong>
+                  <span>Builds an XPI and creates the <code>~/.mozilla/firefox/claudezilla-headless</code> profile, whose <code>user.js</code> sets <code>xpinstall.signatures.required=false</code>; writes <code>start-browser.sh</code> and a systemd user unit (not enabled)</span>
                 </div>
               </div>
             </div>
