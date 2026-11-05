@@ -329,7 +329,7 @@ async function runDiagnostics() {
         name: 'tab_pool',
         status: 'ok',
         tabCount: tabsResult.result?.tabCount || 0,
-        maxTabs: tabsResult.result?.maxTabs || 10,
+        maxTabs: tabsResult.result?.maxTabs || 12,
       });
     } catch (e) {
       diagnostics.checks.push({
