@@ -1824,29 +1824,19 @@ async function handleCliCommand(message) {
         const settings = { compressImages: true, ...(stored.claudezilla || {}) };
         const defaultFormat = settings.compressImages ? 'jpeg' : 'png';
 
-        // Purpose presets - suggestive quality/scale based on intent
-        const PURPOSE_PRESETS = {
-          'quick-glance': { quality: 30, scale: 0.25 },  // Layout/navigation confirmation
-          'read-text': { quality: 60, scale: 0.5 },      // Reading content [DEFAULT]
-          'inspect-ui': { quality: 80, scale: 0.75 },    // UI details/small text
-          'full-detail': { quality: 95, scale: 1.0 },    // Pixel-perfect inspection
-        };
-
-        // Get preset if purpose specified, allow explicit quality/scale to override
-        const preset = params.purpose ? PURPOSE_PRESETS[params.purpose] : null;
-
         const {
           windowId,
           tabId: rawRequestedTabId,
           agentId,
-          quality = preset?.quality ?? 60,
-          scale = preset?.scale ?? 0.5,
+          quality = 60,
           format = defaultFormat,
           // Page readiness options
           maxWait = 10000,
           waitForImages = true,
           skipReadiness = false
         } = params;
+        // Longest image side in px; vision models downscale beyond ~1568 px.
+        const maxEdge = Math.min(2576, Math.max(320, Math.round(Number(params.maxEdge) || 1568)));
         const requestedTabId = rawRequestedTabId ? Number(rawRequestedTabId) : null; // Normalize to Number
 
         const resolvedRequestedTabId = requestedTabId
@@ -1937,11 +1927,46 @@ async function handleCliCommand(message) {
               });
             }
 
-            // Capture with JPEG compression (much smaller than PNG)
+            // Size the image for vision models, which downscale anything whose
+            // long edge exceeds ~1568 px: capture at that size in one step.
             const captureFormat = format === 'png' ? 'png' : 'jpeg';
-            const captureOpts = { format: captureFormat };
+            const viewportResp = await executeInTab(targetTabId, 'getViewport', {});
+            const reportedViewport = viewportResp?.success ? viewportResp.result : null;
+            const finiteNumber = (value, fallback) => (typeof value === 'number' && Number.isFinite(value) ? value : fallback);
+            let vw = finiteNumber(reportedViewport?.width, 0);
+            let vh = finiteNumber(reportedViewport?.height, 0);
+            if (!(vw > 0 && vh > 0)) {
+              const tabInfo = await browser.tabs.get(targetTabId);
+              vw = tabInfo.width ?? 1280;
+              vh = tabInfo.height ?? 800;
+            }
+            const dpr = finiteNumber(reportedViewport?.dpr, 1) > 0 ? finiteNumber(reportedViewport?.dpr, 1) : 1;
+            const scrollX = finiteNumber(reportedViewport?.scrollX, 0);
+            const scrollY = finiteNumber(reportedViewport?.scrollY, 0);
+
+            // The capture box in CSS px: the requested region, else the viewport.
+            let region = null;
+            if (params.region !== undefined && params.region !== null) {
+              const { x, y, width, height } = params.region;
+              if (![x, y, width, height].every((n) => typeof n === 'number' && Number.isFinite(n))) {
+                throw new Error('region requires numeric x, y, width and height');
+              }
+              if (x < 0 || y < 0 || width < 1 || height < 1 || x + width > vw || y + height > vh) {
+                throw new Error(`region must lie within the viewport (${vw}x${vh} CSS px)`);
+              }
+              region = { x, y, width, height };
+            }
+            const boxW = region ? region.width : vw;
+            const boxH = region ? region.height : vh;
+            const cssScale = Math.min(dpr, maxEdge / Math.max(boxW, boxH));
+
+            const captureOpts = { format: captureFormat, scale: cssScale };
             if (captureFormat === 'jpeg') {
               captureOpts.quality = Math.min(100, Math.max(1, quality));
+            }
+            if (region) {
+              // ImageDetails.rect is relative to the document, not the viewport.
+              captureOpts.rect = { x: region.x + scrollX, y: region.y + scrollY, width: region.width, height: region.height };
             }
             // Hide watermark during capture (opacity:0 covers character + glow)
             await executeInTab(targetTabId, 'hideWatermark', {});
@@ -1949,7 +1974,7 @@ async function handleCliCommand(message) {
             // Annotate elements if requested
             let annotationLabels = null;
             if (params.annotate) {
-              const annResp = await executeInTab(targetTabId, 'annotateElements', { maxElements: 30 });
+              const annResp = await executeInTab(targetTabId, 'annotateElements', { maxElements: 30, cssScale });
               if (annResp.success) annotationLabels = annResp.result.labels;
             }
 
@@ -1977,37 +2002,25 @@ async function handleCliCommand(message) {
               await executeInTab(targetTabId, 'removeAnnotations', {});
             }
 
-            // Build base response with readiness data
-            const baseResponse = {
+            // Report the image geometry so callers can map image pixels back to
+            // the page: CSS px = image px / cssScale.
+            return {
               tabId: targetTabId,
               format: captureFormat,
               quality,
+              width: Math.round(boxW * cssScale),
+              height: Math.round(boxH * cssScale),
+              cssScale: Number(cssScale.toFixed(4)),
+              viewport: { width: vw, height: vh, dpr },
+              ...(region ? { region } : {}),
               readiness: screenshotReadiness ? {
                 waitMs: screenshotReadiness.totalWaitMs,
                 timedOut: screenshotReadiness.timedOut,
                 timeline: screenshotReadiness.timeline
-              } : { waitMs: 0, timedOut: false, timeline: [] }
+              } : { waitMs: 0, timedOut: false, timeline: [] },
+              ...(annotationLabels ? { labels: annotationLabels } : {}),
+              dataUrl: rawDataUrl,
             };
-
-            // If scale < 1, resize via content script
-            if (scale < 1) {
-              const response = await executeInTab(targetTabId, 'resizeImage', {
-                dataUrl: rawDataUrl,
-                scale,
-                quality,
-                format: captureFormat,
-              });
-              return {
-                ...baseResponse,
-                dataUrl: response.result.dataUrl,
-                originalSize: response.result.originalSize,
-                scaledSize: response.result.scaledSize,
-                scale,
-                ...(annotationLabels ? { labels: annotationLabels } : {}),
-              };
-            } else {
-              return { ...baseResponse, dataUrl: rawDataUrl, scale: 1, ...(annotationLabels ? { labels: annotationLabels } : {}) };
-            }
           } finally {
             // Release mutex
             screenshotMutexHolder = null;

@@ -14,7 +14,10 @@ import {
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import { randomBytes } from 'crypto';
-import { readFileSync, existsSync, statSync, realpathSync, openSync, writeSync, closeSync, constants } from 'fs';
+import {
+  readFileSync, existsSync, statSync, realpathSync, openSync, writeSync, closeSync,
+  mkdirSync, lstatSync, chmodSync, readdirSync, unlinkSync, constants,
+} from 'fs';
 import { tmpdir } from 'os';
 import { resolve as resolvePath, extname, dirname, basename, join, sep } from 'path';
 import { getSocketPath, getAuthTokenPath } from '../host/ipc.js';
@@ -416,6 +419,22 @@ function allowedSaveRoots() {
 }
 
 /**
+ * Write base64 image bytes to a file created 0600 that refuses to follow a
+ * symlink at the final path component.
+ */
+function writePrivateFile(path, base64Data) {
+  const flags = constants.O_WRONLY | constants.O_CREAT | constants.O_TRUNC | (constants.O_NOFOLLOW ?? 0);
+  const fd = openSync(path, flags, 0o600);
+  try {
+    const bytes = Buffer.from(base64Data, 'base64');
+    let offset = 0;
+    while (offset < bytes.length) offset += writeSync(fd, bytes, offset, bytes.length - offset);
+  } finally {
+    closeSync(fd);
+  }
+}
+
+/**
  * Write a screenshot to disk.
  * SECURITY: savePath is chosen by the agent, so it is confined to
  * allowedSaveRoots(), must carry an extension matching the image format, and
@@ -449,16 +468,50 @@ function saveScreenshotToDisk(base64Data, savePath, format) {
   const inside = roots.some((root) => parent === root || parent.startsWith(root.endsWith(sep) ? root : root + sep));
   if (!inside) throw new Error(`savePath must be inside one of: ${roots.join(', ')}`);
 
-  const flags = constants.O_WRONLY | constants.O_CREAT | constants.O_TRUNC | (constants.O_NOFOLLOW ?? 0);
-  const fd = openSync(join(parent, basename(absPath)), flags, 0o600);
-  try {
-    const bytes = Buffer.from(base64Data, 'base64');
-    let offset = 0;
-    while (offset < bytes.length) offset += writeSync(fd, bytes, offset, bytes.length - offset);
-  } finally {
-    closeSync(fd);
-  }
+  writePrivateFile(join(parent, basename(absPath)), base64Data);
   return absPath;
+}
+
+// CLAUDEZILLA_SCREENSHOT_FILES=1: for harnesses that cannot show inline MCP
+// images (omp renders "[Image: mime]"), also write every screenshot to a
+// private directory and report the path so the agent can open it as a file.
+const SCREENSHOT_FILES = process.env.CLAUDEZILLA_SCREENSHOT_FILES === '1';
+const SCREENSHOT_DIR = join(tmpdir(), 'claudezilla-screenshots');
+const SCREENSHOT_KEEP = 50;
+
+/**
+ * Write a screenshot into SCREENSHOT_DIR and prune it to the newest
+ * SCREENSHOT_KEEP files.
+ * SECURITY: the directory is created 0700 and must be a real directory owned
+ * by this user: tmpdir() can be shared (/tmp), so a pre-created symlink or a
+ * directory owned by someone else is refused.
+ *
+ * @param {string} base64Data - Image bytes, base64-encoded
+ * @param {'jpeg'|'png'} format
+ * @returns {string} Path written
+ */
+function writeScreenshotFile(base64Data, format) {
+  mkdirSync(SCREENSHOT_DIR, { recursive: true, mode: 0o700 });
+  const info = lstatSync(SCREENSHOT_DIR);
+  if (!info.isDirectory() || (typeof process.getuid === 'function' && info.uid !== process.getuid())) {
+    throw new Error(`Refusing to use ${SCREENSHOT_DIR}: not a directory owned by this user`);
+  }
+  chmodSync(SCREENSHOT_DIR, 0o700);
+
+  const ext = format === 'jpeg' ? 'jpg' : 'png';
+  const file = join(SCREENSHOT_DIR, `${Date.now()}-${AGENT_ID.slice(6, 14)}.${ext}`);
+  writePrivateFile(file, base64Data);
+
+  // Names start with a millisecond timestamp, so lexical order is age order.
+  const stale = readdirSync(SCREENSHOT_DIR).sort().slice(0, -SCREENSHOT_KEEP);
+  for (const name of stale) {
+    try {
+      unlinkSync(join(SCREENSHOT_DIR, name));
+    } catch {
+      // Already gone (another agent pruned it).
+    }
+  }
+  return file;
 }
 
 /**
@@ -760,26 +813,32 @@ const TOOLS = [
   },
   {
     name: 'firefox_screenshot',
-    description: 'Capture a screenshot with dynamic page readiness detection. Automatically waits for network idle (XHR, scripts) and render settlement before capture. Returns timing data showing what signals were detected. SERIALIZED: Requests queued to prevent collisions. Default: JPEG 60% quality, 50% scale.',
+    description: 'Capture the viewport (or a region) as an image sized for vision models: long edge capped at maxEdge (default 1568 px). A text block before the image reports width, height and cssScale (CSS px = image px / cssScale). Waits for network idle and render settlement unless skipReadiness. Prefer firefox_get_accessibility_snapshot for reading; use screenshots for layout and visuals.',
     inputSchema: {
       type: 'object',
       properties: {
         tabId: {
           type: 'number',
-          description: 'Specific tab to capture (will switch to it). Default: current active tab.',
+          description: 'Tab ID (default: your current tab)',
         },
-        purpose: {
-          type: 'string',
-          enum: ['quick-glance', 'read-text', 'inspect-ui', 'full-detail'],
-          description: 'SUGGESTED quality presets (you can override with explicit quality/scale): quick-glance (q:30,s:0.25) for layout/navigation confirmation, read-text (q:60,s:0.5) for reading content [DEFAULT], inspect-ui (q:80,s:0.75) for UI details/small text, full-detail (q:95,s:1.0) for pixel-perfect inspection.',
+        maxEdge: {
+          type: 'number',
+          description: 'Longest image side in px (default 1568; 800 for a quick layout check; up to 2576 for small text on high-resolution models)',
+        },
+        region: {
+          type: 'object',
+          description: 'Zoom: capture only this viewport rectangle in CSS px',
+          properties: {
+            x: { type: 'number' },
+            y: { type: 'number' },
+            width: { type: 'number' },
+            height: { type: 'number' },
+          },
+          required: ['x', 'y', 'width', 'height'],
         },
         quality: {
           type: 'number',
-          description: 'JPEG quality 1-100 (default: 60). Overrides purpose preset if specified.',
-        },
-        scale: {
-          type: 'number',
-          description: 'Resolution scale 0.25-1.0 (default: 0.5). Overrides purpose preset if specified.',
+          description: 'JPEG quality 1-100 (default: 60)',
         },
         format: {
           type: 'string',
@@ -800,11 +859,11 @@ const TOOLS = [
         },
         annotate: {
           type: 'boolean',
-          description: 'Overlay numbered badges on interactive elements (buttons, links, inputs) before capture. Returns labels map {index: {selector, text, role}} alongside screenshot. Useful for vision models to identify and reference elements.',
+          description: 'Overlay numbered badges on visible interactive elements (buttons, links, inputs) before capture. Returns labels map {index: {ref, role, text}}; pass a ref to click/type. Useful for vision models to identify elements.',
         },
         savePath: {
           type: 'string',
-          description: 'Optional absolute file path to save the screenshot to disk (e.g. /tmp/shot.jpg). When provided, the file is written and the path is returned alongside the inline image. Supports .jpg/.jpeg and .png extensions.',
+          description: 'Optional file path to also save the image (e.g. /tmp/shot.jpg). Must be inside the temp or current working directory and end in .jpg/.jpeg (JPEG) or .png (PNG). The path is returned in the text block.',
         },
       },
     },
@@ -1863,20 +1922,26 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       // Special handling for screenshots - return as image
       if (name === 'firefox_screenshot' && response.result?.dataUrl) {
         // Detect format from data URL
-        const isJpeg = response.result.dataUrl.startsWith('data:image/jpeg');
+        const { dataUrl, ...meta } = response.result;
+        const isJpeg = dataUrl.startsWith('data:image/jpeg');
         const mimeType = isJpeg ? 'image/jpeg' : 'image/png';
-        const base64Data = response.result.dataUrl.replace(/^data:image\/(jpeg|png);base64,/, '');
-        const content = [{ type: 'image', data: base64Data, mimeType }];
-        // If annotate was requested, append labels as text
-        if (response.result.labels) {
-          content.push({ type: 'text', text: JSON.stringify({ labels: response.result.labels }) });
-        }
-        // If savePath requested, write file to disk
+        const format = isJpeg ? 'jpeg' : 'png';
+        const base64Data = dataUrl.slice(dataUrl.indexOf(',') + 1);
+        // An explicit savePath wins; otherwise CLAUDEZILLA_SCREENSHOT_FILES=1
+        // writes a copy for harnesses that cannot display inline images.
+        let savedPath;
         if (savePathArg) {
-          const savedPath = saveScreenshotToDisk(base64Data, savePathArg, isJpeg ? 'jpeg' : 'png');
-          content.push({ type: 'text', text: JSON.stringify({ savedPath }) });
+          savedPath = saveScreenshotToDisk(base64Data, savePathArg, format);
+        } else if (SCREENSHOT_FILES) {
+          savedPath = writeScreenshotFile(base64Data, format);
         }
-        return { content };
+        // Geometry first (width, height, cssScale, labels, savedPath), then the image.
+        return {
+          content: [
+            { type: 'text', text: JSON.stringify(savedPath ? { ...meta, savedPath } : meta) },
+            { type: 'image', data: base64Data, mimeType },
+          ],
+        };
       }
 
       // Handle undefined/null results - ensure text is always a string

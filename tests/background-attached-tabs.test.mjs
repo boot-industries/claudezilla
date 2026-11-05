@@ -350,7 +350,6 @@ describe('attached user tabs', () => {
       agentId: 'agent-b',
       skipReadiness: true,
       format: 'png',
-      scale: 1,
     });
     assert.equal(screenshot.success, true, screenshot.error);
     assert.equal(screenshot.result.tabId, 42);
@@ -503,7 +502,6 @@ describe('adopted window tab selection', () => {
       agentId: 'agent-a',
       skipReadiness: true,
       format: 'png',
-      scale: 1,
     });
 
     assert.equal(screenshot.success, true, screenshot.error);
@@ -539,7 +537,6 @@ describe('adopted window tab selection', () => {
       agentId: 'agent-a',
       skipReadiness: true,
       format: 'png',
-      scale: 1,
     });
 
     assert.equal(screenshot.success, true, screenshot.error);
@@ -759,7 +756,6 @@ describe('dedicated window keeps the driven tab selected', () => {
       agentId: 'agent-a',
       skipReadiness: true,
       format: 'png',
-      scale: 1,
     });
 
     assert.equal(screenshot.success, true, screenshot.error);
@@ -807,5 +803,84 @@ describe('navigate without tabId', () => {
     assert.equal(harness.calls.windowsCreated, 0);
     assert.equal(harness.calls.tabsCreated, 0);
     assert.deepEqual(harness.calls.tabUpdates, []);
+  });
+});
+
+describe('screenshot sizing', () => {
+  // A 1440x900 CSS viewport on a 2x display, in a dedicated window whose
+  // selected tab is captured with captureVisibleTab.
+  async function sizedHarness() {
+    const harness = createHarness({
+      contentResults: { getViewport: { width: 1440, height: 900, dpr: 2, scrollX: 0, scrollY: 0 } },
+      tabs: [
+        { id: 100, windowId: 7, url: 'https://example.test/agent', title: 'Agent page', active: true, pinned: false, incognito: false },
+      ],
+      storage: {
+        claudezillaWindowState: {
+          windowId: 7,
+          tabs: [{ tabId: 100, ownerId: 'agent-a' }],
+          createdAt: 1,
+          groupId: null,
+          isPrivate: false,
+          adopted: false,
+        },
+      },
+    });
+    await harness.windowGetStarted;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    return harness;
+  }
+
+  it('captures at a scale that puts the long edge at 1568 px by default', async () => {
+    const harness = await sizedHarness();
+
+    const screenshot = await harness.command('screenshot', { agentId: 'agent-a', skipReadiness: true });
+
+    assert.equal(screenshot.success, true, screenshot.error);
+    assert.equal(screenshot.result.width, 1568);
+    assert.equal(screenshot.result.height, 980);
+    assert.ok(Math.abs(screenshot.result.cssScale - 1.0889) < 1e-4, `cssScale ${screenshot.result.cssScale}`);
+    assert.ok(Math.abs(harness.calls.captureOpts[0].scale - 1568 / 1440) < 1e-9);
+    assert.equal(harness.calls.captureOpts[0].rect, undefined);
+  });
+
+  it('maxEdge shrinks the image', async () => {
+    const harness = await sizedHarness();
+
+    const screenshot = await harness.command('screenshot', { agentId: 'agent-a', skipReadiness: true, maxEdge: 800 });
+
+    assert.equal(screenshot.success, true, screenshot.error);
+    assert.equal(screenshot.result.width, 800);
+    assert.equal(screenshot.result.height, 500);
+  });
+
+  it('a region zooms in, capped at the device pixel ratio', async () => {
+    const harness = await sizedHarness();
+
+    const screenshot = await harness.command('screenshot', {
+      agentId: 'agent-a',
+      skipReadiness: true,
+      region: { x: 0, y: 0, width: 400, height: 300 },
+    });
+
+    assert.equal(screenshot.success, true, screenshot.error);
+    assert.equal(harness.calls.captureOpts[0].scale, 2);
+    assert.equal(screenshot.result.width, 800);
+    assert.equal(screenshot.result.height, 600);
+    assert.deepEqual(harness.calls.captureOpts[0].rect, { x: 0, y: 0, width: 400, height: 300 });
+  });
+
+  it('rejects a region outside the viewport without capturing', async () => {
+    const harness = await sizedHarness();
+
+    const screenshot = await harness.command('screenshot', {
+      agentId: 'agent-a',
+      skipReadiness: true,
+      region: { x: 1400, y: 0, width: 100, height: 100 },
+    });
+
+    assert.equal(screenshot.success, false);
+    assert.match(screenshot.error, /region must lie within the viewport \(1440x900 CSS px\)/);
+    assert.deepEqual(harness.calls.captureOpts, []);
   });
 });

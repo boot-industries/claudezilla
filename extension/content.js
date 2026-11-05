@@ -2183,70 +2183,56 @@ function getKeyCodeNum(key) {
 }
 
 /**
- * Resize image using canvas (for screenshot compression)
- * @param {object} params - Parameters
- * @param {string} params.dataUrl - Source image data URL
- * @param {number} params.scale - Scale factor (0.25, 0.5, etc)
- * @param {number} params.quality - JPEG quality (1-100)
- * @param {string} params.format - Output format (jpeg/png)
- * @returns {Promise<object>} Resized image data
+ * Viewport geometry for screenshot sizing.
+ * @returns {{width: number, height: number, dpr: number, scrollX: number, scrollY: number}}
  */
-async function resizeImage(params) {
-  const { dataUrl, scale = 0.5, quality = 60, format = 'jpeg' } = params;
-
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => {
-      const originalWidth = img.width;
-      const originalHeight = img.height;
-      const newWidth = Math.round(originalWidth * scale);
-      const newHeight = Math.round(originalHeight * scale);
-
-      const canvas = document.createElement('canvas');
-      canvas.width = newWidth;
-      canvas.height = newHeight;
-
-      const ctx = canvas.getContext('2d');
-      // Use better quality scaling
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
-      ctx.drawImage(img, 0, 0, newWidth, newHeight);
-
-      const mimeType = format === 'png' ? 'image/png' : 'image/jpeg';
-      const outputDataUrl = canvas.toDataURL(mimeType, quality / 100);
-
-      resolve({
-        dataUrl: outputDataUrl,
-        originalSize: { width: originalWidth, height: originalHeight },
-        scaledSize: { width: newWidth, height: newHeight },
-      });
-    };
-    img.onerror = () => reject(new Error('Failed to load image for resizing'));
-    img.src = dataUrl;
-  });
+function getViewport() {
+  return {
+    width: window.innerWidth,
+    height: window.innerHeight,
+    dpr: window.devicePixelRatio || 1,
+    scrollX: window.scrollX,
+    scrollY: window.scrollY,
+  };
 }
 
 /**
  * Annotate interactive elements with numbered badges for vision models
  * Uses Shadow DOM to avoid polluting page CSS
+ * Only elements that are visible and inside the viewport are numbered, so the
+ * cap is not spent on hidden or off-screen controls.
  * @param {object} params
  * @param {number} params.maxElements - Max elements to annotate (default: 30)
- * @returns {{labels: object, count: number}} labels map {index: {selector, text, role}} + count
+ * @param {number} params.cssScale - Image pixels per CSS pixel of the capture;
+ *   badges are enlarged when the image is downscaled so they stay legible
+ * @returns {{labels: object, count: number}} labels map {index: {ref, role, text}} + count
  */
 function annotateElements(params = {}) {
-  const { maxElements = 30 } = params;
+  const { maxElements = 30, cssScale = 1 } = params;
   const SELECTORS = ['button', 'a[href]', 'input', 'select', 'textarea', '[role="button"]', '[role="link"]'];
   const seen = new Set();
   const elements = [];
 
+  const isShownInViewport = (el) => {
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return false;
+    if (rect.bottom <= 0 || rect.right <= 0 || rect.top >= window.innerHeight || rect.left >= window.innerWidth) return false;
+    const style = window.getComputedStyle(el);
+    return style.display !== 'none' && style.visibility !== 'hidden';
+  };
+
   for (const sel of SELECTORS) {
     for (const el of document.querySelectorAll(sel)) {
-      if (!seen.has(el) && elements.length < maxElements) {
-        seen.add(el);
-        elements.push(el);
-      }
+      if (elements.length >= maxElements) break;
+      if (seen.has(el)) continue;
+      seen.add(el);
+      if (isShownInViewport(el)) elements.push(el);
     }
   }
+
+  // Keep badges legible after the capture is downscaled.
+  const badgeSize = Math.ceil(18 / Math.min(1, cssScale));
+  const badgeFont = Math.ceil(11 / Math.min(1, cssScale));
 
   const labels = {};
   const host = document.createElement('div');
@@ -2257,20 +2243,19 @@ function annotateElements(params = {}) {
   elements.forEach((el, i) => {
     const idx = i + 1;
     const rect = el.getBoundingClientRect();
-    if (rect.width === 0 && rect.height === 0) return;
 
     const badge = document.createElement('div');
     badge.textContent = String(idx);
     Object.assign(badge.style, {
       position: 'fixed',
-      top: `${rect.top + window.scrollY - 9}px`,
-      left: `${rect.left + window.scrollX - 9}px`,
+      top: `${rect.top - 9}px`,
+      left: `${rect.left - 9}px`,
       background: '#e53e3e',
       color: '#fff',
       borderRadius: '50%',
-      width: '18px',
-      height: '18px',
-      fontSize: '11px',
+      width: `${badgeSize}px`,
+      height: `${badgeSize}px`,
+      fontSize: `${badgeFont}px`,
       fontWeight: 'bold',
       display: 'flex',
       alignItems: 'center',
@@ -2282,15 +2267,10 @@ function annotateElements(params = {}) {
     });
     shadow.appendChild(badge);
 
-    // Build a reasonable selector for the element
-    let selector = el.tagName.toLowerCase();
-    if (el.id) selector = `#${el.id}`;
-    else if (el.className && typeof el.className === 'string') selector += '.' + el.className.trim().split(/\s+/).join('.');
-
     labels[String(idx)] = {
-      selector,
-      text: (el.textContent || el.value || el.placeholder || el.getAttribute('aria-label') || '').trim().slice(0, 80),
+      ref: refFor(el),
       role: el.getAttribute('role') || el.tagName.toLowerCase(),
+      text: (el.textContent || el.value || el.placeholder || el.getAttribute('aria-label') || '').trim().slice(0, 80),
     };
   });
 
@@ -2593,8 +2573,8 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
           result = await handleConsent(params);
           break;
 
-        case 'resizeImage':
-          result = await resizeImage(params);
+        case 'getViewport':
+          result = getViewport();
           break;
 
         case 'find':
