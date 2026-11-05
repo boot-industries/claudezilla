@@ -16,7 +16,7 @@ Anthropic's official browser tool requires Chrome. If you're on a system where C
 - **Zero telemetry** — All communication runs through a local Unix socket (a named pipe on Windows). No data leaves your machine. No Google account, no Chrome sync, no phone-home.
 - **Hardened environments** — Built for Tails, Whonix, Qubes OS, air-gapped networks, and enterprise Linux where package policy prohibits Chrome.
 - **Multi-agent safe** — 12-tab shared pool with 128-bit agent IDs, ownership tracking, and screenshot mutex. Multiple Claude sessions coexist safely.
-- **Full browser control** — Read pages as compact accessibility snapshots with element refs; click, type, scroll, screenshot, evaluate JS (opt-in), access DevTools console and network.
+- **Full browser control** — Read pages as compact accessibility snapshots with element refs; click, type, scroll, screenshot, evaluate JS (opt-in), inspect network requests and uncaught page errors.
 
 ## Quick Start
 
@@ -191,7 +191,7 @@ All 35 tools are listed by default.
 - `firefox_scroll` — Scroll to element or position
 
 ### DevTools
-- `firefox_get_console` / `firefox_get_network` — Captured console output and network requests
+- `firefox_get_console` / `firefox_get_network` — Captured uncaught errors and unhandled promise rejections (the page's own `console.*` calls are not captured), and network requests
 - `firefox_evaluate` — Run JavaScript in the page (disabled until enabled in the popup)
 
 ### Diagnostics

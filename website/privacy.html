@@ -324,7 +324,7 @@
         <li><strong>Page content:</strong> Text, DOM elements, and page structure - only when explicitly requested by Claude</li>
         <li><strong>Screenshots:</strong> Returned to Claude Code over the local connection and never transmitted externally. They are written to disk only when requested: an explicit <code>savePath</code> (restricted to the temp and working directories), or <code>CLAUDEZILLA_SCREENSHOT_FILES=1</code>, which keeps the newest 50 in a private temp directory</li>
         <li><strong>Network requests:</strong> Monitored for page readiness detection and returned to Claude only when it asks (<code>firefox_get_network</code>); request bodies are never captured and sensitive URL query parameters are redacted</li>
-        <li><strong>Console logs:</strong> Available on-demand for debugging; opt-in and never transmitted</li>
+        <li><strong>Page errors:</strong> Uncaught errors and unhandled promise rejections, captured only after Claude first asks for them (<code>firefox_get_console</code>) and never transmitted externally. The page's own console messages are not captured</li>
       </ul>
       <p>All accessed data remains on your local machine and is used solely to fulfill automation commands from Claude Code.</p>
 
