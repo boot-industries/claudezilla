@@ -59,7 +59,6 @@ const ALLOWED_COMMANDS = new Set([
   // Core browser control
   'ping',
   'version',
-  'canNavigate',
   'navigate',
   'getActiveTab',
   'getContent',

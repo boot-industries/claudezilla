@@ -887,16 +887,6 @@ async function getSession(windowId) {
 }
 
 /**
- * SECURITY: Verify we're operating in a private window
- * @deprecated Use getSession() instead for multi-window support
- */
-async function requirePrivateWindow() {
-  // Delegate to getSession for backward compatibility
-  const session = await getSession();
-  return session.tab;
-}
-
-/**
  * Handle command from CLI (via native host)
  * Executes the command and sends result back to host
  *
@@ -940,13 +930,6 @@ async function handleCliCommand(message) {
         };
         break;
 
-      case 'canNavigate': {
-        // Check if navigate command is available (disabled if in private windows mode)
-        const allowed = await canRunInPrivateWindows();
-        result = { canNavigate: allowed };
-        break;
-      }
-
       case 'navigate': {
         const { url, tabId: rawNavTabId, windowId, agentId } = params;
         const targetTabId = rawNavTabId ? Number(rawNavTabId) : null;
@@ -965,17 +948,13 @@ async function handleCliCommand(message) {
           break;
         }
 
-        // No tabId: navigate active tab (original behavior with restrictions)
-        // SECURITY: Disable when extension is allowed in private windows
-        // to prevent agents from creating non-private windows
-        if (await canRunInPrivateWindows()) {
-          throw new Error('SECURITY: firefox_navigate is disabled when extension runs in Private Windows. This prevents creating non-private windows. Use firefox_create_window or provide a tabId to navigate an existing tab.');
-        }
-
-        // SECURITY: Require private window, then navigate in current tab
-        const currentTab = await requirePrivateWindow();
+        // No tabId: drive the session's current pool tab. This never creates a
+        // window (getSession throws when none is tracked); windows are created
+        // only by createWindow, which enforces the private-mode setting.
+        const { tab: currentTab } = await getSession(windowId);
         await browser.tabs.update(currentTab.id, { url });
-        result = { tabId: currentTab.id, url };
+        const navigatedTab = await browser.tabs.get(currentTab.id);
+        result = { tabId: currentTab.id, url: navigatedTab.url, title: navigatedTab.title, navigated: true };
         break;
       }
 
@@ -1733,7 +1712,7 @@ async function handleCliCommand(message) {
         // Get current window if no windowId specified
         let targetWindowId = windowId;
         if (!targetWindowId) {
-          const tab = await requirePrivateWindow();
+          const { tab } = await getSession();
           targetWindowId = tab.windowId;
         }
         const updateInfo = {};

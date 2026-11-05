@@ -435,8 +435,8 @@ function buildErrorMessage(errCode, socketPath, authTokenFile) {
  *
  * @param {object} [options]
  * @param {boolean} [options.autostart=true] - false skips the on-demand
- *   browser start: a probe that must not start the browser (the tool-list
- *   canNavigate check) still reaches a running host but never launches one.
+ *   browser start: a call that must not start the browser (goodbye on
+ *   shutdown) still reaches a running host but never launches one.
  * @param {number} [options.timeoutMs] - socket idle timeout override; defaults
  *   to the command's own timeout plus the shared grace period.
  */
@@ -517,22 +517,6 @@ async function sendCommand(command, params = {}, options = {}) {
   }
 
   throw lastError;
-}
-
-/**
- * Check if navigate command is available
- * Returns false if extension is in Private Windows mode
- */
-async function canNavigate() {
-  try {
-    // Listing the tools must never start the browser (CLAUDEZILLA_AUTOSTART_CMD):
-    // probe the host as it is, and let the first tool call start it.
-    const response = await sendCommand('canNavigate', {}, { autostart: false });
-    return response.result?.canNavigate ?? true;
-  } catch (error) {
-    // If we can't check, assume navigate is available (fail open)
-    return true;
-  }
 }
 
 // Tool definitions
@@ -1389,16 +1373,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     return { tools: GATEWAY_TOOLS };
   }
 
-  // After activation: filter by activated categories + canNavigate check
-  const navigateAllowed = await canNavigate();
-
+  // After activation: filter by activated categories
   let availableTools = TOOLS.filter(tool => activatedCategories.has(tool.category));
   if (TOOL_MODE === 'all') {
     // In eager mode, retain firefox_activate in tool list as a compatible no-op
     availableTools = [...GATEWAY_TOOLS, ...availableTools];
-  }
-  if (!navigateAllowed) {
-    availableTools = availableTools.filter(tool => tool.name !== 'firefox_navigate');
   }
 
   return { tools: availableTools };

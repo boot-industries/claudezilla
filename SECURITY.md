@@ -21,7 +21,6 @@ const ALLOWED_COMMANDS = new Set([
   // Core browser control
   'ping',
   'version',
-  'canNavigate',
   'navigate',
   'getActiveTab',
   'getContent',
@@ -86,12 +85,9 @@ The Unix socket is secured with multiple layers:
 
 ### 5. Extension Permission Gating
 
-When the user enables "Run in Private Windows" permission in Firefox (about:addons → Claudezilla → Details), the `firefox_navigate` command is automatically disabled:
-
-- **Permission NOT enabled (default):** All commands work in private windows. Navigate works normally.
-- **Permission enabled:** All commands work in private windows. Navigate throws an error to prevent creating non-private windows.
-
-**Why:** Users who explicitly allow the extension in private windows are signaling privacy awareness. We prevent navigation to avoid accidentally creating non-private browsing context.
+- `firefox_navigate` only drives an existing Claudezilla pool tab or an attached tab, and never creates a window.
+- Windows are created only by `firefox_create_window`, which enforces the private-mode setting.
+- The pre-0.7.7 rule that disabled navigate when the add-on could run in private windows was removed, because it guarded no window-creating path.
 
 ### 6. URL Scheme Validation (v0.4.5)
 

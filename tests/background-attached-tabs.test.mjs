@@ -770,3 +770,42 @@ describe('dedicated window keeps the driven tab selected', () => {
     assert.deepEqual(harness.calls.captures.tab, []);
   });
 });
+
+describe('navigate without tabId', () => {
+  // navigate has no window-creating path, so whether the add-on may run in
+  // private windows must not matter: it drives the pool tab either way.
+  for (const incognitoAccess of [true, false]) {
+    it(`drives the pool tab and leaves the user's tab alone (private-window access: ${incognitoAccess})`, async () => {
+      const harness = createHarness({
+        incognitoAccess,
+        allowTabCreate: true,
+        storage: { claudezilla: { privateMode: false } },
+      });
+
+      const created = await harness.command('createWindow', { url: 'https://example.test/agent', agentId: 'agent-a' });
+      assert.equal(created.success, true, created.error);
+      const poolTabId = created.result.tabId;
+
+      const navigated = await harness.command('navigate', { url: 'https://example.test/next' });
+
+      assert.equal(navigated.success, true, navigated.error);
+      assert.equal(navigated.result.tabId, poolTabId);
+      assert.equal(navigated.result.url, 'https://example.test/next');
+      assert.equal(navigated.result.navigated, true);
+      assert.deepEqual(harness.calls.tabUpdates, [{ tabId: poolTabId, changes: { url: 'https://example.test/next' } }]);
+      assert.equal((await harness.browser.tabs.get(42)).url, 'https://example.test/already-open');
+    });
+  }
+
+  it('never creates a window or tab when no session exists', async () => {
+    const harness = createHarness({ allowTabCreate: true, allowWindowCreate: true });
+
+    const navigated = await harness.command('navigate', { url: 'https://example.test/next' });
+
+    assert.equal(navigated.success, false);
+    assert.match(navigated.error, /Tab session lost/);
+    assert.equal(harness.calls.windowsCreated, 0);
+    assert.equal(harness.calls.tabsCreated, 0);
+    assert.deepEqual(harness.calls.tabUpdates, []);
+  });
+});
