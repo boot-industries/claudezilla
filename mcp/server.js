@@ -228,6 +228,31 @@ agentReaper.start();
 // can cancel them and avoid racing against goodbye/exit.
 const pendingConsentTimers = new Set();
 
+// This agent's most recently used tab (null until a call returns a tabId).
+// Per MCP-server process, i.e. per agent, unlike the extension's global active tab.
+let currentTabId = null;
+// Errors that mean the injected tab no longer exists. "Element not found" is
+// deliberately not matched: a selector miss says nothing about the tab.
+const STALE_TAB_ERROR = /TAB_UNAVAILABLE|Tab \d+ not found|Invalid tab ID/i;
+
+/**
+ * Update currentTabId from a successful tool result.
+ * @param {string} toolName
+ * @param {object|undefined} toolArgs - Arguments the agent passed
+ * @param {object|undefined} result - Extension result
+ */
+function trackCurrentTab(toolName, toolArgs, result) {
+  if (toolName === 'firefox_close_window') {
+    currentTabId = null;
+    return;
+  }
+  if (toolName === 'firefox_close_tab' || toolName === 'firefox_detach_tab') {
+    if (toolArgs?.tabId === currentTabId) currentTabId = null;
+    return;
+  }
+  if (typeof result?.tabId === 'number') currentTabId = result.tabId;
+}
+
 /**
  * Run diagnostics on Claudezilla connection
  * Checks socket, auth token, permissions, and connectivity
@@ -1264,6 +1289,17 @@ for (const tool of TOOLS) {
   }
 }
 
+// Tools whose tabId is optional default to this agent's current tab. Tools
+// that create, attach, detach or close a specific tab are excluded: their
+// tabId (or lack of one) is the point of the call.
+const TAB_DEFAULT_EXCLUDED = new Set(['firefox_close_tab', 'firefox_attach_tab', 'firefox_detach_tab', 'firefox_create_window']);
+const TAB_DEFAULT_TOOLS = new Set(
+  TOOLS
+    .filter((tool) => tool.inputSchema.properties.tabId && !(tool.inputSchema.required ?? []).includes('tabId'))
+    .map((tool) => tool.name)
+    .filter((toolName) => !TAB_DEFAULT_EXCLUDED.has(toolName)),
+);
+
 // Assign categories to tools for lazy loading
 const TOOL_CATEGORIES = {
   firefox_create_window: 'core',
@@ -1653,6 +1689,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
     }
 
+    // Default tab-targeting calls to this agent's own current tab.
+    let injectedTabId = null;
+    if (currentTabId !== null && commandParams.tabId === undefined && TAB_DEFAULT_TOOLS.has(name)) {
+      commandParams.tabId = currentTabId;
+      injectedTabId = currentTabId;
+    }
+
     // Bug 3: Refresh heartbeat before the async wait to prevent orphan timeout during long operations
     updateAgentHeartbeat(AGENT_ID);
     const response = await sendCommand(command, commandParams);
@@ -1673,6 +1716,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }, 600);
         pendingConsentTimers.add(timer);
       }
+    }
+
+    // Track this agent's current tab so later calls without tabId do not fall
+    // through to the extension's single global active tab (another agent's).
+    let staleTabNote = '';
+    if (response.success) {
+      trackCurrentTab(name, args, response.result);
+    } else if (injectedTabId !== null && STALE_TAB_ERROR.test(String(response.error ?? ''))) {
+      currentTabId = null;
+      staleTabNote = ` (your current tab ${injectedTabId} is gone: call firefox_get_tabs or firefox_create_window)`;
     }
 
     if (response.success) {
@@ -1729,6 +1782,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           `  Requested: ${response.details.requestedMode}\n` +
           `  Hint: ${response.details.hint}`;
       }
+      if (staleTabNote) errorText += staleTabNote;
       return {
         content: [{ type: 'text', text: errorText }],
         isError: true,
