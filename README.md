@@ -55,6 +55,7 @@ No manual config required — restart Claude Code and you're ready.
 | `CLAUDEZILLA_AUTOSTART_CMD` | all platforms | Command that starts the browser when the host is not running. Never run through a shell. |
 | `CLAUDEZILLA_AUTOSTART_WAIT_MS` | all platforms | How long to wait for the host to bind its socket after a start (default `45000`). |
 | `CLAUDEZILLA_AUTOSTART_RETRY_COOLDOWN_MS` | all platforms | How long to wait before retrying a failed start (default `60000`). |
+| `CLAUDEZILLA_ALLOW_QUIT` | all platforms | Allows the `quitBrowser` command, which closes every window of the browser the host runs in. Set it only in the environment of a browser that exists for agents (for example the profile started by `CLAUDEZILLA_AUTOSTART_CMD` or a systemd unit), never for your own browser. |
 
 `CLAUDEZILLA_IPC_DIR` in detail:
 
@@ -85,6 +86,23 @@ CLAUDEZILLA_IPC_DIR=/run/user/1000/claudezilla-bg claude
 - The browser is started only when the host is **not reachable**. The check is a connection attempt, not a file check, so it also works on Windows, where the host socket is a named pipe rather than a file.
 - Concurrent calls share a single launch, and a failed start is not retried for `CLAUDEZILLA_AUTOSTART_RETRY_COOLDOWN_MS` — a browser that cannot start does not turn every tool call into another process.
 - The start command must publish the host socket and auth token where the MCP server looks for them. When the browser and the MCP server are different processes, give both the same `CLAUDEZILLA_IPC_DIR`.
+
+Stopping the browser cleanly:
+
+- A signal is not a clean quit. Firefox does not shut down on `SIGTERM` (what `systemctl stop` sends by default): the process ends without writing its session store or cache index, and the next start restores stray windows. Closing the last window is the only clean quit.
+- `node host/cli.js quitBrowser` asks the extension to close every window, the Claudezilla window last so it is the one restored next time. The CLI talks to the host over the socket, so give it the same `CLAUDEZILLA_IPC_DIR` as the browser when one is in use.
+- The host refuses the command unless the **browser's** environment carries `CLAUDEZILLA_ALLOW_QUIT=1`. The host inherits that environment from Firefox, so nothing in the CLI's environment can enable it, and a browser started without the variable cannot be quit this way.
+- No MCP tool exposes the command: it is for the supervisor that started the browser, not for agents.
+
+```ini
+# ~/.config/systemd/user/claudezilla-background.service
+[Service]
+Environment=CLAUDEZILLA_IPC_DIR=%t/claudezilla-bg CLAUDEZILLA_ALLOW_QUIT=1
+ExecStart=/usr/bin/firefox --no-remote --profile %h/profiles/headless
+ExecStop=/usr/bin/node /path/to/claudezilla/host/cli.js quitBrowser
+```
+
+systemd runs `ExecStop` with the unit's environment, waits for Firefox to exit, and only falls back to `SIGTERM` after `TimeoutStopSec`.
 
 ## What Can Claude Do?
 

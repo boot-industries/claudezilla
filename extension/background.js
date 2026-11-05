@@ -251,6 +251,11 @@ const pendingSlotRequests = [];  // [{ agentId, requestedAt }]
 const slotReservations = new Map();
 const SLOT_RESERVATION_TTL_MS = 30000; // 30 seconds to claim reserved slot
 
+// quitBrowser: the reply must leave over native messaging before the first window closes.
+const QUIT_REPLY_GRACE_MS = 200;
+// quitBrowser: let the session store file the other windows as closed before the last close.
+const QUIT_SESSION_STORE_SETTLE_MS = 1500;
+
 // Network request monitoring
 const networkRequests = [];
 const MAX_NETWORK_ENTRIES = 200;
@@ -1652,6 +1657,34 @@ async function handleCliCommand(message) {
         activeTabId = null;
         await browser.windows.remove(winId);
         result = { closed: true, windowId: winId, tabsClosed: tabCount };
+        break;
+      }
+
+      case 'quitBrowser': {
+        // Clean quit: closing the last window makes Firefox write its session
+        // store and cache index, which a signal does not. The Claudezilla
+        // window goes last, so it is the one restored on the next start.
+        const windows = await browser.windows.getAll();
+        if (windows.length === 0) throw new Error('No windows to close');
+        const ids = windows.map(w => w.id);
+        const keepId = claudezillaWindow?.windowId;
+        const keep = ids.includes(keepId);
+        const order = keep ? [...ids.filter(id => id !== keepId), keepId] : ids;
+        // The pause only matters when there are other windows to file as
+        // closed and a tracked window that should be the one restored.
+        const settleBeforeLast = keep && order.length > 1;
+        // Nothing below runs before this handler has returned and the reply
+        // has been posted: the extension dies with the last window.
+        setTimeout(async () => {
+          for (const [i, id] of order.entries()) {
+            if (settleBeforeLast && i === order.length - 1) {
+              await new Promise(r => setTimeout(r, QUIT_SESSION_STORE_SETTLE_MS));
+            }
+            // A window closed by someone else in the meantime is not an error.
+            await browser.windows.remove(id).catch(() => {});
+          }
+        }, QUIT_REPLY_GRACE_MS);
+        result = { quitting: true, windows: order.length };
         break;
       }
 

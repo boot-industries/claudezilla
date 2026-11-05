@@ -66,6 +66,7 @@ claudezilla@boot.industries
 | closeTab | Close tab by ID |
 | getTabs | List tabs with ownership |
 | getWindowMode | Query private mode capability and current window state |
+| quitBrowser | Close every window (clean quit, Claudezilla window last); CLI/supervisor only, opt-in via `CLAUDEZILLA_ALLOW_QUIT` |
 
 ### Page Interaction
 | Command | Description |
@@ -118,6 +119,7 @@ claudezilla@boot.industries
 - Console capture opt-in, request bodies never captured
 - Auth token comparison via `crypto.timingSafeEqual()`
 - Explicit CSP in manifest: `script-src 'self'; object-src 'self'`
+- `quitBrowser` is refused unless `CLAUDEZILLA_ALLOW_QUIT=1` is in the browser's environment (the host inherits it from Firefox, never from the socket client); no MCP tool exposes it
 
 ### Supply Chain Hardening (v0.6.4)
 
