@@ -85,6 +85,7 @@ const ALLOWED_COMMANDS = new Set([
   // Page analysis (fast alternatives to screenshots)
   'getPageState',
   'getAccessibilitySnapshot',
+  'find',
   // Keyboard input
   'pressKey',
   // Loop/concentration feature
