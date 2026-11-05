@@ -237,7 +237,7 @@ describe('page state parameter forwarding and truncation metadata', () => {
 
     // Headings, links, buttons and inputs carry distinct element refs
     const refs = [headings[0], links[0], buttons[0], ...inputs].map(item => item.ref);
-    for (const ref of refs) assert.match(ref, /^ref_\d+$/);
+    for (const ref of refs) assert.match(ref, /^ref_[0-9a-z]{4}_\d+$/);
     assert.equal(new Set(refs).size, refs.length);
   });
 });

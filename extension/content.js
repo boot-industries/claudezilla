@@ -698,10 +698,13 @@ function safeQuerySelector(selector) {
 }
 
 // ===== ELEMENT REFS =====
-// Stable per-document handles (ref_N) for elements returned by snapshots,
-// find and page state. A new content-script instance after navigation starts
-// again from ref_1, so refs from the previous page resolve as stale.
+// Handles (ref_<epoch>_<n>) for elements returned by snapshots, find and page
+// state. The registry lives in this content-script instance, so a navigation
+// starts a fresh one. The random epoch keeps a ref from the previous document
+// from resolving to an unrelated element that gets the same number here:
+// it is simply unknown, and reported as stale.
 
+const REF_EPOCH = Math.floor(Math.random() * 36 ** 4).toString(36).padStart(4, '0');
 const refToElement = new Map();      // ref -> WeakRef<Element>
 const elementToRef = new WeakMap();  // Element -> ref
 let nextRef = 1;
@@ -710,12 +713,12 @@ const REF_PRUNE_EVERY = 500;
 /**
  * Return the element's ref, assigning a new one on first sight.
  * @param {Element} el
- * @returns {string} ref_N
+ * @returns {string} ref_<epoch>_<n>
  */
 function refFor(el) {
   const existing = elementToRef.get(el);
   if (existing) return existing;
-  const ref = `ref_${nextRef++}`;
+  const ref = `ref_${REF_EPOCH}_${nextRef++}`;
   elementToRef.set(el, ref);
   refToElement.set(ref, new WeakRef(el));
   if ((nextRef - 1) % REF_PRUNE_EVERY === 0) {
@@ -732,8 +735,8 @@ function refFor(el) {
  * @returns {Element}
  */
 function resolveRef(ref) {
-  if (typeof ref !== 'string' || !/^ref_\d+$/.test(ref)) {
-    throw new Error(`Invalid ref "${ref}": use a ref_N value from a snapshot or find`);
+  if (typeof ref !== 'string' || !/^ref_[0-9a-z]{4}_\d+$/.test(ref)) {
+    throw new Error(`Invalid ref "${ref}": pass a ref exactly as returned by a snapshot or find`);
   }
   const el = refToElement.get(ref)?.deref();
   if (!el || !el.isConnected) {
@@ -1710,6 +1713,9 @@ const CONTEXT_ROLES = new Set([
   'main', 'navigation', 'banner', 'contentinfo', 'complementary', 'form', 'search', 'region', 'dialog', 'heading',
 ]);
 
+// Longest name/text a find query is matched against, which bounds regex work
+const FIND_MATCH_LIMIT = 2000;
+
 function collapseWhitespace(s) {
   return (s || '').replace(/\s+/g, ' ').trim();
 }
@@ -1751,7 +1757,7 @@ function getRole(el) {
  * Accessible name: explicit labels first, then text content for roles named
  * by their content (buttons, links, headings, ...). Capped at 100 chars.
  */
-function getAccessibleName(el, role = getRole(el)) {
+function getAccessibleName(el, role = getRole(el), limit = 100) {
   const labelledBy = el.getAttribute('aria-labelledby');
   const explicit = el.getAttribute('aria-label') ||
     (labelledBy && document.getElementById(labelledBy)?.textContent?.trim()) ||
@@ -1760,8 +1766,8 @@ function getAccessibleName(el, role = getRole(el)) {
     (el.tagName === 'INPUT' && el.placeholder) ||
     (el.labels?.[0]?.textContent?.trim()) ||
     '';
-  if (explicit) return collapseWhitespace(explicit).slice(0, 100);
-  if (role && NAME_FROM_CONTENT_ROLES.has(role)) return collapseWhitespace(el.textContent).slice(0, 100);
+  if (explicit) return collapseWhitespace(explicit).slice(0, limit);
+  if (role && NAME_FROM_CONTENT_ROLES.has(role)) return collapseWhitespace(el.textContent).slice(0, limit);
   return '';
 }
 
@@ -1780,6 +1786,9 @@ function layoutOf(el) {
   const style = window.getComputedStyle(el);
   return {
     rect,
+    // display: contents generates no box (zero rect) but its children render:
+    // callers skip the element itself and keep walking its children.
+    contents: style.display === 'contents',
     visible: rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden',
   };
 }
@@ -1884,7 +1893,8 @@ function getAccessibilitySnapshot(params = {}) {
       truncated = true;
       return [];
     }
-    const { rect, visible } = layoutOf(el);
+    const { rect, visible, contents } = layoutOf(el);
+    if (contents && el !== root) return walkChildren(el, depth);
     if (!visible && el !== root) return [];
 
     const node = describe(el, rect, depth);
@@ -1906,7 +1916,11 @@ function getAccessibilitySnapshot(params = {}) {
   // Interactive walk: visible actionable elements in DOM order, flat
   function collectInteractive(el, out) {
     if (truncated) return;
-    const { rect, visible } = layoutOf(el);
+    const { rect, visible, contents } = layoutOf(el);
+    if (contents) {
+      for (const child of el.children) collectInteractive(child, out);
+      return;
+    }
     if (!visible && el !== root) return;
     if (isInteractive(el)) {
       if (nodeCount >= maxNodes) {
@@ -2020,12 +2034,18 @@ function findElements(params = {}) {
   // insideMatch: an ancestor already matched, so own-text hits here would only
   // repeat it (a link's name already includes its spans' text)
   function visit(el, insideMatch) {
-    const { rect, visible } = layoutOf(el);
+    const { rect, visible, contents } = layoutOf(el);
+    if (contents) {
+      for (const child of el.children) visit(child, insideMatch);
+      return;
+    }
     if (!visible) return;
     const role = getRole(el);
-    const name = getAccessibleName(el, role);
-    const nameHit = name ? test(name) : null;
-    const own = nameHit || insideMatch ? '' : directText(el);
+    // Match against the full name (bounded to keep regexes cheap); report it capped
+    const fullName = getAccessibleName(el, role, FIND_MATCH_LIMIT);
+    const name = fullName.slice(0, 100);
+    const nameHit = fullName ? test(fullName) : null;
+    const own = nameHit || insideMatch ? '' : directText(el).slice(0, FIND_MATCH_LIMIT);
     const textHit = own ? test(own) : null;
     const matched = Boolean(nameHit || textHit);
     if (matched) {
@@ -2035,7 +2055,7 @@ function findElements(params = {}) {
           ref: refFor(el),
           role: role ?? el.tagName.toLowerCase(),
           name,
-          text: nameHit ? matchSnippet(name, nameHit) : matchSnippet(own, textHit),
+          text: nameHit ? matchSnippet(fullName, nameHit) : matchSnippet(own, textHit),
           context: context.slice(-3).join(' > '),
           offscreen: isOffscreen(rect),
         });

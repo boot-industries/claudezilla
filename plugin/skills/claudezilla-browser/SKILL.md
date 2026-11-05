@@ -20,8 +20,8 @@ Claudezilla drives the user's real Firefox: open tabs, navigate, read pages, cli
    ```
    url: https://example.com/login
    title: Sign in
-   - textbox "Email" [ref_4]
-   - button "Sign in" [ref_5]
+   - textbox "Email" [ref_a1b2_4]
+   - button "Sign in" [ref_a1b2_5]
    ```
    Use `filter: "all"` (default) for the full tree, `maxDepth`/`maxNodes` to bound it, and `ref` or `selector` to read only a subtree.
 3. **Find by text.** `firefox_find` locates elements by visible text or accessible name and returns `[ref_N]` lines with their landmark or heading context. It is cheaper than a full snapshot on large pages.
@@ -31,14 +31,14 @@ Claudezilla drives the user's real Firefox: open tabs, navigate, read pages, cli
    ```
 4. **Act by ref.** Pass `ref` (preferred) or a CSS `selector` to `firefox_click`, `firefox_type`, `firefox_scroll` and `firefox_press_key`.
    ```json
-   firefox_type {"ref": "ref_4", "text": "user@example.com"}
-   firefox_click {"ref": "ref_5"}
-   firefox_press_key {"ref": "ref_4", "key": "Enter"}
+   firefox_type {"ref": "ref_a1b2_4", "text": "user@example.com"}
+   firefox_click {"ref": "ref_a1b2_5"}
+   firefox_press_key {"ref": "ref_a1b2_4", "key": "Enter"}
    ```
 5. **Read long text.** `firefox_get_content` returns the visible text (default 20,000 chars) after a one-line JSON header. When the header says `truncated`, call again with its `nextOffset`.
    ```json
-   firefox_get_content {"ref": "ref_12"}
-   firefox_get_content {"offset": 20000}
+   firefox_get_content {"ref": "ref_a1b2_12"}
+   firefox_get_content {"ref": "ref_a1b2_12", "offset": 20000}
    ```
 6. **Look only when needed.** Use `firefox_screenshot` when layout or visuals matter (see Screenshots).
    ```json
@@ -48,8 +48,8 @@ Claudezilla drives the user's real Firefox: open tabs, navigate, read pages, cli
 
 ## Refs and stale-ref recovery
 
-- A ref (`ref_N`) names one element in the current document. It stays valid until the page navigates or the element is removed.
-- Refs are per document: after navigation the numbering starts again at `ref_1`, so never reuse refs across page loads.
+- A ref (for example `ref_a1b2_12`) names one element in the current document. It stays valid until the page navigates or the element is removed.
+- Refs are per document: each page load gets a new random prefix, so a ref from a previous page is reported as stale rather than matching another element. Always pass refs exactly as returned.
 - A stale ref fails with `ref_N is stale or not found on the current page. Re-read the page to get fresh references.` Recover by calling `firefox_get_accessibility_snapshot` or `firefox_find` again and using the new ref. Do not guess a ref number.
 - `firefox_get_element` and `firefox_get_content` also accept `ref`. `firefox_get_page_state` items carry `ref` too.
 

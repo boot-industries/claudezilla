@@ -101,7 +101,7 @@ function createHarness() {
     scrollY: 0,
     addEventListener() {},
     removeEventListener() {},
-    getComputedStyle() { return { display: 'block', visibility: 'visible' }; },
+    getComputedStyle(el) { return { display: el?.styleDisplay ?? 'block', visibility: 'visible' }; },
   };
   windowObj.window = windowObj;
   windowObj.top = windowObj;
@@ -134,7 +134,7 @@ const nodeLines = (text) => text.split('\n').filter(line => line.trimStart().sta
 const refOn = (text, needle) => {
   const line = text.split('\n').find(l => l.includes(needle));
   assert.ok(line, `no line contains ${needle}:\n${text}`);
-  return /\[(ref_\d+)\]/.exec(line)[1];
+  return /\[(ref_[0-9a-z]{4}_\d+)\]/.exec(line)[1];
 };
 
 describe('element refs, text snapshot and find', () => {
@@ -142,7 +142,7 @@ describe('element refs, text snapshot and find', () => {
     const { context } = createHarness();
     const snap = context.getAccessibilitySnapshot();
     assert.equal(snap.format, 'text');
-    assert.match(snap.text, /- button "Sign in" \[ref_\d+\]/);
+    assert.match(snap.text, /- button "Sign in" \[ref_[0-9a-z]{4}_\d+\]/);
     assert.ok(!snap.text.includes('Ghost'), snap.text);
     assert.equal(snap.truncated, false);
   });
@@ -158,8 +158,8 @@ describe('element refs, text snapshot and find', () => {
     const { context } = createHarness();
     const lines = nodeLines(context.getAccessibilitySnapshot({ filter: 'interactive' }).text);
     assert.equal(lines.length, 2, lines.join('\n'));
-    assert.match(lines[0], /^- textbox "Email" \[ref_\d+\]$/);
-    assert.match(lines[1], /^- button "Sign in" \[ref_\d+\]$/);
+    assert.match(lines[0], /^- textbox "Email" \[ref_[0-9a-z]{4}_\d+\]$/);
+    assert.match(lines[1], /^- button "Sign in" \[ref_[0-9a-z]{4}_\d+\]$/);
   });
 
   it('find matches by name and reports landmark context', () => {
@@ -178,7 +178,7 @@ describe('element refs, text snapshot and find', () => {
     const { context } = createHarness();
     const result = context.findElements({ query: '^Wel', regex: true });
     assert.equal(result.total, 1);
-    assert.match(result.text, /^\[ref_\d+\] heading "Welcome" — main$/);
+    assert.match(result.text, /^\[ref_[0-9a-z]{4}_\d+\] heading "Welcome" — main$/);
   });
 
   it('a ref to a detached element fails with the stale-ref message', () => {
@@ -197,6 +197,42 @@ describe('element refs, text snapshot and find', () => {
     assert.equal(snap.truncated, true);
     assert.equal(nodeLines(snap.text).length, 2);
     assert.ok(snap.text.endsWith('[truncated at 2 nodes: pass ref to read a subtree or raise maxNodes]'), snap.text);
+  });
+
+  it('a ref from another document is stale, even when the number would match', () => {
+    // Two harnesses = two content-script instances (a navigation). The pages are
+    // identical, so both assign the same number to the same button.
+    const before = createHarness();
+    const after = createHarness();
+    const oldRef = refOn(before.context.getAccessibilitySnapshot().text, 'button "Sign in"');
+    const newRef = refOn(after.context.getAccessibilitySnapshot().text, 'button "Sign in"');
+    assert.equal(oldRef.split('_')[2], newRef.split('_')[2]);
+    assert.notEqual(oldRef, newRef);
+    assert.throws(
+      () => after.context.getAccessibilitySnapshot({ ref: oldRef }),
+      { message: `${oldRef} is stale or not found on the current page. Re-read the page to get fresh references.` },
+    );
+  });
+
+  it('snapshot and find see through display: contents wrappers', () => {
+    const { context, page } = createHarness();
+    const wrapper = mockElement('DIV', {
+      rect: { top: 0, left: 0, width: 0, height: 0 },
+      styleDisplay: 'contents',
+      children: [mockElement('BUTTON', { text: 'Wrapped' })],
+    });
+    page.body.children[0].children.push(wrapper);
+    assert.match(context.getAccessibilitySnapshot().text, /- button "Wrapped" \[ref_/);
+    assert.match(context.getAccessibilitySnapshot({ filter: 'interactive' }).text, /- button "Wrapped" \[ref_/);
+    assert.equal(context.findElements({ query: 'wrapped' }).total, 1);
+  });
+
+  it('find matches past the 100-character name cap but reports the capped name', () => {
+    const { context, page } = createHarness();
+    page.body.children[0].children.push(mockElement('BUTTON', { attrs: { 'aria-label': `${'x'.repeat(150)}needle` } }));
+    const result = context.findElements({ query: 'needle' });
+    assert.equal(result.total, 1);
+    assert.match(result.text, /button "x{100}"/);
   });
 });
 

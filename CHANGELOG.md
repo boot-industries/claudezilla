@@ -56,6 +56,13 @@
 - `firefox_scroll` defaults to `instant` and reports the position after a smooth scroll settles.
 - The focus-loop stop hook authenticates and honours `CLAUDEZILLA_IPC_DIR`.
 - Command parameters (typed text, passwords) are no longer logged by the extension.
+- A ref carries a random per-page prefix (`ref_a1b2_12`), so a ref from a previous page is reported
+  as stale instead of matching an unrelated element. `firefox_find` matches full accessible names,
+  and snapshots and find see through `display: contents` wrappers.
+- `firefox_navigate` without `tabId` verifies ownership of the session tab, like an explicit `tabId`.
+- `firefox_screenshot` is no longer annotated `readOnlyHint` (it can write files); `--tools all` wins
+  over `CLAUDEZILLA_TOOL_MODE=lazy`. The installers no longer nest the skill link inside a copied
+  skill directory.
 
 ### Breaking Changes
 
