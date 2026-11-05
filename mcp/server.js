@@ -157,7 +157,7 @@ function checkDomainAllowed(agentId, url) {
   const allowed = config.allowedDomains.some(pattern => {
     if (pattern.startsWith('*.')) {
       const base = pattern.slice(2).replace(/\./g, '\\.');
-      return new RegExp(`^[^.]+\.${base}$`).test(hostname) || hostname === pattern.slice(2);
+      return new RegExp(`^[^.]+\\.${base}$`).test(hostname) || hostname === pattern.slice(2);
     }
     return hostname === pattern;
   });
