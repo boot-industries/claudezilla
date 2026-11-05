@@ -437,6 +437,8 @@ function buildErrorMessage(errCode, socketPath, authTokenFile) {
  * @param {boolean} [options.autostart=true] - false skips the on-demand
  *   browser start: a probe that must not start the browser (the tool-list
  *   canNavigate check) still reaches a running host but never launches one.
+ * @param {number} [options.timeoutMs] - socket idle timeout override; defaults
+ *   to the command's own timeout plus the shared grace period.
  */
 async function sendCommandOnce(command, params = {}, options = {}) {
   // Optional on-demand browser start. When the host is not reachable and
@@ -471,6 +473,7 @@ async function sendCommandOnce(command, params = {}, options = {}) {
       params,
       authToken,
       socketPath: SOCKET_PATH,
+      timeoutMs: options.timeoutMs,
       describeError: (errCode) => buildErrorMessage(errCode, SOCKET_PATH, AUTH_TOKEN_FILE),
     });
   } catch (err) {
@@ -1711,7 +1714,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
  */
 async function sendGoodbye() {
   try {
-    await sendCommandOnce('goodbye', { agentId: AGENT_ID });
+    // Shutting down must never launch Firefox, and must not wait on the
+    // ~155 s socket default when the host is unresponsive.
+    await sendCommandOnce('goodbye', { agentId: AGENT_ID }, { autostart: false, timeoutMs: 2000 });
     console.error(`[claudezilla] Sent goodbye for ${truncateAgentId(AGENT_ID)}`);
   } catch (e) {
     // Ignore errors on shutdown - extension may already be gone
@@ -1730,6 +1735,8 @@ function handleShutdown(signal) {
   for (const timer of pendingConsentTimers) clearTimeout(timer);
   pendingConsentTimers.clear();
   console.error(`[claudezilla] Received ${signal}, cleaning up...`);
+  // Hard backstop: exit even if goodbye hangs on a stuck socket.
+  setTimeout(() => process.exit(0), 3000).unref();
   sendGoodbye().finally(() => process.exit(0));
 }
 
