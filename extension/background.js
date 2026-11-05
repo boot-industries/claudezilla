@@ -210,6 +210,31 @@ async function detachExistingTab(tabId) {
   return detached;
 }
 
+/**
+ * Make a pool tab the selected tab of the dedicated Claudezilla window.
+ *
+ * Firefox treats every non-selected tab as hidden: document.hidden is true,
+ * timers are throttled and animation frames stop, so single-page apps
+ * (Teams, WhatsApp Web) stop rendering. The dedicated window belongs to
+ * Claudezilla, so the tab being driven is selected before each command.
+ * An ADOPTED window belongs to the user and is never touched. Selecting a
+ * tab does not focus its window.
+ *
+ * @param {number} tabId
+ */
+async function bringToFrontInDedicatedWindow(tabId) {
+  if (!claudezillaWindow || claudezillaWindow.adopted) return;
+  try {
+    const tab = await browser.tabs.get(tabId);
+    if (tab.active || tab.windowId !== claudezillaWindow.windowId) return;
+    await browser.tabs.update(tabId, { active: true });
+    // Wait (bounded) for the page to report visible and paint, instead of a fixed sleep
+    await executeInTab(tabId, 'awaitVisible', { timeoutMs: 300 }).catch(() => {});
+  } catch (e) {
+    console.log(`[claudezilla] Could not bring tab ${tabId} to front:`, e.message);
+  }
+}
+
 async function resolveTargetTab(targetTab, windowId, agentId, operation) {
   const normalizedTabId = Number(targetTab);
   // A managed-pool tab always retains managed ownership, even if stale local
@@ -217,6 +242,7 @@ async function resolveTargetTab(targetTab, windowId, agentId, operation) {
   if (targetTab && claudezillaWindow?.tabs.some((entry) => entry.tabId === normalizedTabId)) {
     await getSession(windowId);
     if (agentId) verifyTabOwnership(normalizedTabId, agentId, operation);
+    await bringToFrontInDedicatedWindow(normalizedTabId);
     return normalizedTabId;
   }
   if (targetTab && isAttachedTab(normalizedTabId)) {
@@ -232,6 +258,9 @@ async function resolveTargetTab(targetTab, windowId, agentId, operation) {
   const session = await getSession(windowId);
   const tabId = normalizedTabId || session.tabId;
   if (targetTab && agentId) verifyTabOwnership(tabId, agentId, operation);
+  if (claudezillaWindow?.tabs.some((entry) => entry.tabId === tabId)) {
+    await bringToFrontInDedicatedWindow(tabId);
+  }
   return tabId;
 }
 
@@ -250,6 +279,11 @@ const pendingSlotRequests = [];  // [{ agentId, requestedAt }]
 // Map: agentId -> { reservedAt, expiresAt }
 const slotReservations = new Map();
 const SLOT_RESERVATION_TTL_MS = 30000; // 30 seconds to claim reserved slot
+
+// quitBrowser: the reply must leave over native messaging before the first window closes.
+const QUIT_REPLY_GRACE_MS = 200;
+// quitBrowser: let the session store file the other windows as closed before the last close.
+const QUIT_SESSION_STORE_SETTLE_MS = 1500;
 
 // Network request monitoring
 const networkRequests = [];
@@ -853,16 +887,6 @@ async function getSession(windowId) {
 }
 
 /**
- * SECURITY: Verify we're operating in a private window
- * @deprecated Use getSession() instead for multi-window support
- */
-async function requirePrivateWindow() {
-  // Delegate to getSession for backward compatibility
-  const session = await getSession();
-  return session.tab;
-}
-
-/**
  * Handle command from CLI (via native host)
  * Executes the command and sends result back to host
  *
@@ -871,7 +895,7 @@ async function requirePrivateWindow() {
 async function handleCliCommand(message) {
   const { id, command, params = {} } = message;
 
-  console.log('[claudezilla] CLI command:', command, params);
+  console.log('[claudezilla] CLI command:', command);
 
   // Adopt a surviving window before any command touches claudezillaWindow
   // (no-op after the first call per background lifetime).
@@ -902,16 +926,9 @@ async function handleCliCommand(message) {
         result = {
           extension: browser.runtime.getManifest().version,
           browser: navigator.userAgent,
-          features: ['devtools', 'network', 'console', 'evaluate', 'focusglow', 'tabgroups', 'security-hardened', 'orphan-cleanup', 'focus-loop', 'auto-retry', 'task-detection', 'expression-validation', 'windows-support', 'autonomous-install', 'attached-tabs'],
+          features: ['devtools', 'network', 'console', 'evaluate', 'focusglow', 'tabgroups', 'security-hardened', 'orphan-cleanup', 'focus-loop', 'auto-retry', 'task-detection', 'expression-validation', 'windows-support', 'autonomous-install', 'attached-tabs', 'quit-browser'],
         };
         break;
-
-      case 'canNavigate': {
-        // Check if navigate command is available (disabled if in private windows mode)
-        const allowed = await canRunInPrivateWindows();
-        result = { canNavigate: allowed };
-        break;
-      }
 
       case 'navigate': {
         const { url, tabId: rawNavTabId, windowId, agentId } = params;
@@ -931,17 +948,15 @@ async function handleCliCommand(message) {
           break;
         }
 
-        // No tabId: navigate active tab (original behavior with restrictions)
-        // SECURITY: Disable when extension is allowed in private windows
-        // to prevent agents from creating non-private windows
-        if (await canRunInPrivateWindows()) {
-          throw new Error('SECURITY: firefox_navigate is disabled when extension runs in Private Windows. This prevents creating non-private windows. Use firefox_create_window or provide a tabId to navigate an existing tab.');
-        }
-
-        // SECURITY: Require private window, then navigate in current tab
-        const currentTab = await requirePrivateWindow();
+        // No tabId: drive the session's current pool tab. This never creates a
+        // window (getSession throws when none is tracked); windows are created
+        // only by createWindow, which enforces the private-mode setting.
+        const { tab: currentTab } = await getSession(windowId);
+        // The session tab may belong to another agent: same rule as an explicit tabId.
+        if (agentId) verifyTabOwnership(currentTab.id, agentId, 'navigate');
         await browser.tabs.update(currentTab.id, { url });
-        result = { tabId: currentTab.id, url };
+        const navigatedTab = await browser.tabs.get(currentTab.id);
+        result = { tabId: currentTab.id, url: navigatedTab.url, title: navigatedTab.title, navigated: true };
         break;
       }
 
@@ -1655,6 +1670,34 @@ async function handleCliCommand(message) {
         break;
       }
 
+      case 'quitBrowser': {
+        // Clean quit: closing the last window makes Firefox write its session
+        // store and cache index, which a signal does not. The Claudezilla
+        // window goes last, so it is the one restored on the next start.
+        const windows = await browser.windows.getAll();
+        if (windows.length === 0) throw new Error('No windows to close');
+        const ids = windows.map(w => w.id);
+        const keepId = claudezillaWindow?.windowId;
+        const keep = ids.includes(keepId);
+        const order = keep ? [...ids.filter(id => id !== keepId), keepId] : ids;
+        // The pause only matters when there are other windows to file as
+        // closed and a tracked window that should be the one restored.
+        const settleBeforeLast = keep && order.length > 1;
+        // Nothing below runs before this handler has returned and the reply
+        // has been posted: the extension dies with the last window.
+        setTimeout(async () => {
+          for (const [i, id] of order.entries()) {
+            if (settleBeforeLast && i === order.length - 1) {
+              await new Promise(r => setTimeout(r, QUIT_SESSION_STORE_SETTLE_MS));
+            }
+            // A window closed by someone else in the meantime is not an error.
+            await browser.windows.remove(id).catch(() => {});
+          }
+        }, QUIT_REPLY_GRACE_MS);
+        result = { quitting: true, windows: order.length };
+        break;
+      }
+
       case 'getWindows': {
         const windows = await browser.windows.getAll({ populate: true });
         result = windows.map(w => ({
@@ -1671,7 +1714,7 @@ async function handleCliCommand(message) {
         // Get current window if no windowId specified
         let targetWindowId = windowId;
         if (!targetWindowId) {
-          const tab = await requirePrivateWindow();
+          const { tab } = await getSession();
           targetWindowId = tab.windowId;
         }
         const updateInfo = {};
@@ -1783,29 +1826,19 @@ async function handleCliCommand(message) {
         const settings = { compressImages: true, ...(stored.claudezilla || {}) };
         const defaultFormat = settings.compressImages ? 'jpeg' : 'png';
 
-        // Purpose presets - suggestive quality/scale based on intent
-        const PURPOSE_PRESETS = {
-          'quick-glance': { quality: 30, scale: 0.25 },  // Layout/navigation confirmation
-          'read-text': { quality: 60, scale: 0.5 },      // Reading content [DEFAULT]
-          'inspect-ui': { quality: 80, scale: 0.75 },    // UI details/small text
-          'full-detail': { quality: 95, scale: 1.0 },    // Pixel-perfect inspection
-        };
-
-        // Get preset if purpose specified, allow explicit quality/scale to override
-        const preset = params.purpose ? PURPOSE_PRESETS[params.purpose] : null;
-
         const {
           windowId,
           tabId: rawRequestedTabId,
           agentId,
-          quality = preset?.quality ?? 60,
-          scale = preset?.scale ?? 0.5,
+          quality = 60,
           format = defaultFormat,
           // Page readiness options
           maxWait = 10000,
           waitForImages = true,
           skipReadiness = false
         } = params;
+        // Longest image side in px; vision models downscale beyond ~1568 px.
+        const maxEdge = Math.min(2576, Math.max(320, Math.round(Number(params.maxEdge) || 1568)));
         const requestedTabId = rawRequestedTabId ? Number(rawRequestedTabId) : null; // Normalize to Number
 
         const resolvedRequestedTabId = requestedTabId
@@ -1896,11 +1929,46 @@ async function handleCliCommand(message) {
               });
             }
 
-            // Capture with JPEG compression (much smaller than PNG)
+            // Size the image for vision models, which downscale anything whose
+            // long edge exceeds ~1568 px: capture at that size in one step.
             const captureFormat = format === 'png' ? 'png' : 'jpeg';
-            const captureOpts = { format: captureFormat };
+            const viewportResp = await executeInTab(targetTabId, 'getViewport', {});
+            const reportedViewport = viewportResp?.success ? viewportResp.result : null;
+            const finiteNumber = (value, fallback) => (typeof value === 'number' && Number.isFinite(value) ? value : fallback);
+            let vw = finiteNumber(reportedViewport?.width, 0);
+            let vh = finiteNumber(reportedViewport?.height, 0);
+            if (!(vw > 0 && vh > 0)) {
+              const tabInfo = await browser.tabs.get(targetTabId);
+              vw = tabInfo.width ?? 1280;
+              vh = tabInfo.height ?? 800;
+            }
+            const dpr = finiteNumber(reportedViewport?.dpr, 1) > 0 ? finiteNumber(reportedViewport?.dpr, 1) : 1;
+            const scrollX = finiteNumber(reportedViewport?.scrollX, 0);
+            const scrollY = finiteNumber(reportedViewport?.scrollY, 0);
+
+            // The capture box in CSS px: the requested region, else the viewport.
+            let region = null;
+            if (params.region !== undefined && params.region !== null) {
+              const { x, y, width, height } = params.region;
+              if (![x, y, width, height].every((n) => typeof n === 'number' && Number.isFinite(n))) {
+                throw new Error('region requires numeric x, y, width and height');
+              }
+              if (x < 0 || y < 0 || width < 1 || height < 1 || x + width > vw || y + height > vh) {
+                throw new Error(`region must lie within the viewport (${vw}x${vh} CSS px)`);
+              }
+              region = { x, y, width, height };
+            }
+            const boxW = region ? region.width : vw;
+            const boxH = region ? region.height : vh;
+            const cssScale = Math.min(dpr, maxEdge / Math.max(boxW, boxH));
+
+            const captureOpts = { format: captureFormat, scale: cssScale };
             if (captureFormat === 'jpeg') {
               captureOpts.quality = Math.min(100, Math.max(1, quality));
+            }
+            if (region) {
+              // ImageDetails.rect is relative to the document, not the viewport.
+              captureOpts.rect = { x: region.x + scrollX, y: region.y + scrollY, width: region.width, height: region.height };
             }
             // Hide watermark during capture (opacity:0 covers character + glow)
             await executeInTab(targetTabId, 'hideWatermark', {});
@@ -1908,7 +1976,7 @@ async function handleCliCommand(message) {
             // Annotate elements if requested
             let annotationLabels = null;
             if (params.annotate) {
-              const annResp = await executeInTab(targetTabId, 'annotateElements', { maxElements: 30 });
+              const annResp = await executeInTab(targetTabId, 'annotateElements', { maxElements: 30, cssScale });
               if (annResp.success) annotationLabels = annResp.result.labels;
             }
 
@@ -1936,37 +2004,25 @@ async function handleCliCommand(message) {
               await executeInTab(targetTabId, 'removeAnnotations', {});
             }
 
-            // Build base response with readiness data
-            const baseResponse = {
+            // Report the image geometry so callers can map image pixels back to
+            // the page: CSS px = image px / cssScale.
+            return {
               tabId: targetTabId,
               format: captureFormat,
               quality,
+              width: Math.round(boxW * cssScale),
+              height: Math.round(boxH * cssScale),
+              cssScale: Number(cssScale.toFixed(4)),
+              viewport: { width: vw, height: vh, dpr },
+              ...(region ? { region } : {}),
               readiness: screenshotReadiness ? {
                 waitMs: screenshotReadiness.totalWaitMs,
                 timedOut: screenshotReadiness.timedOut,
                 timeline: screenshotReadiness.timeline
-              } : { waitMs: 0, timedOut: false, timeline: [] }
+              } : { waitMs: 0, timedOut: false, timeline: [] },
+              ...(annotationLabels ? { labels: annotationLabels } : {}),
+              dataUrl: rawDataUrl,
             };
-
-            // If scale < 1, resize via content script
-            if (scale < 1) {
-              const response = await executeInTab(targetTabId, 'resizeImage', {
-                dataUrl: rawDataUrl,
-                scale,
-                quality,
-                format: captureFormat,
-              });
-              return {
-                ...baseResponse,
-                dataUrl: response.result.dataUrl,
-                originalSize: response.result.originalSize,
-                scaledSize: response.result.scaledSize,
-                scale,
-                ...(annotationLabels ? { labels: annotationLabels } : {}),
-              };
-            } else {
-              return { ...baseResponse, dataUrl: rawDataUrl, scale: 1, ...(annotationLabels ? { labels: annotationLabels } : {}) };
-            }
           } finally {
             // Release mutex
             screenshotMutexHolder = null;
@@ -2070,6 +2126,17 @@ async function handleCliCommand(message) {
         const { windowId, tabId: targetTab, agentId, ...a11yParams } = params;
         const tabId = await resolveTargetTab(targetTab, windowId, agentId, 'read accessibility from');
         const response = await executeInTab(tabId, 'getAccessibilitySnapshot', a11yParams);
+        if (!response.success) {
+          throw new Error(response.error);
+        }
+        result = { tabId, ...response.result };
+        break;
+      }
+
+      case 'find': {
+        const { windowId, tabId: targetTab, agentId, ...findParams } = params;
+        const tabId = await resolveTargetTab(targetTab, windowId, agentId, 'search');
+        const response = await executeInTab(tabId, 'find', findParams);
         if (!response.success) {
           throw new Error(response.error);
         }

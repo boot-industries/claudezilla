@@ -1,7 +1,78 @@
 # CLZ002 Changelog
 
 **Project:** Claudezilla
-**Current Version:** 0.7.2
+**Current Version:** 0.7.7
+
+## v0.7.7 (2026-11-05)
+
+**Vetted community PRs #40–#49, element refs and `firefox_find`, vision-sized screenshots, full tool catalog by default (PR #50; fixes #47).**
+
+### Community Contributions
+
+- **`npm test` Finds the Suite on Node 22+ (PR #41, @andrei-rizoiu)** — bare `node --test`.
+- **`CLAUDEZILLA_AUTOSTART_CMD` Is Not Triggered by Listing Tools (PR #43, @andrei-rizoiu)** — a
+  `tools/list` probe no longer starts the browser. The `autostart: false` option it added is reused
+  by the shutdown goodbye below.
+- **Driven Tab Stays Selected in a Dedicated Window (PR #44, @andrei-rizoiu)** — the fixed 150 ms
+  wait after selecting a pool tab is now a capped wait for the page to report visible.
+- **`quitBrowser` (PR #45, @andrei-rizoiu)** — clean shutdown of an agent-only browser; off by
+  default, CLI only, advertised as the `quit-browser` feature.
+- **Dependency Audit on Fork PRs (PR #46, @andrei-rizoiu)** — no `pull_request_target`.
+- **Goodbye Loop on Client Exit (PR #48, @braklo; fixes #47)** — the server exits once the client
+  goes away. Goodbye now never starts Firefox, is bounded to 2 s, and a 3 s backstop forces exit.
+- **Debug Log Cap (PR #49, @braklo)** — the host debug log is size-capped; extension replies are
+  logged without stringifying the payload.
+- **proxy-addr CVE-2026-90711 (PR #40, @anupamme — superseded)** — the code path is unreachable
+  (the stdio server never uses express), but the `mcp/` lockfile was stale (SDK 1.29.0 against a
+  pinned 1.32.1). It is refreshed and resolves proxy-addr 2.0.8 without a permanent override.
+- **Navigate Gate (PR #42, @andrei-rizoiu — superseded)** — the root cause is fixed instead:
+  `firefox_navigate` never creates a window, so the "disabled in private windows" gate and the
+  `canNavigate` probe are gone (see SECURITY.md §5).
+
+### Features
+
+- **Element refs** — `firefox_get_accessibility_snapshot` returns a compact text tree with
+  `[ref_N]` handles; `firefox_click`, `firefox_type`, `firefox_scroll`, `firefox_press_key`,
+  `firefox_get_element`, `firefox_get_content` accept `ref`. A stale ref fails with a re-read hint.
+- **`firefox_find`** — find elements by visible text or accessible name, with landmark context.
+- **Vision-sized screenshots** — long edge capped at `maxEdge` (default 1568, up to 2576), `region`
+  zoom, and `width`/`height`/`cssScale` reported before the image. `CLAUDEZILLA_SCREENSHOT_FILES=1`
+  also writes each screenshot to a private temp directory for harnesses without inline images.
+- **Full catalog by default** — tools are annotated (`readOnlyHint`, `destructiveHint`,
+  `openWorldHint`), titled, and the server sends `instructions`. Lazy loading is opt-in
+  (`--tools lazy` / `CLAUDEZILLA_TOOL_MODE=lazy`). Results are compact JSON; text bodies follow a
+  one-line header.
+- **Portable `claudezilla-browser` Agent Skill** and installer updates for omp, Pi, Hermes Agent and
+  Mercury.
+
+### Fixes & Security
+
+- The popup no longer erases `privateMode` when saving settings.
+- `firefox_wait_for` forwards its `timeout` to the page instead of overwriting it.
+- `*.example.com` no longer matches `evilexample.com`.
+- `savePath` is confined to the temp and working directories, needs a matching extension, and is
+  written 0600 without following symlinks.
+- Calls without `tabId` target the agent's own current tab, not the extension's global active tab.
+- `firefox_scroll` defaults to `instant` and reports the position after a smooth scroll settles.
+- The focus-loop stop hook authenticates and honours `CLAUDEZILLA_IPC_DIR`.
+- Command parameters (typed text, passwords) are no longer logged by the extension.
+- A ref carries a random per-page prefix (`ref_a1b2_12`), so a ref from a previous page is reported
+  as stale instead of matching an unrelated element. `firefox_find` matches full accessible names,
+  and snapshots and find see through `display: contents` wrappers.
+- `firefox_navigate` without `tabId` verifies ownership of the session tab, like an explicit `tabId`.
+- `firefox_screenshot` is no longer annotated `readOnlyHint` (it can write files); `--tools all` wins
+  over `CLAUDEZILLA_TOOL_MODE=lazy`. The installers no longer nest the skill link inside a copied
+  skill directory.
+
+### Breaking Changes
+
+- `firefox_screenshot` `purpose` and `scale` are removed (use `maxEdge` / `region`).
+- Every tool is listed by default; `firefox_activate` exists only in lazy mode. `--all-tools` is
+  ignored.
+- Annotated screenshot labels are `{ref, role, text}` (no `selector`).
+- `firefox_get_content` returns visible text (`innerText`), 20,000 characters per call.
+- `firefox_scroll` defaults to `behavior: instant`.
+- `savePath` is restricted as above.
 
 ## v0.7.2 (2026-10-19)
 

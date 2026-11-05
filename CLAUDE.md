@@ -1,13 +1,13 @@
 # Claudezilla — Claude Code Firefox Extension
 
-**Version:** 0.7.2
+**Version:** 0.7.7
 **Documentation PREFIX:** CLZ
 
 ## Overview
 
 Firefox extension providing browser automation for Claude Code CLI. A Google-free alternative to the official Chrome extension.
 
-**Key Features:** Consent automation (4-pass CMP detection), lazy tool loading (~6,400 token savings), Linux/Windows/macOS support, annotated screenshots, focus loops, multi-agent tab coordination, orphaned tab cleanup, auto-retry system, supply chain hardened.
+**Key Features:** Consent automation (4-pass CMP detection), full tool catalog by default (opt-in lazy loading with `--tools lazy`), stable element refs (`ref_N`) with text snapshots and `firefox_find`, vision-sized screenshots, Linux/Windows/macOS support, annotated screenshots, focus loops, multi-agent tab coordination, orphaned tab cleanup, auto-retry system, supply chain hardened.
 
 ## Architecture
 
@@ -52,7 +52,7 @@ claudezilla@boot.industries
 - **Socket path:** XDG_RUNTIME_DIR -> `~/.claudezilla/` (mode 0700) -> tmpdir()
 - **Override (POSIX only):** `CLAUDEZILLA_IPC_DIR` puts the socket, auth token and debug log in that directory (mode 0700; an existing directory is chmod'ed to 0700). The host is launched by Firefox and inherits the *browser's* environment, while the MCP server resolves the path from *its own* environment at module load — so both must carry the same value, and the MCP server must be restarted after a change. Windows uses a fixed named pipe and a `%LOCALAPPDATA%` token path, so the variable is ignored there.
 - **Windows:** `host.bat` wrapper (not `args` manifest field)
-- **Optional on-demand start:** `CLAUDEZILLA_AUTOSTART_CMD` starts the browser when the host is not reachable. The command is an argv vector (a JSON array, or a plain string split on whitespace), executed with `execFile` and never through a shell. The readiness check is a connection attempt, not a file check, so it works with the Windows named pipe. `CLAUDEZILLA_AUTOSTART_WAIT_MS` (default 45 s) bounds the wait for the socket; `CLAUDEZILLA_AUTOSTART_RETRY_COOLDOWN_MS` (default 60 s) throttles retries after a failed start.
+- **Optional on-demand start:** `CLAUDEZILLA_AUTOSTART_CMD` starts the browser when the host is not reachable. The command is an argv vector (a JSON array, or a plain string split on whitespace), executed with `execFile` and never through a shell. The readiness check is a connection attempt, not a file check, so it works with the Windows named pipe. Listing the tools never starts the browser; the first tool call does. `CLAUDEZILLA_AUTOSTART_WAIT_MS` (default 45 s) bounds the wait for the socket; `CLAUDEZILLA_AUTOSTART_RETRY_COOLDOWN_MS` (default 60 s) throttles retries after a failed start.
 
 ## Commands
 
@@ -66,23 +66,25 @@ claudezilla@boot.industries
 | closeTab | Close tab by ID |
 | getTabs | List tabs with ownership |
 | getWindowMode | Query private mode capability and current window state |
+| quitBrowser | Close every window (clean quit, Claudezilla window last); CLI/supervisor only, opt-in via `CLAUDEZILLA_ALLOW_QUIT` |
 
 ### Page Interaction
 | Command | Description |
 |---------|-------------|
-| getContent | Page text (HTML opt-in, 50K limit) |
-| click | Click element by selector |
-| type | Type text (React/Angular compatible) |
+| getContent | Visible page text (`ref`/selector scope, 20K chars per call, `offset` paging, HTML opt-in) |
+| click | Click element by `ref` or selector |
+| type | Type text by `ref` or selector (React/Angular compatible) |
 | pressKey | Send keyboard events |
-| scroll | Scroll to element/position |
+| scroll | Scroll to element/position (instant by default) |
 | waitFor | Wait for element |
-| screenshot | Capture with dynamic readiness detection |
+| screenshot | Vision-sized capture (`maxEdge` 1568, `region` zoom) with dynamic readiness detection |
 
 ### Page Analysis
 | Command | Description |
 |---------|-------------|
 | getPageState | Structured JSON (headings, links, buttons) |
-| getAccessibilitySnapshot | Semantic tree (200 node limit) |
+| getAccessibilitySnapshot | Compact text tree with `[ref_N]` handles (200 node default, `filter: interactive`, `format: json`) |
+| find | Elements by visible text or accessible name, with refs and landmark context |
 | getElementInfo | Element attributes, styles |
 | evaluate | Run JS in page context |
 
@@ -118,6 +120,7 @@ claudezilla@boot.industries
 - Console capture opt-in, request bodies never captured
 - Auth token comparison via `crypto.timingSafeEqual()`
 - Explicit CSP in manifest: `script-src 'self'; object-src 'self'`
+- `quitBrowser` is refused unless `CLAUDEZILLA_ALLOW_QUIT=1` is in the browser's environment (the host inherits it from Firefox, never from the socket client); no MCP tool exposes it
 
 ### Supply Chain Hardening (v0.6.4)
 

@@ -13,7 +13,7 @@
  */
 
 import { readMessage, sendMessage } from './protocol.js';
-import { appendFileSync, unlinkSync, existsSync, writeFileSync, readFileSync } from 'fs';
+import { unlinkSync, existsSync, writeFileSync, readFileSync } from 'fs';
 import { createServer } from 'net';
 import { randomUUID, randomBytes, timingSafeEqual } from 'crypto';
 import {
@@ -26,8 +26,10 @@ import {
   ensureParentDir,
   isWindows,
   commandTimeoutMs,
-  socketTimeoutMs
+  socketTimeoutMs,
+  quitBrowserAllowed
 } from './ipc.js';
+import { appendDebugLog } from './debug-log.js';
 
 // Single source of truth for the host version. Reading from package.json at
 // module load keeps the `version` response in sync with the npm-tracked
@@ -57,7 +59,6 @@ const ALLOWED_COMMANDS = new Set([
   // Core browser control
   'ping',
   'version',
-  'canNavigate',
   'navigate',
   'getActiveTab',
   'getContent',
@@ -84,6 +85,7 @@ const ALLOWED_COMMANDS = new Set([
   // Page analysis (fast alternatives to screenshots)
   'getPageState',
   'getAccessibilitySnapshot',
+  'find',
   // Keyboard input
   'pressKey',
   // Loop/concentration feature
@@ -100,6 +102,8 @@ const ALLOWED_COMMANDS = new Set([
   'setPrivateMode',
   // Session cleanup
   'goodbye',
+  // Clean quit (opt-in via CLAUDEZILLA_ALLOW_QUIT, see handleCliCommand)
+  'quitBrowser',
   // Consent automation
   'handleConsent',
   // Window mode query
@@ -167,11 +171,7 @@ function log(...args) {
   const msg = `[${new Date().toISOString()}] [claudezilla-host] ${args.join(' ')}\n`;
   console.error('[claudezilla-host]', ...args);
   try {
-    // Create log file with restricted permissions if it doesn't exist
-    if (!existsSync(DEBUG_LOG)) {
-      writeFileSync(DEBUG_LOG, '', { mode: 0o600 });
-    }
-    appendFileSync(DEBUG_LOG, msg);
+    appendDebugLog(DEBUG_LOG, msg);
   } catch (e) {
     // ignore
   }
@@ -313,6 +313,17 @@ function handleCliCommand(command, params, authToken, callback, socketRequests) 
     return;
   }
 
+  // SECURITY: quitBrowser closes every window of the browser this host runs in.
+  // The opt-in is read from the host's own environment, inherited from the
+  // browser that launched it, so a socket client cannot grant it to itself.
+  if (command === 'quitBrowser' && !quitBrowserAllowed()) {
+    callback({
+      success: false,
+      error: 'quitBrowser is disabled. Set CLAUDEZILLA_ALLOW_QUIT=1 in the environment of the browser process (the host inherits it from Firefox, not from the CLI) and restart that browser.',
+    });
+    return;
+  }
+
   // Handle loop commands directly in host (no extension needed)
   const LOOP_COMMANDS = ['startLoop', 'stopLoop', 'getLoopState', 'incrementLoopIteration'];
   if (LOOP_COMMANDS.includes(command)) {
@@ -350,7 +361,7 @@ function handleCliCommand(command, params, authToken, callback, socketRequests) 
 function handleExtensionMessage(message) {
   const { id, command, success, result, error } = message;
 
-  log('Received from extension:', JSON.stringify(message).slice(0, 200));
+  log('Received from extension:', id ?? '-', command ?? '', success === undefined ? 'event' : success ? 'ok' : 'error');
 
   // If this is a response to a CLI request (has success field), route it back
   if (id && pendingCliRequests.has(id) && success !== undefined) {

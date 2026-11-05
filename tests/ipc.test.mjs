@@ -19,6 +19,7 @@ import {
   getSocketPath,
   getAuthTokenPath,
   getDebugLogPath,
+  quitBrowserAllowed,
 } from '../host/ipc.js';
 
 describe('validatePath', () => {
@@ -89,6 +90,33 @@ describe('command timeout policy', () => {
     assert.equal(socketTimeoutMs({ _timeout: 30000 }), 30000 + SOCKET_TIMEOUT_GRACE_MS);
     assert.equal(socketTimeoutMs(), DEFAULT_COMMAND_TIMEOUT_MS + SOCKET_TIMEOUT_GRACE_MS);
     assert.ok(socketTimeoutMs({ _timeout: 30000 }) > commandTimeoutMs({ _timeout: 30000 }));
+  });
+});
+
+describe('quitBrowserAllowed', () => {
+  it('allows the quit only when CLAUDEZILLA_ALLOW_QUIT is 1 or true, in any case', () => {
+    assert.equal(quitBrowserAllowed({ CLAUDEZILLA_ALLOW_QUIT: '1' }), true);
+    assert.equal(quitBrowserAllowed({ CLAUDEZILLA_ALLOW_QUIT: 'true' }), true);
+    assert.equal(quitBrowserAllowed({ CLAUDEZILLA_ALLOW_QUIT: 'TRUE' }), true);
+  });
+
+  it('refuses when the variable is unset or carries any other value', () => {
+    assert.equal(quitBrowserAllowed({}), false);
+    assert.equal(quitBrowserAllowed({ CLAUDEZILLA_ALLOW_QUIT: '0' }), false);
+    assert.equal(quitBrowserAllowed({ CLAUDEZILLA_ALLOW_QUIT: 'yes' }), false);
+  });
+
+  it('reads the host process environment by default', () => {
+    const saved = process.env.CLAUDEZILLA_ALLOW_QUIT;
+    try {
+      delete process.env.CLAUDEZILLA_ALLOW_QUIT;
+      assert.equal(quitBrowserAllowed(), false);
+      process.env.CLAUDEZILLA_ALLOW_QUIT = '1';
+      assert.equal(quitBrowserAllowed(), true);
+    } finally {
+      if (saved === undefined) delete process.env.CLAUDEZILLA_ALLOW_QUIT;
+      else process.env.CLAUDEZILLA_ALLOW_QUIT = saved;
+    }
   });
 });
 

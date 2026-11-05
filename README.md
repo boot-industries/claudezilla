@@ -2,7 +2,7 @@
 
 **Browser automation for Claude Code that runs on Firefox** — for systems where Chrome is unavailable, unwelcome, or policy-prohibited.
 
-[![Version](https://img.shields.io/badge/version-0.7.2-blue.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.7.7-blue.svg)](./CHANGELOG.md)
 
 The only Firefox-native MCP server for Claude Code. Navigate, automate, screenshot, and extract data on any system that runs Firefox — no Chrome dependency, no Google infrastructure.
 
@@ -55,6 +55,7 @@ No manual config required — restart Claude Code and you're ready.
 | `CLAUDEZILLA_AUTOSTART_CMD` | all platforms | Command that starts the browser when the host is not running. Never run through a shell. |
 | `CLAUDEZILLA_AUTOSTART_WAIT_MS` | all platforms | How long to wait for the host to bind its socket after a start (default `45000`). |
 | `CLAUDEZILLA_AUTOSTART_RETRY_COOLDOWN_MS` | all platforms | How long to wait before retrying a failed start (default `60000`). |
+| `CLAUDEZILLA_ALLOW_QUIT` | all platforms | Allows the `quitBrowser` command, which closes every window of the browser the host runs in. Set it only in the environment of a browser that exists for agents (for example the profile started by `CLAUDEZILLA_AUTOSTART_CMD` or a systemd unit), never for your own browser. |
 
 `CLAUDEZILLA_IPC_DIR` in detail:
 
@@ -83,8 +84,26 @@ CLAUDEZILLA_IPC_DIR=/run/user/1000/claudezilla-bg claude
   CLAUDEZILLA_AUTOSTART_CMD='systemctl --user start claudezilla-background'
   ```
 - The browser is started only when the host is **not reachable**. The check is a connection attempt, not a file check, so it also works on Windows, where the host socket is a named pipe rather than a file.
+- Listing the tools never starts the browser; the first tool call does. A client that lists the tools at session start does not launch a browser it may never use.
 - Concurrent calls share a single launch, and a failed start is not retried for `CLAUDEZILLA_AUTOSTART_RETRY_COOLDOWN_MS` — a browser that cannot start does not turn every tool call into another process.
 - The start command must publish the host socket and auth token where the MCP server looks for them. When the browser and the MCP server are different processes, give both the same `CLAUDEZILLA_IPC_DIR`.
+
+Stopping the browser cleanly:
+
+- A signal is not a clean quit. Firefox does not shut down on `SIGTERM` (what `systemctl stop` sends by default): the process ends without writing its session store or cache index, and the next start restores stray windows. Closing the last window is the only clean quit.
+- `node host/cli.js quitBrowser` asks the extension to close every window, the Claudezilla window last so it is the one restored next time. The CLI talks to the host over the socket, so give it the same `CLAUDEZILLA_IPC_DIR` as the browser when one is in use.
+- The host refuses the command unless the **browser's** environment carries `CLAUDEZILLA_ALLOW_QUIT=1`. The host inherits that environment from Firefox, so nothing in the CLI's environment can enable it, and a browser started without the variable cannot be quit this way.
+- No MCP tool exposes the command: it is for the supervisor that started the browser, not for agents.
+
+```ini
+# ~/.config/systemd/user/claudezilla-background.service
+[Service]
+Environment=CLAUDEZILLA_IPC_DIR=%t/claudezilla-bg CLAUDEZILLA_ALLOW_QUIT=1
+ExecStart=/usr/bin/firefox --no-remote --profile %h/profiles/headless
+ExecStop=/usr/bin/node /path/to/claudezilla/host/cli.js quitBrowser
+```
+
+systemd runs `ExecStop` with the unit's environment, waits for Firefox to exit, and only falls back to `SIGTERM` after `TimeoutStopSec`.
 
 ## What Can Claude Do?
 
@@ -122,18 +141,18 @@ Claude, get all the links on this page
 
 ### Browser Control
 - `firefox_create_window` — Open URL in browser
-- `firefox_navigate` — Navigate current tab to a URL
-- `firefox_get_content` — Read page text (50K char limit)
-- `firefox_click` — Click element by CSS selector
-- `firefox_type` — Type into input field
+- `firefox_navigate` — Navigate an existing tab (default: your current tab) to a URL
+- `firefox_get_content` — Read visible page text or one element's text (20K chars per call, `offset` paging)
+- `firefox_click` — Click an element by `ref` (from a snapshot or `firefox_find`) or CSS selector
+- `firefox_type` — Type into an input field by `ref` or selector
 - `firefox_press_key` — Keyboard events (Enter, Tab, shortcuts)
-- `firefox_screenshot` — Capture viewport (supports annotated mode)
+- `firefox_screenshot` — Capture the viewport or a `region`, sized for vision models (`maxEdge`, default 1568 px); supports annotated mode. Set `CLAUDEZILLA_SCREENSHOT_FILES=1` for harnesses that cannot show inline images: each screenshot is also saved under the temp directory and its `savedPath` is returned.
 - `firefox_get_tabs` / `firefox_close_tab` — Manage tabs
 - `firefox_list_all_tabs` — List all open tabs, including ones not yet under Claudezilla's control
 - `firefox_attach_tab` / `firefox_detach_tab` — Attach to (or release) a tab the user already has open, driving it in place instead of opening a new one
 
 ### Configuration
-- `firefox_activate` — Load tool categories on demand (lazy loading saves ~6K tokens)
+- `firefox_activate` — Only with opt-in lazy loading (`--tools lazy` or `CLAUDEZILLA_TOOL_MODE=lazy`): load tool categories on demand. By default every tool is listed.
 - `firefox_set_config` — Set domain allowlist, consent auto-dismiss, and session config
 - `firefox_set_private_mode` — Toggle private/regular browsing
 - `firefox_handle_consent` — Dismiss cookie/GDPR consent dialogs
@@ -145,7 +164,8 @@ Claude, get all the links on this page
 
 ### Page Analysis
 - `firefox_get_page_state` — Structured data (headings, links, buttons, diff support)
-- `firefox_get_accessibility_snapshot` — Semantic tree (screen reader view)
+- `firefox_get_accessibility_snapshot` — Primary way to read a page: compact text tree with `[ref_N]` handles for click/type/scroll (cheaper than screenshots)
+- `firefox_find` — Find elements by visible text or accessible name; returns refs with landmark context
 - `firefox_get_element_info` — Element attributes and styles
 - `firefox_wait_for` — Wait for element, text, or URL pattern
 - `firefox_scroll` — Scroll to element or position

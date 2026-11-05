@@ -14,8 +14,12 @@ import {
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import { randomBytes } from 'crypto';
-import { readFileSync, existsSync, statSync, writeFileSync } from 'fs';
-import { resolve as resolvePath, extname } from 'path';
+import {
+  readFileSync, existsSync, statSync, realpathSync, openSync, writeSync, closeSync,
+  mkdirSync, lstatSync, chmodSync, readdirSync, unlinkSync, constants,
+} from 'fs';
+import { tmpdir } from 'os';
+import { resolve as resolvePath, extname, dirname, basename, join, sep } from 'path';
 import { getSocketPath, getAuthTokenPath } from '../host/ipc.js';
 import { requestOverSocket } from './socket-request.js';
 import { createAgentReaper, resolveAgentTimeout } from './agent-reaper.js';
@@ -157,7 +161,7 @@ function checkDomainAllowed(agentId, url) {
   const allowed = config.allowedDomains.some(pattern => {
     if (pattern.startsWith('*.')) {
       const base = pattern.slice(2).replace(/\./g, '\\.');
-      return new RegExp(`^[^.]+\.${base}$`).test(hostname) || hostname === pattern.slice(2);
+      return new RegExp(`^[^.]+\\.${base}$`).test(hostname) || hostname === pattern.slice(2);
     }
     return hostname === pattern;
   });
@@ -226,6 +230,31 @@ agentReaper.start();
 // Pending fire-and-forget consent setTimeout handles. Tracked so handleShutdown
 // can cancel them and avoid racing against goodbye/exit.
 const pendingConsentTimers = new Set();
+
+// This agent's most recently used tab (null until a call returns a tabId).
+// Per MCP-server process, i.e. per agent, unlike the extension's global active tab.
+let currentTabId = null;
+// Errors that mean the injected tab no longer exists. "Element not found" is
+// deliberately not matched: a selector miss says nothing about the tab.
+const STALE_TAB_ERROR = /TAB_UNAVAILABLE|Tab \d+ not found|Invalid tab ID/i;
+
+/**
+ * Update currentTabId from a successful tool result.
+ * @param {string} toolName
+ * @param {object|undefined} toolArgs - Arguments the agent passed
+ * @param {object|undefined} result - Extension result
+ */
+function trackCurrentTab(toolName, toolArgs, result) {
+  if (toolName === 'firefox_close_window') {
+    currentTabId = null;
+    return;
+  }
+  if (toolName === 'firefox_close_tab' || toolName === 'firefox_detach_tab') {
+    if (toolArgs?.tabId === currentTabId) currentTabId = null;
+    return;
+  }
+  if (typeof result?.tabId === 'number') currentTabId = result.tabId;
+}
 
 /**
  * Run diagnostics on Claudezilla connection
@@ -329,7 +358,7 @@ async function runDiagnostics() {
         name: 'tab_pool',
         status: 'ok',
         tabCount: tabsResult.result?.tabCount || 0,
-        maxTabs: tabsResult.result?.maxTabs || 10,
+        maxTabs: tabsResult.result?.maxTabs || 12,
       });
     } catch (e) {
       diagnostics.checks.push({
@@ -372,23 +401,122 @@ const RETRY_CONFIG = {
 };
 
 /**
- * Sleep for specified milliseconds
+ * Directories a screenshot may be written to: the OS temp dir, /tmp (POSIX)
+ * and the working directory, as real paths so symlinks cannot widen them.
  */
-function saveScreenshotToDisk(base64Data, savePath) {
+function allowedSaveRoots() {
+  const candidates = [tmpdir(), process.cwd()];
+  if (process.platform !== 'win32') candidates.push('/tmp');
+  const roots = new Set();
+  for (const dir of candidates) {
+    try {
+      roots.add(realpathSync(dir));
+    } catch {
+      // Directory missing on this platform: not a root.
+    }
+  }
+  return [...roots];
+}
+
+/**
+ * Write base64 image bytes to a file created 0600 that refuses to follow a
+ * symlink at the final path component.
+ */
+function writePrivateFile(path, base64Data) {
+  const flags = constants.O_WRONLY | constants.O_CREAT | constants.O_TRUNC | (constants.O_NOFOLLOW ?? 0);
+  const fd = openSync(path, flags, 0o600);
+  try {
+    const bytes = Buffer.from(base64Data, 'base64');
+    let offset = 0;
+    while (offset < bytes.length) offset += writeSync(fd, bytes, offset, bytes.length - offset);
+  } finally {
+    closeSync(fd);
+  }
+}
+
+/**
+ * Write a screenshot to disk.
+ * SECURITY: savePath is chosen by the agent, so it is confined to
+ * allowedSaveRoots(), must carry an extension matching the image format, and
+ * is opened with O_NOFOLLOW and mode 0600 so it cannot clobber a symlink
+ * target or leak the image to other local users.
+ *
+ * @param {string} base64Data - Image bytes, base64-encoded
+ * @param {string} savePath - Requested destination
+ * @param {'jpeg'|'png'} format - Image format of base64Data
+ * @returns {string} Absolute path written
+ */
+function saveScreenshotToDisk(base64Data, savePath, format) {
   if (!savePath || typeof savePath !== 'string') throw new Error('savePath must be a non-empty string');
   if (savePath.includes('\0')) throw new Error('savePath contains null byte');
   if (savePath.includes('..')) throw new Error('savePath contains path traversal');
 
   const absPath = resolvePath(savePath);
   const ext = extname(absPath).toLowerCase();
-  if (ext && ext !== '.jpg' && ext !== '.jpeg' && ext !== '.png') {
-    throw new Error(`Unsupported extension "${ext}" — use .jpg or .png`);
+  const validExts = format === 'jpeg' ? ['.jpg', '.jpeg'] : ['.png'];
+  if (!validExts.includes(ext)) {
+    throw new Error('savePath must end in .jpg/.jpeg for JPEG or .png for PNG');
   }
 
-  writeFileSync(absPath, Buffer.from(base64Data, 'base64'));
+  const roots = allowedSaveRoots();
+  let parent;
+  try {
+    parent = realpathSync(dirname(absPath));
+  } catch {
+    throw new Error(`savePath directory does not exist: ${dirname(absPath)}`);
+  }
+  const inside = roots.some((root) => parent === root || parent.startsWith(root.endsWith(sep) ? root : root + sep));
+  if (!inside) throw new Error(`savePath must be inside one of: ${roots.join(', ')}`);
+
+  writePrivateFile(join(parent, basename(absPath)), base64Data);
   return absPath;
 }
 
+// CLAUDEZILLA_SCREENSHOT_FILES=1: for harnesses that cannot show inline MCP
+// images (omp renders "[Image: mime]"), also write every screenshot to a
+// private directory and report the path so the agent can open it as a file.
+const SCREENSHOT_FILES = process.env.CLAUDEZILLA_SCREENSHOT_FILES === '1';
+const SCREENSHOT_DIR = join(tmpdir(), 'claudezilla-screenshots');
+const SCREENSHOT_KEEP = 50;
+
+/**
+ * Write a screenshot into SCREENSHOT_DIR and prune it to the newest
+ * SCREENSHOT_KEEP files.
+ * SECURITY: the directory is created 0700 and must be a real directory owned
+ * by this user: tmpdir() can be shared (/tmp), so a pre-created symlink or a
+ * directory owned by someone else is refused.
+ *
+ * @param {string} base64Data - Image bytes, base64-encoded
+ * @param {'jpeg'|'png'} format
+ * @returns {string} Path written
+ */
+function writeScreenshotFile(base64Data, format) {
+  mkdirSync(SCREENSHOT_DIR, { recursive: true, mode: 0o700 });
+  const info = lstatSync(SCREENSHOT_DIR);
+  if (!info.isDirectory() || (typeof process.getuid === 'function' && info.uid !== process.getuid())) {
+    throw new Error(`Refusing to use ${SCREENSHOT_DIR}: not a directory owned by this user`);
+  }
+  chmodSync(SCREENSHOT_DIR, 0o700);
+
+  const ext = format === 'jpeg' ? 'jpg' : 'png';
+  const file = join(SCREENSHOT_DIR, `${Date.now()}-${AGENT_ID.slice(6, 14)}.${ext}`);
+  writePrivateFile(file, base64Data);
+
+  // Names start with a millisecond timestamp, so lexical order is age order.
+  const stale = readdirSync(SCREENSHOT_DIR).sort().slice(0, -SCREENSHOT_KEEP);
+  for (const name of stale) {
+    try {
+      unlinkSync(join(SCREENSHOT_DIR, name));
+    } catch {
+      // Already gone (another agent pruned it).
+    }
+  }
+  return file;
+}
+
+/**
+ * Sleep for specified milliseconds
+ */
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -432,22 +560,31 @@ function buildErrorMessage(errCode, socketPath, authTokenFile) {
 /**
  * Send command to Claudezilla via Unix socket (single attempt)
  * SECURITY: Includes auth token read from host-created file
+ *
+ * @param {object} [options]
+ * @param {boolean} [options.autostart=true] - false skips the on-demand
+ *   browser start: a call that must not start the browser (goodbye on
+ *   shutdown) still reaches a running host but never launches one.
+ * @param {number} [options.timeoutMs] - socket idle timeout override; defaults
+ *   to the command's own timeout plus the shared grace period.
  */
-async function sendCommandOnce(command, params = {}) {
+async function sendCommandOnce(command, params = {}, options = {}) {
   // Optional on-demand browser start. When the host is not reachable and
   // CLAUDEZILLA_AUTOSTART_CMD is set, the browser is started and this call
   // waits for its socket. A failed start is reported alongside the original
   // connection error.
   let startError = null;
-  try {
-    const start = await autostart.ensureStarted();
-    if (start.reason === 'launch-failed') {
-      startError = start.error ?? new Error('Autostart failed');
-    } else if (start.reason === 'cooldown') {
-      startError = new Error('Autostart skipped: the previous start failed and the retry cooldown has not elapsed.');
+  if (options.autostart !== false) {
+    try {
+      const start = await autostart.ensureStarted();
+      if (start.reason === 'launch-failed') {
+        startError = start.error ?? new Error('Autostart failed');
+      } else if (start.reason === 'cooldown') {
+        startError = new Error('Autostart skipped: the previous start failed and the retry cooldown has not elapsed.');
+      }
+    } catch (e) {
+      startError = e;
     }
-  } catch (e) {
-    startError = e;
   }
 
   // SECURITY: Load auth token on each command (handles host restarts)
@@ -464,6 +601,7 @@ async function sendCommandOnce(command, params = {}) {
       params,
       authToken,
       socketPath: SOCKET_PATH,
+      timeoutMs: options.timeoutMs,
       describeError: (errCode) => buildErrorMessage(errCode, SOCKET_PATH, AUTH_TOKEN_FILE),
     });
   } catch (err) {
@@ -480,13 +618,13 @@ async function sendCommandOnce(command, params = {}) {
  * Send command to Claudezilla with automatic retry for transient failures
  * Retries with exponential backoff for ENOENT, ECONNREFUSED, ECONNRESET
  */
-async function sendCommand(command, params = {}) {
+async function sendCommand(command, params = {}, options = {}) {
   let lastError;
   let delay = RETRY_CONFIG.initialDelayMs;
 
   for (let attempt = 0; attempt <= RETRY_CONFIG.maxRetries; attempt++) {
     try {
-      return await sendCommandOnce(command, params);
+      return await sendCommandOnce(command, params, options);
     } catch (err) {
       lastError = err;
 
@@ -507,20 +645,6 @@ async function sendCommand(command, params = {}) {
   }
 
   throw lastError;
-}
-
-/**
- * Check if navigate command is available
- * Returns false if extension is in Private Windows mode
- */
-async function canNavigate() {
-  try {
-    const response = await sendCommand('canNavigate');
-    return response.result?.canNavigate ?? true;
-  } catch (error) {
-    // If we can't check, assume navigate is available (fail open)
-    return true;
-  }
 }
 
 // Tool definitions
@@ -545,7 +669,7 @@ const TOOLS = [
   },
   {
     name: 'firefox_navigate',
-    description: 'Navigate to a URL. If tabId provided, navigates that tab (requires ownership). Without tabId, navigates active tab (may be restricted in private window mode).',
+    description: 'Navigate an existing tab to a URL. tabId defaults to your current tab; ownership is enforced. Never creates a window: call firefox_create_window first.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -555,7 +679,7 @@ const TOOLS = [
         },
         tabId: {
           type: 'number',
-          description: 'Target tab ID. If provided, navigates this tab (ownership enforced). Without tabId, navigates active tab.',
+          description: 'Tab ID (default: your current tab)',
         },
       },
       required: ['url'],
@@ -563,13 +687,17 @@ const TOOLS = [
   },
   {
     name: 'firefox_get_content',
-    description: 'Get the text content of a page or element. Works on background tabs. Returns url, title, text. HTML excluded by default (use includeHtml=true if needed). Text truncated at 50K chars by default.',
+    description: 'Read the visible text of the page or of one element (ref or selector), returned as plain text after a one-line JSON header. Default 20,000 chars; when truncated, the header carries nextOffset for the next page. HTML only with includeHtml=true.',
     inputSchema: {
       type: 'object',
       properties: {
         tabId: {
           type: 'number',
-          description: 'Target tab ID. Default: active tab. Works on background tabs.',
+          description: 'Tab ID (default: your current tab)',
+        },
+        ref: {
+          type: 'string',
+          description: 'Element ref from a snapshot or firefox_find, e.g. "ref_a1b2_12" (preferred over selector)',
         },
         selector: {
           type: 'string',
@@ -579,9 +707,13 @@ const TOOLS = [
           type: 'boolean',
           description: 'Include raw HTML in response (default: false). Warning: can be very large.',
         },
+        offset: {
+          type: 'number',
+          description: 'Character offset to start from (use nextOffset from a truncated result)',
+        },
         maxLength: {
           type: 'number',
-          description: 'Max text length before truncation (default: 50000). Use selector for focused extraction.',
+          description: 'Max characters to return (default: 20000)',
         },
       },
     },
@@ -594,14 +726,17 @@ const TOOLS = [
       properties: {
         tabId: {
           type: 'number',
-          description: 'Target tab ID. Default: active tab. Works on background tabs.',
+          description: 'Tab ID (default: your current tab)',
+        },
+        ref: {
+          type: 'string',
+          description: 'Element ref from a snapshot or firefox_find, e.g. "ref_a1b2_12" (preferred over selector)',
         },
         selector: {
           type: 'string',
           description: 'CSS selector for the element to click (e.g., "button.submit", "#login-btn")',
         },
       },
-      required: ['selector'],
     },
   },
   {
@@ -612,7 +747,11 @@ const TOOLS = [
       properties: {
         tabId: {
           type: 'number',
-          description: 'Target tab ID. Default: active tab. Works on background tabs.',
+          description: 'Tab ID (default: your current tab)',
+        },
+        ref: {
+          type: 'string',
+          description: 'Element ref from a snapshot or firefox_find, e.g. "ref_a1b2_12" (preferred over selector)',
         },
         selector: {
           type: 'string',
@@ -627,7 +766,7 @@ const TOOLS = [
           description: 'Whether to clear existing text first (default: true)',
         },
       },
-      required: ['selector', 'text'],
+      required: ['text'],
     },
   },
   {
@@ -638,11 +777,15 @@ const TOOLS = [
       properties: {
         tabId: {
           type: 'number',
-          description: 'Target tab ID. Default: active tab. Works on background tabs.',
+          description: 'Tab ID (default: your current tab)',
         },
         key: {
           type: 'string',
           description: 'Key to press: Enter, Tab, Escape, Backspace, Delete, ArrowUp/Down/Left/Right, Home, End, PageUp/Down, or single characters (a-z, 0-9)',
+        },
+        ref: {
+          type: 'string',
+          description: 'Element ref from a snapshot or firefox_find, e.g. "ref_a1b2_12" (preferred over selector)',
         },
         selector: {
           type: 'string',
@@ -670,26 +813,32 @@ const TOOLS = [
   },
   {
     name: 'firefox_screenshot',
-    description: 'Capture a screenshot with dynamic page readiness detection. Automatically waits for network idle (XHR, scripts) and render settlement before capture. Returns timing data showing what signals were detected. SERIALIZED: Requests queued to prevent collisions. Default: JPEG 60% quality, 50% scale.',
+    description: 'Capture the viewport (or a region) as an image sized for vision models: long edge capped at maxEdge (default 1568 px). A text block before the image reports width, height and cssScale (CSS px = image px / cssScale). Waits for network idle and render settlement unless skipReadiness. Prefer firefox_get_accessibility_snapshot for reading; use screenshots for layout and visuals.',
     inputSchema: {
       type: 'object',
       properties: {
         tabId: {
           type: 'number',
-          description: 'Specific tab to capture (will switch to it). Default: current active tab.',
+          description: 'Tab ID (default: your current tab)',
         },
-        purpose: {
-          type: 'string',
-          enum: ['quick-glance', 'read-text', 'inspect-ui', 'full-detail'],
-          description: 'SUGGESTED quality presets (you can override with explicit quality/scale): quick-glance (q:30,s:0.25) for layout/navigation confirmation, read-text (q:60,s:0.5) for reading content [DEFAULT], inspect-ui (q:80,s:0.75) for UI details/small text, full-detail (q:95,s:1.0) for pixel-perfect inspection.',
+        maxEdge: {
+          type: 'number',
+          description: 'Longest image side in px (default 1568; 800 for a quick layout check; up to 2576 for small text on high-resolution models)',
+        },
+        region: {
+          type: 'object',
+          description: 'Zoom: capture only this viewport rectangle in CSS px',
+          properties: {
+            x: { type: 'number' },
+            y: { type: 'number' },
+            width: { type: 'number' },
+            height: { type: 'number' },
+          },
+          required: ['x', 'y', 'width', 'height'],
         },
         quality: {
           type: 'number',
-          description: 'JPEG quality 1-100 (default: 60). Overrides purpose preset if specified.',
-        },
-        scale: {
-          type: 'number',
-          description: 'Resolution scale 0.25-1.0 (default: 0.5). Overrides purpose preset if specified.',
+          description: 'JPEG quality 1-100 (default: 60)',
         },
         format: {
           type: 'string',
@@ -710,11 +859,11 @@ const TOOLS = [
         },
         annotate: {
           type: 'boolean',
-          description: 'Overlay numbered badges on interactive elements (buttons, links, inputs) before capture. Returns labels map {index: {selector, text, role}} alongside screenshot. Useful for vision models to identify and reference elements.',
+          description: 'Overlay numbered badges on visible interactive elements (buttons, links, inputs) before capture. Returns labels map {index: {ref, role, text}}; pass a ref to click/type. Useful for vision models to identify elements.',
         },
         savePath: {
           type: 'string',
-          description: 'Optional absolute file path to save the screenshot to disk (e.g. /tmp/shot.jpg). When provided, the file is written and the path is returned alongside the inline image. Supports .jpg/.jpeg and .png extensions.',
+          description: 'Optional file path to also save the image (e.g. /tmp/shot.jpg). Must be inside the temp or current working directory and end in .jpg/.jpeg (JPEG) or .png (PNG). The path is returned in the text block.',
         },
       },
     },
@@ -874,7 +1023,7 @@ const TOOLS = [
       properties: {
         tabId: {
           type: 'number',
-          description: 'Target tab ID. Default: active tab. Works on background tabs.',
+          description: 'Tab ID (default: your current tab)',
         },
         level: {
           type: 'string',
@@ -900,7 +1049,7 @@ const TOOLS = [
       properties: {
         tabId: {
           type: 'number',
-          description: 'Target tab ID. Default: active tab. Works on background tabs.',
+          description: 'Tab ID (default: your current tab)',
         },
         type: {
           type: 'string',
@@ -934,7 +1083,7 @@ const TOOLS = [
       properties: {
         tabId: {
           type: 'number',
-          description: 'Target tab ID. Default: active tab. Works on background tabs.',
+          description: 'Tab ID (default: your current tab)',
         },
         expression: {
           type: 'string',
@@ -952,7 +1101,7 @@ const TOOLS = [
       properties: {
         tabId: {
           type: 'number',
-          description: 'Target tab ID. Default: active tab. Works on background tabs.',
+          description: 'Tab ID (default: your current tab)',
         },
         selector: {
           type: 'string',
@@ -981,7 +1130,11 @@ const TOOLS = [
       properties: {
         tabId: {
           type: 'number',
-          description: 'Target tab ID. Default: active tab. Works on background tabs.',
+          description: 'Tab ID (default: your current tab)',
+        },
+        ref: {
+          type: 'string',
+          description: 'Element ref from a snapshot or firefox_find, e.g. "ref_a1b2_12" (preferred over selector)',
         },
         selector: {
           type: 'string',
@@ -997,7 +1150,7 @@ const TOOLS = [
         },
         behavior: {
           type: 'string',
-          description: 'Scroll behavior: smooth or instant (default: smooth)',
+          description: 'Scroll behavior: instant or smooth (default: instant). Smooth waits up to 1 s for the scroll to finish before reporting positions.',
           enum: ['smooth', 'instant'],
         },
       },
@@ -1011,26 +1164,29 @@ const TOOLS = [
       properties: {
         tabId: {
           type: 'number',
-          description: 'Target tab ID. Default: active tab. Works on background tabs.',
+          description: 'Tab ID (default: your current tab)',
+        },
+        ref: {
+          type: 'string',
+          description: 'Element ref from a snapshot or firefox_find, e.g. "ref_a1b2_12" (preferred over selector)',
         },
         selector: {
           type: 'string',
           description: 'CSS selector for the element',
         },
       },
-      required: ['selector'],
     },
   },
   // ===== PAGE ANALYSIS (FAST ALTERNATIVES TO SCREENSHOTS) =====
   {
     name: 'firefox_get_page_state',
-    description: 'Get structured page state as JSON. Much faster than screenshots for understanding page content. Returns: URL, title, viewport, errors, headings, links, buttons, inputs, images, landmarks with counts. Individual string values are length-capped (headings: 100, links: 50/100, buttons: 50, inputs: 50, images: 100) with explicit `truncated: true` and `rawLength` metadata when shortened. Password fields are always masked ("***"). Works on background tabs.',
+    description: 'Get structured page state as JSON: URL, title, viewport, errors, headings, links, buttons, inputs, images, landmarks with counts. Headings, links, buttons and inputs carry a `ref` you can pass to firefox_click / firefox_type / firefox_scroll / firefox_press_key. Default item caps: headings 30, links 50, buttons 30, inputs 30, images 20 (raise with the max* params). Long strings are shortened with `truncated: true` and `rawLength` metadata. Password fields are masked ("***"). Cheaper than screenshots.',
     inputSchema: {
       type: 'object',
       properties: {
         tabId: {
           type: 'number',
-          description: 'Target tab ID. Default: active tab. Works on background tabs.',
+          description: 'Tab ID (default: your current tab)',
         },
         maxHeadings: {
           type: 'number',
@@ -1057,27 +1213,67 @@ const TOOLS = [
   },
   {
     name: 'firefox_get_accessibility_snapshot',
-    description: 'Get accessibility tree snapshot. Returns semantic structure with roles, names, states. Capped at 200 nodes by default to prevent overflow. Works on background tabs.',
+    description: 'Primary way to read a page: compact accessibility tree, one line per element with [ref_N] handles you can pass as ref to click/type/scroll/press_key. filter=interactive lists only actionable elements. Cheaper than screenshots. Refs stay valid until navigation.',
     inputSchema: {
       type: 'object',
       properties: {
         tabId: {
           type: 'number',
-          description: 'Target tab ID. Default: active tab. Works on background tabs.',
+          description: 'Tab ID (default: your current tab)',
+        },
+        format: {
+          type: 'string',
+          enum: ['text', 'json'],
+          description: 'text (default): one line per element; json: nested tree with ref on every node',
+        },
+        filter: {
+          type: 'string',
+          enum: ['all', 'interactive'],
+          description: 'all (default): full tree; interactive: flat list of visible actionable elements',
         },
         maxDepth: {
           type: 'number',
-          description: 'Maximum tree depth to traverse (default: 5)',
+          description: 'Maximum tree depth to traverse (default: 15)',
         },
         maxNodes: {
           type: 'number',
-          description: 'Maximum nodes to include (default: 200). Lower = faster, less detail.',
+          description: 'Maximum nodes to include (default: 200, max 2000)',
+        },
+        ref: {
+          type: 'string',
+          description: 'Element ref from a snapshot or firefox_find, e.g. "ref_a1b2_12" (preferred over selector)',
         },
         selector: {
           type: 'string',
           description: 'CSS selector for root element (default: body)',
         },
       },
+    },
+  },
+  {
+    name: 'firefox_find',
+    description: 'Find elements by visible text or accessible name (substring, or regex=true). Returns up to maxResults (default 20) matches as [ref_N] lines with their landmark/heading context; pass a ref to click/type/scroll. Cheaper than a full snapshot on large pages.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        tabId: {
+          type: 'number',
+          description: 'Tab ID (default: your current tab)',
+        },
+        query: {
+          type: 'string',
+          description: 'Text to search for (case-insensitive substring, max 200 chars)',
+        },
+        regex: {
+          type: 'boolean',
+          description: 'Treat query as a case-insensitive regular expression (default: false)',
+        },
+        maxResults: {
+          type: 'number',
+          description: 'Maximum matches to return (default: 20)',
+        },
+      },
+      required: ['query'],
     },
   },
 
@@ -1130,7 +1326,7 @@ const TOOLS = [
       properties: {
         timeout: {
           type: 'number',
-          description: 'Request timeout in milliseconds (default: 150000, range: 5000-300000)',
+          description: 'Request timeout in ms (5000-300000, default 150000)',
         },
         scanTimeout: {
           type: 'number',
@@ -1209,13 +1405,25 @@ const TOOLS = [
 
 // Add optional 'timeout' parameter to all tool schemas (except diagnose which runs locally)
 for (const tool of TOOLS) {
-  if (tool.name !== 'firefox_diagnose') {
+  // Tools that already define their own `timeout` (firefox_wait_for) keep it.
+  if (tool.name !== 'firefox_diagnose' && !tool.inputSchema.properties.timeout) {
     tool.inputSchema.properties.timeout = {
       type: 'number',
-      description: 'Request timeout in milliseconds (default: 150000, range: 5000-300000)',
+      description: 'Request timeout in ms (5000-300000, default 150000)',
     };
   }
 }
+
+// Tools whose tabId is optional default to this agent's current tab. Tools
+// that create, attach, detach or close a specific tab are excluded: their
+// tabId (or lack of one) is the point of the call.
+const TAB_DEFAULT_EXCLUDED = new Set(['firefox_close_tab', 'firefox_attach_tab', 'firefox_detach_tab', 'firefox_create_window']);
+const TAB_DEFAULT_TOOLS = new Set(
+  TOOLS
+    .filter((tool) => tool.inputSchema.properties.tabId && !(tool.inputSchema.required ?? []).includes('tabId'))
+    .map((tool) => tool.name)
+    .filter((toolName) => !TAB_DEFAULT_EXCLUDED.has(toolName)),
+);
 
 // Assign categories to tools for lazy loading
 const TOOL_CATEGORIES = {
@@ -1239,7 +1447,8 @@ const TOOL_CATEGORIES = {
   firefox_get_console: 'devtools',
   firefox_get_network: 'devtools',
   firefox_evaluate: 'devtools',
-  firefox_get_accessibility_snapshot: 'devtools',
+  firefox_get_accessibility_snapshot: 'core',
+  firefox_find: 'core',
   firefox_request_tab_space: 'multiagent',
   firefox_grant_tab_space: 'multiagent',
   firefox_get_slot_requests: 'multiagent',
@@ -1270,16 +1479,15 @@ const CATEGORY_GROUPS = {
   all: ['core', 'inspection', 'devtools', 'multiagent', 'loop', 'config', 'diagnose'],
 };
 
-// Tool discovery policy: 'lazy' (default for Claude Code) vs 'all' (eager for OMP, Hermes, Pi, Claude Desktop)
-// Precedence: CLI argument (--tools all | --all-tools) > Env var (CLAUDEZILLA_TOOL_MODE=all) > default 'lazy'
+// Tool discovery policy: the full catalog ('all') by default; 'lazy' is opt-in and
+// exposes only the firefox_activate gateway until a category is activated.
+// Precedence: CLI argument (--tools lazy|all) > Env var (CLAUDEZILLA_TOOL_MODE=lazy) > default 'all'
 const TOOL_MODE = (() => {
-  if (process.argv.includes('--all-tools')) return 'all';
   const toolsArgIdx = process.argv.indexOf('--tools');
-  if (toolsArgIdx !== -1 && process.argv[toolsArgIdx + 1] === 'all') return 'all';
-  if (toolsArgIdx !== -1 && process.argv[toolsArgIdx + 1] === 'lazy') return 'lazy';
-  const envMode = process.env.CLAUDEZILLA_TOOL_MODE?.toLowerCase();
-  if (envMode === 'all') return 'all';
-  return 'lazy';
+  const toolsArg = toolsArgIdx !== -1 ? process.argv[toolsArgIdx + 1] : undefined;
+  if (toolsArg === 'lazy' || toolsArg === 'all') return toolsArg;
+  if (process.env.CLAUDEZILLA_TOOL_MODE?.toLowerCase() === 'lazy') return 'lazy';
+  return 'all';
 })();
 
 let activatedCategories = new Set();
@@ -1310,6 +1518,73 @@ const GATEWAY_TOOLS = [
   },
 ];
 
+// Server-level guidance sent once in the initialize response. Keep it under
+// 1,500 characters: it is read by every agent on every session.
+const SERVER_INSTRUCTIONS = `Claudezilla drives the user's real Firefox: open tabs, navigate, read pages, click, type and take screenshots (firefox_* tools).
+Workflow: firefox_create_window opens your tab; later calls without tabId target your most recent tab. Read before you look: firefox_get_accessibility_snapshot returns a compact text tree with [ref_N] handles, and firefox_find locates elements by text. Act with firefox_click / firefox_type / firefox_scroll / firefox_press_key by passing ref (preferred) or a CSS selector. Refs stay valid until the page navigates; after a stale-ref error, read the page again. Use firefox_get_content for long text (paginate with offset) and firefox_screenshot only when layout or visuals matter (default long edge 1568 px; region zooms; maxEdge 2576 for small text). Screenshot coordinates: CSS px = image px / cssScale.
+Etiquette: tabs you create are yours; never close or navigate other agents' tabs. The pool holds 12 tabs; close tabs you no longer need. Attach to the user's own tabs only when asked (firefox_list_all_tabs, firefox_attach_tab). firefox_evaluate stays disabled unless the user enables it in the add-on popup.
+On connection errors run firefox_diagnose.`;
+
+// Tool annotations (MCP spec): hints that let clients auto-approve reads and
+// prompt before destructive or open-world actions. firefox_screenshot is not
+// read-only: savePath and CLAUDEZILLA_SCREENSHOT_FILES write files to disk.
+const READ_ONLY_TOOLS = new Set([
+  'firefox_get_tabs', 'firefox_list_all_tabs', 'firefox_get_content', 'firefox_get_element',
+  'firefox_wait_for', 'firefox_get_page_state', 'firefox_get_accessibility_snapshot', 'firefox_find',
+  'firefox_diff_page_state', 'firefox_get_slot_requests', 'firefox_loop_status',
+  'firefox_diagnose',
+]);
+const DESTRUCTIVE_TOOLS = new Set([
+  'firefox_close_tab', 'firefox_close_window', 'firefox_grant_tab_space', 'firefox_evaluate',
+]);
+const OPEN_WORLD_TOOLS = new Set(['firefox_create_window', 'firefox_navigate']);
+
+// Tools Claude Code should load up front rather than defer behind tool search.
+const ALWAYS_LOAD = new Set([
+  'firefox_create_window', 'firefox_navigate', 'firefox_get_accessibility_snapshot',
+  'firefox_find', 'firefox_click', 'firefox_type', 'firefox_screenshot',
+]);
+
+/**
+ * Shape a tool definition for tools/list: spec fields only (no internal
+ * `category`), a human title and annotations.
+ */
+function toWireTool(tool) {
+  const title = tool.name
+    .replace(/^firefox_/, '')
+    .split('_')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+  const wire = {
+    name: tool.name,
+    title,
+    description: tool.description,
+    inputSchema: tool.inputSchema,
+    annotations: {
+      title,
+      readOnlyHint: READ_ONLY_TOOLS.has(tool.name),
+      destructiveHint: DESTRUCTIVE_TOOLS.has(tool.name),
+      openWorldHint: OPEN_WORLD_TOOLS.has(tool.name),
+    },
+  };
+  if (ALWAYS_LOAD.has(tool.name)) wire._meta = { 'anthropic/alwaysLoad': true };
+  return wire;
+}
+
+// Tools whose result has a `text` body: sent as a one-line JSON header followed
+// by the text itself, so newlines and quotes are not re-escaped into JSON.
+const TEXT_BODY_TOOLS = new Set(['firefox_get_content', 'firefox_get_accessibility_snapshot', 'firefox_find']);
+
+/**
+ * Serialize a command result for the tool response.
+ */
+function formatResult(name, result) {
+  if (typeof result?.text === 'string' && TEXT_BODY_TOOLS.has(name)) {
+    return JSON.stringify({ ...result, text: undefined }) + '\n\n' + result.text;
+  }
+  return JSON.stringify(result);
+}
+
 // Map MCP tool names to Claudezilla commands
 const TOOL_TO_COMMAND = {
   // Core browser control
@@ -1337,6 +1612,7 @@ const TOOL_TO_COMMAND = {
   // Page analysis
   firefox_get_page_state: 'getPageState',
   firefox_get_accessibility_snapshot: 'getAccessibilitySnapshot',
+  firefox_find: 'find',
   // Keyboard input
   firefox_press_key: 'pressKey',
   // Loop/focus
@@ -1367,29 +1643,22 @@ const server = new Server(
     capabilities: {
       tools: { listChanged: true },
     },
+    instructions: TOOL_MODE === 'lazy'
+      ? `Call firefox_activate first to load the tools. ${SERVER_INSTRUCTIONS}`
+      : SERVER_INSTRUCTIONS,
   }
 );
 
 // Handle list tools request
 server.setRequestHandler(ListToolsRequestSchema, async () => {
-  // Before activation: expose only the gateway tool
+  // Lazy mode before activation: expose only the gateway tool
   if (!isActivated) {
-    return { tools: GATEWAY_TOOLS };
+    return { tools: GATEWAY_TOOLS.map(toWireTool) };
   }
 
-  // After activation: filter by activated categories + canNavigate check
-  const navigateAllowed = await canNavigate();
-
-  let availableTools = TOOLS.filter(tool => activatedCategories.has(tool.category));
-  if (TOOL_MODE === 'all') {
-    // In eager mode, retain firefox_activate in tool list as a compatible no-op
-    availableTools = [...GATEWAY_TOOLS, ...availableTools];
-  }
-  if (!navigateAllowed) {
-    availableTools = availableTools.filter(tool => tool.name !== 'firefox_navigate');
-  }
-
-  return { tools: availableTools };
+  // Filter by activated categories (everything in the default 'all' mode)
+  const availableTools = TOOLS.filter(tool => activatedCategories.has(tool.category));
+  return { tools: availableTools.map(toWireTool) };
 });
 
 // Handle tool calls
@@ -1509,7 +1778,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       if (!before || !after) throw new Error('Both "before" and "after" snapshots are required');
       const diff = diffPageState(before, after);
       return {
-        content: [{ type: 'text', text: JSON.stringify(diff, null, 2) }],
+        content: [{ type: 'text', text: JSON.stringify(diff) }],
       };
     } catch (error) {
       return { content: [{ type: 'text', text: `Diff error: ${error.message}` }], isError: true };
@@ -1523,7 +1792,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       return {
         content: [{
           type: 'text',
-          text: JSON.stringify(diagnostics, null, 2),
+          text: JSON.stringify(diagnostics),
         }],
       };
     } catch (error) {
@@ -1547,8 +1816,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     // All tab-targeting commands now require ownership verification
     const commandParams = { ...(args || {}) };
 
-    // Per-operation timeout: map 'timeout' from tool args to '_timeout' internal param
-    if (commandParams.timeout && typeof commandParams.timeout === 'number') {
+    // Per-operation timeout: map 'timeout' from tool args to '_timeout' internal param.
+    // firefox_wait_for owns a `timeout` (how long the page waits): forward it to
+    // the content script and give the socket 5 s of headroom on top of it.
+    if (name === 'firefox_wait_for') {
+      const waitMs = typeof commandParams.timeout === 'number' ? commandParams.timeout : 10000;
+      commandParams._timeout = Math.max(5000, Math.min(300000, waitMs + 5000));
+    } else if (commandParams.timeout && typeof commandParams.timeout === 'number') {
       commandParams._timeout = Math.max(5000, Math.min(300000, commandParams.timeout));
       delete commandParams.timeout; // Don't forward the schema param to extension
     }
@@ -1574,6 +1848,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       'firefox_wait_for',
       'firefox_get_page_state',
       'firefox_get_accessibility_snapshot',
+      'firefox_find',
       'firefox_press_key',
       'firefox_screenshot',
       'firefox_request_tab_space',
@@ -1606,6 +1881,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
     }
 
+    // Default tab-targeting calls to this agent's own current tab.
+    let injectedTabId = null;
+    if (currentTabId !== null && commandParams.tabId === undefined && TAB_DEFAULT_TOOLS.has(name)) {
+      commandParams.tabId = currentTabId;
+      injectedTabId = currentTabId;
+    }
+
     // Bug 3: Refresh heartbeat before the async wait to prevent orphan timeout during long operations
     updateAgentHeartbeat(AGENT_ID);
     const response = await sendCommand(command, commandParams);
@@ -1628,29 +1910,45 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
     }
 
+    // Track this agent's current tab so later calls without tabId do not fall
+    // through to the extension's single global active tab (another agent's).
+    let staleTabNote = '';
+    if (response.success) {
+      trackCurrentTab(name, args, response.result);
+    } else if (injectedTabId !== null && STALE_TAB_ERROR.test(String(response.error ?? ''))) {
+      currentTabId = null;
+      staleTabNote = ` (your current tab ${injectedTabId} is gone: call firefox_get_tabs or firefox_create_window)`;
+    }
+
     if (response.success) {
       // Special handling for screenshots - return as image
       if (name === 'firefox_screenshot' && response.result?.dataUrl) {
         // Detect format from data URL
-        const isJpeg = response.result.dataUrl.startsWith('data:image/jpeg');
+        const { dataUrl, ...meta } = response.result;
+        const isJpeg = dataUrl.startsWith('data:image/jpeg');
         const mimeType = isJpeg ? 'image/jpeg' : 'image/png';
-        const base64Data = response.result.dataUrl.replace(/^data:image\/(jpeg|png);base64,/, '');
-        const content = [{ type: 'image', data: base64Data, mimeType }];
-        // If annotate was requested, append labels as text
-        if (response.result.labels) {
-          content.push({ type: 'text', text: JSON.stringify({ labels: response.result.labels }) });
-        }
-        // If savePath requested, write file to disk
+        const format = isJpeg ? 'jpeg' : 'png';
+        const base64Data = dataUrl.slice(dataUrl.indexOf(',') + 1);
+        // An explicit savePath wins; otherwise CLAUDEZILLA_SCREENSHOT_FILES=1
+        // writes a copy for harnesses that cannot display inline images.
+        let savedPath;
         if (savePathArg) {
-          const savedPath = saveScreenshotToDisk(base64Data, savePathArg);
-          content.push({ type: 'text', text: JSON.stringify({ savedPath }) });
+          savedPath = saveScreenshotToDisk(base64Data, savePathArg, format);
+        } else if (SCREENSHOT_FILES) {
+          savedPath = writeScreenshotFile(base64Data, format);
         }
-        return { content };
+        // Geometry first (width, height, cssScale, labels, savedPath), then the image.
+        return {
+          content: [
+            { type: 'text', text: JSON.stringify(savedPath ? { ...meta, savedPath } : meta) },
+            { type: 'image', data: base64Data, mimeType },
+          ],
+        };
       }
 
       // Handle undefined/null results - ensure text is always a string
       const resultText = response.result !== undefined
-        ? JSON.stringify(response.result, null, 2)
+        ? formatResult(name, response.result)
         : '{ "success": true }';
 
       return {
@@ -1682,6 +1980,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           `  Requested: ${response.details.requestedMode}\n` +
           `  Hint: ${response.details.hint}`;
       }
+      if (staleTabNote) errorText += staleTabNote;
       return {
         content: [{ type: 'text', text: errorText }],
         isError: true,
@@ -1702,7 +2001,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
  */
 async function sendGoodbye() {
   try {
-    await sendCommandOnce('goodbye', { agentId: AGENT_ID });
+    // Shutting down must never launch Firefox, and must not wait on the
+    // ~155 s socket default when the host is unresponsive.
+    await sendCommandOnce('goodbye', { agentId: AGENT_ID }, { autostart: false, timeoutMs: 2000 });
     console.error(`[claudezilla] Sent goodbye for ${truncateAgentId(AGENT_ID)}`);
   } catch (e) {
     // Ignore errors on shutdown - extension may already be gone
@@ -1721,6 +2022,8 @@ function handleShutdown(signal) {
   for (const timer of pendingConsentTimers) clearTimeout(timer);
   pendingConsentTimers.clear();
   console.error(`[claudezilla] Received ${signal}, cleaning up...`);
+  // Hard backstop: exit even if goodbye hangs on a stuck socket.
+  setTimeout(() => process.exit(0), 3000).unref();
   sendGoodbye().finally(() => process.exit(0));
 }
 
@@ -1728,13 +2031,16 @@ process.on('SIGINT', () => handleShutdown('SIGINT'));
 process.on('SIGTERM', () => handleShutdown('SIGTERM'));
 process.on('SIGHUP', () => handleShutdown('SIGHUP'));
 
-// Also handle unexpected exits
-process.on('beforeExit', () => {
-  if (!isShuttingDown) {
-    console.error('[claudezilla] beforeExit - sending goodbye');
-    sendGoodbye();
-  }
-});
+// The MCP client went away (stdin closed). The stdio transport does not
+// end the process on its own, so shut down here instead of lingering as an
+// orphan.
+process.stdin.on('end', () => handleShutdown('stdin end'));
+
+// Also handle unexpected exits. handleShutdown() guards with isShuttingDown
+// and exits after the goodbye: sendGoodbye() alone keeps the event loop busy,
+// so beforeExit fires again once it settles, and the server would send
+// goodbye in a tight loop.
+process.on('beforeExit', () => handleShutdown('beforeExit'));
 
 async function main() {
   const transport = new StdioServerTransport();
