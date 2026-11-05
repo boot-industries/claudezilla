@@ -1104,7 +1104,10 @@ function waitForScrollEnd({ startTimeoutMs = 150, maxMs = 1000 } = {}) {
  * @returns {Promise<object>} Result
  */
 async function scroll(params = {}) {
-  const { selector, x, y, behavior = 'instant' } = params;
+  const { selector, x, y } = params;
+  // A hidden tab has no refresh driver, so a smooth scroll never animates and
+  // would report noEffect: scroll instantly there.
+  const behavior = (params.behavior ?? 'instant') === 'smooth' && document.visibilityState === 'visible' ? 'smooth' : 'instant';
   const settled = behavior === 'smooth' ? waitForScrollEnd() : null;
 
   if (hasRef(params) || selector) {
