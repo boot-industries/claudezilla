@@ -1,7 +1,7 @@
 {
   "name": "claudezilla-loop",
   "description": "Focus loop feature for Claudezilla - enables persistent iterative development across Claude Code sessions",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "author": {
     "name": "Boot Industries",
     "email": "hello@boot.industries"
