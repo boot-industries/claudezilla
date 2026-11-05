@@ -1728,13 +1728,16 @@ process.on('SIGINT', () => handleShutdown('SIGINT'));
 process.on('SIGTERM', () => handleShutdown('SIGTERM'));
 process.on('SIGHUP', () => handleShutdown('SIGHUP'));
 
-// Also handle unexpected exits
-process.on('beforeExit', () => {
-  if (!isShuttingDown) {
-    console.error('[claudezilla] beforeExit - sending goodbye');
-    sendGoodbye();
-  }
-});
+// The MCP client went away (stdin closed). The stdio transport does not
+// end the process on its own, so shut down here instead of lingering as an
+// orphan.
+process.stdin.on('end', () => handleShutdown('stdin end'));
+
+// Also handle unexpected exits. handleShutdown() guards with isShuttingDown
+// and exits after the goodbye: sendGoodbye() alone keeps the event loop busy,
+// so beforeExit fires again once it settles, and the server would send
+// goodbye in a tight loop.
+process.on('beforeExit', () => handleShutdown('beforeExit'));
 
 async function main() {
   const transport = new StdioServerTransport();
