@@ -1068,7 +1068,7 @@ const TOOLS = [
         },
         behavior: {
           type: 'string',
-          description: 'Scroll behavior: smooth or instant (default: smooth)',
+          description: 'Scroll behavior: instant or smooth (default: instant). Smooth waits up to 1 s for the scroll to finish before reporting positions.',
           enum: ['smooth', 'instant'],
         },
       },

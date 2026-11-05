@@ -997,16 +997,47 @@ function buildElementNotFoundError(selector, operation) {
 // ===== END AUTO-RETRY SYSTEM =====
 
 /**
+ * Resolve once any scroll in the page (window or an inner container) has
+ * finished. Waits for `scrollend`, capped at maxMs; resolves early when no
+ * scroll event starts within startTimeoutMs, i.e. the call moved nothing.
+ * Scroll events do not bubble from elements, hence the capturing listeners.
+ */
+function waitForScrollEnd({ startTimeoutMs = 150, maxMs = 1000 } = {}) {
+  return new Promise(resolve => {
+    let started = false;
+    let startTimer;
+    let maxTimer;
+    const finish = () => {
+      clearTimeout(startTimer);
+      clearTimeout(maxTimer);
+      window.removeEventListener('scroll', onScroll, true);
+      window.removeEventListener('scrollend', finish, true);
+      resolve();
+    };
+    const onScroll = () => {
+      started = true;
+      clearTimeout(startTimer);
+    };
+    window.addEventListener('scroll', onScroll, true);
+    window.addEventListener('scrollend', finish, true);
+    startTimer = setTimeout(() => { if (!started) finish(); }, startTimeoutMs);
+    maxTimer = setTimeout(finish, maxMs);
+  });
+}
+
+/**
  * Scroll to element or position
  * @param {object} params - Parameters
  * @param {string} params.selector - CSS selector to scroll to
  * @param {number} params.x - X position to scroll to
  * @param {number} params.y - Y position to scroll to
- * @param {string} params.behavior - 'smooth' or 'instant' (default: smooth)
- * @returns {object} Result
+ * @param {string} params.behavior - 'instant' or 'smooth' (default: instant). Smooth
+ *   scrolls are awaited so reported positions are final.
+ * @returns {Promise<object>} Result
  */
-function scroll(params = {}) {
-  const { selector, x, y, behavior = 'smooth' } = params;
+async function scroll(params = {}) {
+  const { selector, x, y, behavior = 'instant' } = params;
+  const settled = behavior === 'smooth' ? waitForScrollEnd() : null;
 
   if (selector) {
     // SECURITY: Validate selector before use
@@ -1017,6 +1048,7 @@ function scroll(params = {}) {
     // Show focusglow on scroll target
     moveFocusTo(selector);
     element.scrollIntoView({ behavior, block: 'center' });
+    if (settled) await settled;
     const rect = element.getBoundingClientRect();
     return {
       selector,
@@ -1033,6 +1065,7 @@ function scroll(params = {}) {
       top: y ?? window.scrollY,
       behavior,
     });
+    if (settled) await settled;
     const afterX = window.scrollX;
     const afterY = window.scrollY;
     const noEffect = afterX === beforeX && afterY === beforeY;
@@ -1044,6 +1077,7 @@ function scroll(params = {}) {
   }
 
   // Return current scroll position
+  if (settled) await settled;
   return {
     position: { x: window.scrollX, y: window.scrollY },
     pageHeight: document.documentElement.scrollHeight,
@@ -2232,7 +2266,7 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
           break;
 
         case 'scroll':
-          result = scroll(params);
+          result = await scroll(params);
           break;
 
         case 'waitFor':
