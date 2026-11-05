@@ -895,7 +895,7 @@ async function getSession(windowId) {
 async function handleCliCommand(message) {
   const { id, command, params = {} } = message;
 
-  console.log('[claudezilla] CLI command:', command, params);
+  console.log('[claudezilla] CLI command:', command);
 
   // Adopt a surviving window before any command touches claudezillaWindow
   // (no-op after the first call per background lifetime).
