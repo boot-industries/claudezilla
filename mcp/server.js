@@ -642,6 +642,10 @@ const TOOLS = [
           type: 'number',
           description: 'Tab ID (default: your current tab)',
         },
+        ref: {
+          type: 'string',
+          description: 'Element ref from a snapshot or firefox_find, e.g. "ref_12" (preferred over selector)',
+        },
         selector: {
           type: 'string',
           description: 'Optional CSS selector to get content from a specific element',
@@ -667,12 +671,15 @@ const TOOLS = [
           type: 'number',
           description: 'Tab ID (default: your current tab)',
         },
+        ref: {
+          type: 'string',
+          description: 'Element ref from a snapshot or firefox_find, e.g. "ref_12" (preferred over selector)',
+        },
         selector: {
           type: 'string',
           description: 'CSS selector for the element to click (e.g., "button.submit", "#login-btn")',
         },
       },
-      required: ['selector'],
     },
   },
   {
@@ -684,6 +691,10 @@ const TOOLS = [
         tabId: {
           type: 'number',
           description: 'Tab ID (default: your current tab)',
+        },
+        ref: {
+          type: 'string',
+          description: 'Element ref from a snapshot or firefox_find, e.g. "ref_12" (preferred over selector)',
         },
         selector: {
           type: 'string',
@@ -698,7 +709,7 @@ const TOOLS = [
           description: 'Whether to clear existing text first (default: true)',
         },
       },
-      required: ['selector', 'text'],
+      required: ['text'],
     },
   },
   {
@@ -714,6 +725,10 @@ const TOOLS = [
         key: {
           type: 'string',
           description: 'Key to press: Enter, Tab, Escape, Backspace, Delete, ArrowUp/Down/Left/Right, Home, End, PageUp/Down, or single characters (a-z, 0-9)',
+        },
+        ref: {
+          type: 'string',
+          description: 'Element ref from a snapshot or firefox_find, e.g. "ref_12" (preferred over selector)',
         },
         selector: {
           type: 'string',
@@ -1054,6 +1069,10 @@ const TOOLS = [
           type: 'number',
           description: 'Tab ID (default: your current tab)',
         },
+        ref: {
+          type: 'string',
+          description: 'Element ref from a snapshot or firefox_find, e.g. "ref_12" (preferred over selector)',
+        },
         selector: {
           type: 'string',
           description: 'CSS selector to scroll to',
@@ -1084,18 +1103,21 @@ const TOOLS = [
           type: 'number',
           description: 'Tab ID (default: your current tab)',
         },
+        ref: {
+          type: 'string',
+          description: 'Element ref from a snapshot or firefox_find, e.g. "ref_12" (preferred over selector)',
+        },
         selector: {
           type: 'string',
           description: 'CSS selector for the element',
         },
       },
-      required: ['selector'],
     },
   },
   // ===== PAGE ANALYSIS (FAST ALTERNATIVES TO SCREENSHOTS) =====
   {
     name: 'firefox_get_page_state',
-    description: 'Get structured page state as JSON: URL, title, viewport, errors, headings, links, buttons, inputs, images, landmarks with counts. Default item caps: headings 30, links 50, buttons 30, inputs 30, images 20 (raise with the max* params). Long strings are shortened with `truncated: true` and `rawLength` metadata. Password fields are masked ("***"). Cheaper than screenshots.',
+    description: 'Get structured page state as JSON: URL, title, viewport, errors, headings, links, buttons, inputs, images, landmarks with counts. Headings, links, buttons and inputs carry a `ref` you can pass to firefox_click / firefox_type / firefox_scroll / firefox_press_key. Default item caps: headings 30, links 50, buttons 30, inputs 30, images 20 (raise with the max* params). Long strings are shortened with `truncated: true` and `rawLength` metadata. Password fields are masked ("***"). Cheaper than screenshots.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1128,7 +1150,7 @@ const TOOLS = [
   },
   {
     name: 'firefox_get_accessibility_snapshot',
-    description: 'Get accessibility tree snapshot. Returns semantic structure with roles, names, states. Capped at 200 nodes by default to prevent overflow. Works on background tabs.',
+    description: 'Primary way to read a page: compact accessibility tree, one line per element with [ref_N] handles you can pass as ref to click/type/scroll/press_key. filter=interactive lists only actionable elements. Cheaper than screenshots. Refs stay valid until navigation.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1136,19 +1158,59 @@ const TOOLS = [
           type: 'number',
           description: 'Tab ID (default: your current tab)',
         },
+        format: {
+          type: 'string',
+          enum: ['text', 'json'],
+          description: 'text (default): one line per element; json: nested tree with ref on every node',
+        },
+        filter: {
+          type: 'string',
+          enum: ['all', 'interactive'],
+          description: 'all (default): full tree; interactive: flat list of visible actionable elements',
+        },
         maxDepth: {
           type: 'number',
-          description: 'Maximum tree depth to traverse (default: 5)',
+          description: 'Maximum tree depth to traverse (default: 15)',
         },
         maxNodes: {
           type: 'number',
-          description: 'Maximum nodes to include (default: 200). Lower = faster, less detail.',
+          description: 'Maximum nodes to include (default: 200, max 2000)',
+        },
+        ref: {
+          type: 'string',
+          description: 'Element ref from a snapshot or firefox_find, e.g. "ref_12" (preferred over selector)',
         },
         selector: {
           type: 'string',
           description: 'CSS selector for root element (default: body)',
         },
       },
+    },
+  },
+  {
+    name: 'firefox_find',
+    description: 'Find elements by visible text or accessible name (substring, or regex=true). Returns up to maxResults (default 20) matches as [ref_N] lines with their landmark/heading context; pass a ref to click/type/scroll. Cheaper than a full snapshot on large pages.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        tabId: {
+          type: 'number',
+          description: 'Tab ID (default: your current tab)',
+        },
+        query: {
+          type: 'string',
+          description: 'Text to search for (case-insensitive substring, max 200 chars)',
+        },
+        regex: {
+          type: 'boolean',
+          description: 'Treat query as a case-insensitive regular expression (default: false)',
+        },
+        maxResults: {
+          type: 'number',
+          description: 'Maximum matches to return (default: 20)',
+        },
+      },
+      required: ['query'],
     },
   },
 
@@ -1323,6 +1385,7 @@ const TOOL_CATEGORIES = {
   firefox_get_network: 'devtools',
   firefox_evaluate: 'devtools',
   firefox_get_accessibility_snapshot: 'devtools',
+  firefox_find: 'core',
   firefox_request_tab_space: 'multiagent',
   firefox_grant_tab_space: 'multiagent',
   firefox_get_slot_requests: 'multiagent',
@@ -1484,6 +1547,7 @@ const TOOL_TO_COMMAND = {
   // Page analysis
   firefox_get_page_state: 'getPageState',
   firefox_get_accessibility_snapshot: 'getAccessibilitySnapshot',
+  firefox_find: 'find',
   // Keyboard input
   firefox_press_key: 'pressKey',
   // Loop/focus
@@ -1719,6 +1783,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       'firefox_wait_for',
       'firefox_get_page_state',
       'firefox_get_accessibility_snapshot',
+      'firefox_find',
       'firefox_press_key',
       'firefox_screenshot',
       'firefox_request_tab_space',

@@ -427,21 +427,10 @@ function initFocusglow() {
 
 /**
  * Move focusglow to an element
- * @param {string} selector - CSS selector of target element
+ * @param {Element} el - Target element
  */
-function moveFocusTo(selector) {
-  if (!settings.showFocusglow || !focusglowElement) {
-    return;
-  }
-
-  // Safe selector query - don't throw on invalid, just skip
-  let el;
-  try {
-    el = document.querySelector(selector);
-  } catch (e) {
-    return; // Invalid selector, skip focus glow
-  }
-  if (!el) {
+function moveFocusTo(el) {
+  if (!settings.showFocusglow || !focusglowElement || !el) {
     return;
   }
 
@@ -706,6 +695,85 @@ function validateSelector(selector) {
 function safeQuerySelector(selector) {
   validateSelector(selector);
   return document.querySelector(selector);
+}
+
+// ===== ELEMENT REFS =====
+// Stable per-document handles (ref_N) for elements returned by snapshots,
+// find and page state. A new content-script instance after navigation starts
+// again from ref_1, so refs from the previous page resolve as stale.
+
+const refToElement = new Map();      // ref -> WeakRef<Element>
+const elementToRef = new WeakMap();  // Element -> ref
+let nextRef = 1;
+const REF_PRUNE_EVERY = 500;
+
+/**
+ * Return the element's ref, assigning a new one on first sight.
+ * @param {Element} el
+ * @returns {string} ref_N
+ */
+function refFor(el) {
+  const existing = elementToRef.get(el);
+  if (existing) return existing;
+  const ref = `ref_${nextRef++}`;
+  elementToRef.set(el, ref);
+  refToElement.set(ref, new WeakRef(el));
+  if ((nextRef - 1) % REF_PRUNE_EVERY === 0) {
+    for (const [key, weak] of refToElement) {
+      if (!weak.deref()) refToElement.delete(key);
+    }
+  }
+  return ref;
+}
+
+/**
+ * Resolve a ref to its live element.
+ * @param {string} ref
+ * @returns {Element}
+ */
+function resolveRef(ref) {
+  if (typeof ref !== 'string' || !/^ref_\d+$/.test(ref)) {
+    throw new Error(`Invalid ref "${ref}": use a ref_N value from a snapshot or find`);
+  }
+  const el = refToElement.get(ref)?.deref();
+  if (!el || !el.isConnected) {
+    refToElement.delete(ref);
+    if (el) elementToRef.delete(el);
+    throw new Error(`${ref} is stale or not found on the current page. Re-read the page to get fresh references.`);
+  }
+  return el;
+}
+
+/**
+ * Resolve the target element of a command: ref wins over selector.
+ * With autoWait the selector path returns a Promise (smartQuerySelector);
+ * without it the result is synchronous. A selector miss yields null so callers
+ * keep their own not-found errors; a bad ref throws.
+ * @param {object} params - { ref?, selector? }
+ * @param {object} options - { autoWait, timeout }
+ * @returns {Element|null|Promise<Element|null>}
+ */
+function resolveElement(params, { autoWait = false, timeout } = {}) {
+  if (hasRef(params)) return resolveRef(params.ref);
+  if (params.selector) {
+    return autoWait
+      ? smartQuerySelector(params.selector, { autoWait: true, timeout })
+      : safeQuerySelector(params.selector);
+  }
+  throw new Error('Provide ref (from a snapshot or find) or selector');
+}
+
+/**
+ * Describe a command target for results and errors.
+ * @param {object} params - { ref?, selector? }
+ * @returns {object} { ref } or { selector }
+ */
+function targetOf(params) {
+  return hasRef(params) ? { ref: params.ref } : { selector: params.selector };
+}
+
+function hasRef(params) {
+  return params.ref !== undefined && params.ref !== null;
 }
 
 /**
@@ -1039,19 +1107,18 @@ async function scroll(params = {}) {
   const { selector, x, y, behavior = 'instant' } = params;
   const settled = behavior === 'smooth' ? waitForScrollEnd() : null;
 
-  if (selector) {
-    // SECURITY: Validate selector before use
-    const element = safeQuerySelector(selector);
+  if (hasRef(params) || selector) {
+    const element = resolveElement(params);
     if (!element) {
       throw new Error(`Element not found: ${selector}`);
     }
     // Show focusglow on scroll target
-    moveFocusTo(selector);
+    moveFocusTo(element);
     element.scrollIntoView({ behavior, block: 'center' });
     if (settled) await settled;
     const rect = element.getBoundingClientRect();
     return {
-      selector,
+      ...targetOf(params),
       scrolledTo: true,
       elementPosition: { x: rect.x, y: rect.y },
     };
@@ -1271,16 +1338,13 @@ async function evaluate(params) {
  * @returns {object} Element info
  */
 function getElementInfo(params) {
-  const { selector } = params;
-
-  // SECURITY: Validate selector before use
-  const element = safeQuerySelector(selector);
+  const element = resolveElement(params);
   if (!element) {
-    throw new Error(`Element not found: ${selector}`);
+    throw new Error(`Element not found: ${params.selector}`);
   }
 
   // Show focusglow on inspected element
-  moveFocusTo(selector);
+  moveFocusTo(element);
 
   const rect = element.getBoundingClientRect();
   const styles = window.getComputedStyle(element);
@@ -1292,7 +1356,7 @@ function getElementInfo(params) {
   }
 
   return {
-    selector,
+    ...targetOf(params),
     tagName: element.tagName.toLowerCase(),
     attributes,
     text: element.textContent?.trim().slice(0, 500),
@@ -1329,20 +1393,19 @@ function getContent(params = {}) {
     };
   }
 
-  if (selector) {
-    // SECURITY: Validate selector before use
-    const element = safeQuerySelector(selector);
+  if (hasRef(params) || selector) {
+    const element = resolveElement(params);
     if (!element) {
       throw new Error(`Element not found: ${selector}`);
     }
     // Show focusglow on read element
-    moveFocusTo(selector);
+    moveFocusTo(element);
 
     const rawText = element.textContent?.trim() || '';
     const { text, truncated } = truncateText(rawText, maxLength);
 
     const result = {
-      selector,
+      ...targetOf(params),
       text,
       tagName: element.tagName.toLowerCase(),
       textLength: rawText.length,
@@ -1381,14 +1444,14 @@ function getContent(params = {}) {
 async function click(params) {
   const { selector, autoWait = true, waitTimeout = RETRY_CONFIG.autoWaitTimeout } = params;
 
-  // SMART QUERY: Auto-waits for element if not found immediately
-  const element = await smartQuerySelector(selector, { autoWait, timeout: waitTimeout });
+  // ref resolves immediately; a selector auto-waits for the element
+  const element = await resolveElement(params, { autoWait, timeout: waitTimeout });
   if (!element) {
     throw buildElementNotFoundError(selector, 'click');
   }
 
   // Show focusglow on clicked element
-  moveFocusTo(selector);
+  moveFocusTo(element);
 
   // Scroll element into view
   element.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -1400,7 +1463,7 @@ async function click(params) {
   const dispatch = dispatchPointerClick(element);
 
   return {
-    selector,
+    ...targetOf(params),
     clicked: true,
     method: dispatch.method,
     trusted: dispatch.trusted,
@@ -1433,8 +1496,8 @@ async function type(params) {
     throw new Error('text is required');
   }
 
-  // SMART QUERY: Auto-waits for element if not found immediately
-  const element = await smartQuerySelector(selector, { autoWait, timeout: waitTimeout });
+  // ref resolves immediately; a selector auto-waits for the element
+  const element = await resolveElement(params, { autoWait, timeout: waitTimeout });
   if (!element) {
     throw buildElementNotFoundError(selector, 'type');
   }
@@ -1444,11 +1507,11 @@ async function type(params) {
   const isContentEditable = element.isContentEditable;
 
   if (!isInput && !isContentEditable) {
-    throw new Error(`Element is not editable: ${selector}`);
+    throw new Error(`Element is not editable: ${params.ref ?? selector}`);
   }
 
   // Show focusglow on input element
-  moveFocusTo(selector);
+  moveFocusTo(element);
 
   // Focus the element
   element.focus();
@@ -1491,7 +1554,7 @@ async function type(params) {
   }
 
   return {
-    selector,
+    ...targetOf(params),
     typed: text,
     currentValue: isInput ? element.value : element.textContent,
   };
@@ -1530,6 +1593,7 @@ function getPageState(params = {}) {
     if (text) {
       const isTruncated = text.length > 100;
       allHeadings.push({
+        ref: refFor(el),
         level: el.tagName.toLowerCase(),
         text: text.slice(0, 100),
         ...(isTruncated ? { truncated: true, rawLength: text.length } : {}),
@@ -1546,6 +1610,7 @@ function getPageState(params = {}) {
         const rawHref = el.getAttribute('href') || '';
         const isTruncated = text.length > 50 || rawHref.length > 100;
         allLinks.push({
+          ref: refFor(el),
           text: text.slice(0, 50),
           href: rawHref.slice(0, 100),
           ...(isTruncated ? { truncated: true } : {}),
@@ -1561,6 +1626,7 @@ function getPageState(params = {}) {
       const rawText = el.textContent?.trim() || el.value || el.getAttribute('aria-label') || '';
       const isTruncated = rawText.length > 50;
       allButtons.push({
+        ref: refFor(el),
         text: rawText.slice(0, 50),
         disabled: el.disabled || el.getAttribute('aria-disabled') === 'true',
         type: el.type || 'button',
@@ -1578,6 +1644,7 @@ function getPageState(params = {}) {
       const rawVal = el.value || '';
       const isTruncated = !isPassword && rawVal.length > 50;
       allInputs.push({
+        ref: refFor(el),
         type: el.type || el.tagName.toLowerCase(),
         name: el.name || el.id || '',
         label: el.getAttribute('aria-label') || el.placeholder || document.querySelector(`label[for="${el.id}"]`)?.textContent?.trim() || '',
@@ -1640,141 +1707,373 @@ function getPageState(params = {}) {
   };
 }
 
+// ===== ACCESSIBILITY HELPERS (snapshot, find) =====
+
+// Roles whose accessible name comes from their text content
+const NAME_FROM_CONTENT_ROLES = new Set([
+  'button', 'link', 'heading', 'tab', 'menuitem', 'option', 'switch', 'treeitem', 'checkbox', 'radio',
+]);
+const INTERACTIVE_ROLES = new Set([
+  'button', 'link', 'checkbox', 'radio', 'tab', 'menuitem', 'option', 'switch', 'combobox', 'textbox',
+  'searchbox', 'slider',
+]);
+// Ancestors that give a find match its context
+const CONTEXT_ROLES = new Set([
+  'main', 'navigation', 'banner', 'contentinfo', 'complementary', 'form', 'search', 'region', 'dialog', 'heading',
+]);
+
+function collapseWhitespace(s) {
+  return (s || '').replace(/\s+/g, ' ').trim();
+}
+
+function getRole(el) {
+  const explicit = el.getAttribute('role');
+  if (explicit) return explicit;
+
+  // Implicit roles
+  const tag = el.tagName.toLowerCase();
+  const roleMap = {
+    'a': el.href ? 'link' : null,
+    'button': 'button',
+    'input': el.type === 'checkbox' ? 'checkbox' : el.type === 'radio' ? 'radio' : el.type === 'submit' ? 'button' : 'textbox',
+    'select': 'combobox',
+    'textarea': 'textbox',
+    'img': 'img',
+    'nav': 'navigation',
+    'main': 'main',
+    'header': 'banner',
+    'footer': 'contentinfo',
+    'aside': 'complementary',
+    'form': 'form',
+    'table': 'table',
+    'ul': 'list',
+    'ol': 'list',
+    'li': 'listitem',
+    'h1': 'heading',
+    'h2': 'heading',
+    'h3': 'heading',
+    'h4': 'heading',
+    'h5': 'heading',
+    'h6': 'heading',
+  };
+  return roleMap[tag] || null;
+}
+
+/**
+ * Accessible name: explicit labels first, then text content for roles named
+ * by their content (buttons, links, headings, ...). Capped at 100 chars.
+ */
+function getAccessibleName(el, role = getRole(el)) {
+  const labelledBy = el.getAttribute('aria-labelledby');
+  const explicit = el.getAttribute('aria-label') ||
+    (labelledBy && document.getElementById(labelledBy)?.textContent?.trim()) ||
+    el.getAttribute('title') ||
+    el.getAttribute('alt') ||
+    (el.tagName === 'INPUT' && el.placeholder) ||
+    (el.labels?.[0]?.textContent?.trim()) ||
+    '';
+  if (explicit) return collapseWhitespace(explicit).slice(0, 100);
+  if (role && NAME_FROM_CONTENT_ROLES.has(role)) return collapseWhitespace(el.textContent).slice(0, 100);
+  return '';
+}
+
+/** The element's own text: its direct text-node children, not descendants' text. */
+function directText(el) {
+  let text = '';
+  for (const node of el.childNodes) {
+    if (node.nodeType === 3) text += node.textContent;
+  }
+  return collapseWhitespace(text);
+}
+
+/** One getComputedStyle call per element. */
+function layoutOf(el) {
+  const rect = el.getBoundingClientRect();
+  const style = window.getComputedStyle(el);
+  return {
+    rect,
+    visible: rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden',
+  };
+}
+
+function isOffscreen(rect) {
+  return rect.top + rect.height <= 0 || rect.top >= window.innerHeight ||
+         rect.left + rect.width <= 0 || rect.left >= window.innerWidth;
+}
+
+/**
+ * Whether the user can act on the element (click, type, toggle).
+ * @param {Element} el
+ * @returns {boolean}
+ */
+function isInteractive(el) {
+  const tag = el.tagName;
+  if (tag === 'A' && el.getAttribute('href') !== null) return true;
+  if (tag === 'BUTTON' || tag === 'SELECT' || tag === 'TEXTAREA' || tag === 'SUMMARY') return true;
+  if (tag === 'INPUT' && String(el.type || '').toLowerCase() !== 'hidden') return true;
+  const role = el.getAttribute('role');
+  if (role && INTERACTIVE_ROLES.has(role)) return true;
+  const editable = el.getAttribute('contenteditable');
+  if (editable === '' || editable === 'true') return true;
+  const tabindex = el.getAttribute('tabindex');
+  return tabindex !== null && tabindex.trim() !== '' && Number(tabindex) >= 0;
+}
+
+/** Form field value safe to show (never passwords, not for toggles/buttons). */
+function fieldValue(el) {
+  if (!/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return '';
+  if (/^(password|checkbox|radio|submit|button|reset|image|file)$/i.test(el.type || '')) return '';
+  return el.value ? String(el.value).slice(0, 50) : '';
+}
+
+/** Link target with a same-origin prefix stripped, capped at 100 chars. */
+function shortHref(el) {
+  const href = typeof el.href === 'string' ? el.href : (el.getAttribute('href') || '');
+  const origin = window.location.origin;
+  const short = origin && href.startsWith(`${origin}/`) ? href.slice(origin.length) : href;
+  return short.slice(0, 100);
+}
+
+function stateTokens(el, role, rect) {
+  const tokens = [];
+  if (el.disabled || el.getAttribute('aria-disabled') === 'true') tokens.push('disabled');
+  if (el.checked || el.getAttribute('aria-checked') === 'true') tokens.push('checked');
+  const expanded = el.getAttribute('aria-expanded');
+  if (expanded === 'true') tokens.push('expanded');
+  else if (expanded === 'false') tokens.push('collapsed');
+  if (el.getAttribute('aria-selected') === 'true' || (el.tagName === 'OPTION' && el.selected)) tokens.push('selected');
+  if (role === 'heading') {
+    const level = el.getAttribute('aria-level') || /^H([1-6])$/i.exec(el.tagName)?.[1];
+    if (level) tokens.push(`level=${level}`);
+  }
+  if (role === 'link') {
+    const href = shortHref(el);
+    if (href) tokens.push(`href=${href}`);
+  }
+  const value = fieldValue(el);
+  if (value) tokens.push(`value=${JSON.stringify(value)}`);
+  if (isOffscreen(rect)) tokens.push('offscreen');
+  return tokens;
+}
+
 /**
  * Get accessibility tree snapshot
  * @param {object} params - Parameters
- * @param {number} params.maxDepth - Max tree depth (default: 5)
- * @param {number} params.maxNodes - Max nodes to include (default: 200)
+ * @param {string} params.format - 'text' (default): one line per node with [ref_N]; 'json': nested tree
+ * @param {string} params.filter - 'all' (default) or 'interactive' (flat list of actionable elements)
+ * @param {number} params.maxDepth - Max tree depth (default: 15)
+ * @param {number} params.maxNodes - Max nodes to include (default: 200, cap 2000)
+ * @param {string} params.ref - Root element ref (default: body)
  * @param {string} params.selector - Root element selector (default: body)
- * @returns {object} Accessibility tree
+ * @returns {object} Snapshot: text lines, or a JSON tree (filter=all) / node list (filter=interactive)
  */
 function getAccessibilitySnapshot(params = {}) {
-  const { maxDepth = 5, maxNodes = 200, selector = 'body' } = params;
-  // SECURITY: Validate selector before use (default 'body' is always valid)
-  const root = selector === 'body' ? document.body : safeQuerySelector(selector);
-  if (!root) throw new Error(`Element not found: ${selector}`);
+  const { format = 'text', filter = 'all', maxDepth = 15 } = params;
+  const maxNodes = Math.min(Math.max(1, Number(params.maxNodes) || 200), 2000);
+  if (format !== 'text' && format !== 'json') throw new Error('format must be "text" or "json"');
+  if (filter !== 'all' && filter !== 'interactive') throw new Error('filter must be "all" or "interactive"');
+
+  let root = document.body;
+  if (hasRef(params) || params.selector) {
+    root = resolveElement(params);
+    if (!root) throw new Error(`Element not found: ${params.selector}`);
+  }
 
   let nodeCount = 0;
   let truncated = false;
 
-  function getAccessibleName(el) {
-    return el.getAttribute('aria-label') ||
-           el.getAttribute('aria-labelledby') && document.getElementById(el.getAttribute('aria-labelledby'))?.textContent?.trim() ||
-           el.getAttribute('title') ||
-           el.getAttribute('alt') ||
-           (el.tagName === 'INPUT' && el.placeholder) ||
-           (el.tagName === 'IMG' && el.alt) ||
-           (el.labels?.[0]?.textContent?.trim()) ||
-           '';
+  function describe(el, rect, depth) {
+    const role = getRole(el);
+    const name = getAccessibleName(el, role);
+    const own = directText(el).slice(0, 100);
+    return { el, rect, depth, role, name, text: own !== name ? own : '', children: [] };
   }
 
-  function getRole(el) {
-    const explicit = el.getAttribute('role');
-    if (explicit) return explicit;
-
-    // Implicit roles
-    const tag = el.tagName.toLowerCase();
-    const roleMap = {
-      'a': el.href ? 'link' : null,
-      'button': 'button',
-      'input': el.type === 'checkbox' ? 'checkbox' : el.type === 'radio' ? 'radio' : el.type === 'submit' ? 'button' : 'textbox',
-      'select': 'combobox',
-      'textarea': 'textbox',
-      'img': 'img',
-      'nav': 'navigation',
-      'main': 'main',
-      'header': 'banner',
-      'footer': 'contentinfo',
-      'aside': 'complementary',
-      'form': 'form',
-      'table': 'table',
-      'ul': 'list',
-      'ol': 'list',
-      'li': 'listitem',
-      'h1': 'heading',
-      'h2': 'heading',
-      'h3': 'heading',
-      'h4': 'heading',
-      'h5': 'heading',
-      'h6': 'heading',
-    };
-    return roleMap[tag] || null;
-  }
-
-  function walkTree(el, depth = 0) {
-    if (depth > maxDepth) return null;
+  // Tree walk: returns the emitted nodes for el (wrappers yield their children)
+  function walk(el, depth) {
+    if (depth > maxDepth) return [];
     if (nodeCount >= maxNodes) {
       truncated = true;
-      return null;
+      return [];
     }
+    const { rect, visible } = layoutOf(el);
+    if (!visible && el !== root) return [];
 
-    const rect = el.getBoundingClientRect();
-    const isVisible = rect.width > 0 && rect.height > 0 &&
-                      window.getComputedStyle(el).display !== 'none' &&
-                      window.getComputedStyle(el).visibility !== 'hidden';
-
-    if (!isVisible && el !== root) return null;
-
-    const role = getRole(el);
-    const name = getAccessibleName(el);
-    const text = el.childNodes.length === 1 && el.childNodes[0].nodeType === 3
-                 ? el.textContent?.trim().slice(0, 100)
-                 : '';
-
-    // Skip non-semantic elements without accessible info
-    if (!role && !name && !text && el.tagName.match(/^(DIV|SPAN|P)$/i)) {
-      // But still process children
-      const children = [];
-      for (const child of el.children) {
-        const childNode = walkTree(child, depth);
-        if (childNode) children.push(childNode);
-      }
-      return children.length === 1 ? children[0] : (children.length > 1 ? { children } : null);
+    const node = describe(el, rect, depth);
+    // Skip non-semantic wrappers without accessible info, keeping their children
+    if (el !== root && !node.role && !node.name && !node.text && /^(DIV|SPAN|P)$/i.test(el.tagName)) {
+      return walkChildren(el, depth);
     }
-
-    // Count this as a meaningful node
     nodeCount++;
-
-    const node = {};
-    if (role) node.role = role;
-    if (name) node.name = name;
-    if (text) node.text = text;
-
-    // State
-    if (el.disabled) node.disabled = true;
-    if (el.checked) node.checked = true;
-    if (el.getAttribute('aria-expanded')) node.expanded = el.getAttribute('aria-expanded') === 'true';
-    if (el.getAttribute('aria-selected')) node.selected = el.getAttribute('aria-selected') === 'true';
-    if (el.value && el.tagName.match(/^(INPUT|TEXTAREA|SELECT)$/i) && el.type !== 'password') {
-      node.value = el.value.slice(0, 50);
-    }
-
-    // Children
-    const children = [];
-    for (const child of el.children) {
-      const childNode = walkTree(child, depth + 1);
-      if (childNode) {
-        if (Array.isArray(childNode)) {
-          children.push(...childNode);
-        } else {
-          children.push(childNode);
-        }
-      }
-    }
-    if (children.length > 0) node.children = children.slice(0, 50);
-
-    return Object.keys(node).length > 0 ? node : null;
+    node.children = walkChildren(el, depth + 1);
+    return [node];
   }
 
-  const tree = walkTree(root);
+  function walkChildren(el, depth) {
+    const out = [];
+    for (const child of el.children) out.push(...walk(child, depth));
+    return out;
+  }
+
+  // Interactive walk: visible actionable elements in DOM order, flat
+  function collectInteractive(el, out) {
+    if (truncated) return;
+    const { rect, visible } = layoutOf(el);
+    if (!visible && el !== root) return;
+    if (isInteractive(el)) {
+      if (nodeCount >= maxNodes) {
+        truncated = true;
+        return;
+      }
+      nodeCount++;
+      out.push(describe(el, rect, 0));
+    }
+    for (const child of el.children) collectInteractive(child, out);
+  }
+
+  let nodes;
+  if (filter === 'interactive') {
+    nodes = [];
+    collectInteractive(root, nodes);
+  } else {
+    nodes = walk(root, 0);
+  }
+
+  const url = window.location.href;
+  const title = document.title;
+
+  if (format === 'json') {
+    const toJson = (node) => {
+      const { el } = node;
+      const out = { ref: refFor(el) };
+      if (node.role) out.role = node.role;
+      if (node.name) out.name = node.name;
+      if (node.text) out.text = node.text;
+      if (el.disabled) out.disabled = true;
+      if (el.checked) out.checked = true;
+      if (el.getAttribute('aria-expanded')) out.expanded = el.getAttribute('aria-expanded') === 'true';
+      if (el.getAttribute('aria-selected')) out.selected = el.getAttribute('aria-selected') === 'true';
+      const value = fieldValue(el);
+      if (value) out.value = value;
+      if (node.children.length > 0) out.children = node.children.map(toJson);
+      return out;
+    };
+    const result = { url, title, format: 'json', nodeCount, maxNodes, truncated };
+    if (filter === 'interactive') result.nodes = nodes.map(toJson);
+    else result.tree = nodes[0] ? toJson(nodes[0]) : null;
+    return result;
+  }
+
+  const lines = [`url: ${url}`, `title: ${title}`];
+  const emit = (node) => {
+    let line = `${'  '.repeat(node.depth)}- ${node.role ?? node.el.tagName.toLowerCase()}`;
+    if (node.name) line += ` ${JSON.stringify(node.name)}`;
+    if (node.text) line += `: ${JSON.stringify(node.text)}`;
+    line += ` [${refFor(node.el)}]`;
+    const states = stateTokens(node.el, node.role, node.rect);
+    if (states.length > 0) line += ` ${states.join(' ')}`;
+    lines.push(line);
+    node.children.forEach(emit);
+  };
+  nodes.forEach(emit);
+  if (truncated) {
+    lines.push(`[truncated at ${maxNodes} nodes: pass ref to read a subtree or raise maxNodes]`);
+  }
+
+  return { url, title, format: 'text', nodeCount, truncated, text: lines.join('\n') };
+}
+
+/** Up to 80 chars of s around the match. */
+function matchSnippet(s, { index, length }) {
+  if (s.length <= 80) return s;
+  const lead = Math.floor((80 - Math.min(length, 80)) / 2);
+  const start = Math.max(0, Math.min(index - lead, s.length - 80));
+  return s.slice(start, start + 80);
+}
+
+/**
+ * Find visible elements by accessible name or own text.
+ * @param {object} params - Parameters
+ * @param {string} params.query - Text to find (case-insensitive substring, max 200 chars)
+ * @param {boolean} params.regex - Treat query as a case-insensitive regular expression
+ * @param {number} params.maxResults - Max matches listed (default: 20)
+ * @returns {object} { query, total, truncated, text } with one [ref_N] line per match
+ */
+function findElements(params = {}) {
+  const { query, regex = false } = params;
+  const maxResults = Math.max(1, Number(params.maxResults) || 20);
+  if (typeof query !== 'string' || query.length === 0) throw new Error('query is required');
+  if (query.length > 200) throw new Error('query too long (max 200 characters)');
+
+  let test;
+  if (regex) {
+    let re;
+    try {
+      re = new RegExp(query, 'i');
+    } catch (e) {
+      throw new Error(`Invalid regex: ${e.message}`);
+    }
+    test = (s) => {
+      const m = re.exec(s);
+      return m ? { index: m.index, length: m[0].length } : null;
+    };
+  } else {
+    const needle = query.toLowerCase();
+    test = (s) => {
+      const index = s.toLowerCase().indexOf(needle);
+      return index >= 0 ? { index, length: needle.length } : null;
+    };
+  }
+
+  const matches = [];
+  const context = [];
+  let total = 0;
+
+  // insideMatch: an ancestor already matched, so own-text hits here would only
+  // repeat it (a link's name already includes its spans' text)
+  function visit(el, insideMatch) {
+    const { rect, visible } = layoutOf(el);
+    if (!visible) return;
+    const role = getRole(el);
+    const name = getAccessibleName(el, role);
+    const nameHit = name ? test(name) : null;
+    const own = nameHit || insideMatch ? '' : directText(el);
+    const textHit = own ? test(own) : null;
+    const matched = Boolean(nameHit || textHit);
+    if (matched) {
+      total++;
+      if (matches.length < maxResults) {
+        matches.push({
+          ref: refFor(el),
+          role: role ?? el.tagName.toLowerCase(),
+          name,
+          text: nameHit ? matchSnippet(name, nameHit) : matchSnippet(own, textHit),
+          context: context.slice(-3).join(' > '),
+          offscreen: isOffscreen(rect),
+        });
+      }
+    }
+    const label = role && CONTEXT_ROLES.has(role) ? `${role}${name ? ` ${JSON.stringify(name)}` : ''}` : '';
+    if (label) context.push(label);
+    for (const child of el.children) visit(child, insideMatch || matched);
+    if (label) context.pop();
+  }
+  for (const child of document.body.children) visit(child, false);
+
+  const lines = matches.map((m) => {
+    let line = `[${m.ref}] ${m.role}`;
+    if (m.name) line += ` ${JSON.stringify(m.name)}`;
+    if (m.text && m.text !== m.name) line += `: ${JSON.stringify(m.text)}`;
+    if (m.context) line += ` — ${m.context}`;
+    if (m.offscreen) line += ' offscreen';
+    return line;
+  });
 
   return {
-    url: window.location.href,
-    title: document.title,
-    tree,
-    nodeCount,
-    maxNodes,
-    truncated,
+    query,
+    total,
+    truncated: total > maxResults,
+    text: lines.length > 0 ? lines.join('\n') : `No visible element matches ${JSON.stringify(query)}`,
   };
 }
 
@@ -1792,6 +2091,7 @@ function getAccessibilitySnapshot(params = {}) {
 function pressKey(params) {
   const {
     key,
+    ref,
     selector,
     ctrlKey = false,
     shiftKey = false,
@@ -1805,14 +2105,13 @@ function pressKey(params) {
 
   // Get target element
   let target;
-  if (selector) {
-    // SECURITY: Validate selector before use
-    target = safeQuerySelector(selector);
+  if (hasRef(params) || selector) {
+    target = resolveElement(params);
     if (!target) {
       throw new Error(`Element not found: ${selector}`);
     }
     target.focus();
-    moveFocusTo(selector);
+    moveFocusTo(target);
   } else {
     target = document.activeElement || document.body;
   }
@@ -1844,7 +2143,7 @@ function pressKey(params) {
 
   return {
     key,
-    selector: selector || '(active element)',
+    ...(hasRef(params) ? { ref } : { selector: selector || '(active element)' }),
     targetTag: target.tagName.toLowerCase(),
     modifiers: { ctrlKey, shiftKey, altKey, metaKey },
   };
@@ -2311,6 +2610,10 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
         case 'resizeImage':
           result = await resizeImage(params);
+          break;
+
+        case 'find':
+          result = findElements(params);
           break;
 
         case 'pressKey':

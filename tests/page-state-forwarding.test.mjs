@@ -234,5 +234,10 @@ describe('page state parameter forwarding and truncation metadata', () => {
     assert.equal(images[0].alt.length, 100);
     assert.equal(images[0].src.length, 100);
     assert.equal(images[0].truncated, true);
+
+    // Headings, links, buttons and inputs carry distinct element refs
+    const refs = [headings[0], links[0], buttons[0], ...inputs].map(item => item.ref);
+    for (const ref of refs) assert.match(ref, /^ref_\d+$/);
+    assert.equal(new Set(refs).size, refs.length);
   });
 });

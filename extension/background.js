@@ -2118,6 +2118,17 @@ async function handleCliCommand(message) {
         break;
       }
 
+      case 'find': {
+        const { windowId, tabId: targetTab, agentId, ...findParams } = params;
+        const tabId = await resolveTargetTab(targetTab, windowId, agentId, 'search');
+        const response = await executeInTab(tabId, 'find', findParams);
+        if (!response.success) {
+          throw new Error(response.error);
+        }
+        result = { tabId, ...response.result };
+        break;
+      }
+
       case 'pressKey': {
         const { windowId, tabId: targetTab, agentId, ...keyParams } = params;
         const tabId = await resolveTargetTab(targetTab, windowId, agentId, 'send keys to');

@@ -95,6 +95,7 @@ describe('mcp server tool discovery policy', () => {
     const toolNames = tools.map(t => t.name);
     assert.ok(!toolNames.includes('firefox_activate'), 'the lazy gateway is opt-in');
     assert.ok(toolNames.includes('firefox_navigate'));
+    assert.ok(toolNames.includes('firefox_find'));
     assert.ok(toolNames.includes('firefox_screenshot'));
     assert.ok(toolNames.length > 20, `Expected >20 tools but got ${toolNames.length}`);
     assert.deepEqual(toolNames, second.find(l => l.id === 2).result.tools.map(t => t.name), 'tool order must be stable');
@@ -107,6 +108,7 @@ describe('mcp server tool discovery policy', () => {
     assert.deepEqual(alwaysLoaded, [
       'firefox_click',
       'firefox_create_window',
+      'firefox_find',
       'firefox_get_accessibility_snapshot',
       'firefox_navigate',
       'firefox_screenshot',
