@@ -809,9 +809,9 @@ describe('navigate without tabId', () => {
 describe('screenshot sizing', () => {
   // A 1440x900 CSS viewport on a 2x display, in a dedicated window whose
   // selected tab is captured with captureVisibleTab.
-  async function sizedHarness() {
+  async function sizedHarness(scroll = {}) {
     const harness = createHarness({
-      contentResults: { getViewport: { width: 1440, height: 900, dpr: 2, scrollX: 0, scrollY: 0 } },
+      contentResults: { getViewport: { width: 1440, height: 900, dpr: 2, scrollX: 0, scrollY: 0, ...scroll } },
       tabs: [
         { id: 100, windowId: 7, url: 'https://example.test/agent', title: 'Agent page', active: true, pinned: false, incognito: false },
       ],
@@ -868,6 +868,21 @@ describe('screenshot sizing', () => {
     assert.equal(screenshot.result.width, 800);
     assert.equal(screenshot.result.height, 600);
     assert.deepEqual(harness.calls.captureOpts[0].rect, { x: 0, y: 0, width: 400, height: 300 });
+  });
+
+  it('a region is viewport-relative: the capture rect adds the scroll offset', async () => {
+    // Verified against Firefox: ImageDetails.rect is document-relative.
+    const harness = await sizedHarness({ scrollX: 30, scrollY: 400 });
+
+    const screenshot = await harness.command('screenshot', {
+      agentId: 'agent-a',
+      skipReadiness: true,
+      region: { x: 10, y: 20, width: 400, height: 300 },
+    });
+
+    assert.equal(screenshot.success, true, screenshot.error);
+    assert.deepEqual(harness.calls.captureOpts[0].rect, { x: 40, y: 420, width: 400, height: 300 });
+    assert.deepEqual(structuredClone(screenshot.result.region), { x: 10, y: 20, width: 400, height: 300 });
   });
 
   it('rejects a region outside the viewport without capturing', async () => {
