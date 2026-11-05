@@ -360,7 +360,7 @@ function handleCliCommand(command, params, authToken, callback, socketRequests) 
 function handleExtensionMessage(message) {
   const { id, command, success, result, error } = message;
 
-  log('Received from extension:', JSON.stringify(message).slice(0, 200));
+  log('Received from extension:', id ?? '-', command ?? '', success === undefined ? 'event' : success ? 'ok' : 'error');
 
   // If this is a response to a CLI request (has success field), route it back
   if (id && pendingCliRequests.has(id) && success !== undefined) {
