@@ -210,6 +210,31 @@ async function detachExistingTab(tabId) {
   return detached;
 }
 
+/**
+ * Make a pool tab the selected tab of the dedicated Claudezilla window.
+ *
+ * Firefox treats every non-selected tab as hidden: document.hidden is true,
+ * timers are throttled and animation frames stop, so single-page apps
+ * (Teams, WhatsApp Web) stop rendering. The dedicated window belongs to
+ * Claudezilla, so the tab being driven is selected before each command.
+ * An ADOPTED window belongs to the user and is never touched. Selecting a
+ * tab does not focus its window.
+ *
+ * @param {number} tabId
+ */
+async function bringToFrontInDedicatedWindow(tabId) {
+  if (!claudezillaWindow || claudezillaWindow.adopted) return;
+  try {
+    const tab = await browser.tabs.get(tabId);
+    if (tab.active || tab.windowId !== claudezillaWindow.windowId) return;
+    await browser.tabs.update(tabId, { active: true });
+    // Give the page a moment to receive visibilitychange and repaint
+    await new Promise(resolve => setTimeout(resolve, 150));
+  } catch (e) {
+    console.log(`[claudezilla] Could not bring tab ${tabId} to front:`, e.message);
+  }
+}
+
 async function resolveTargetTab(targetTab, windowId, agentId, operation) {
   const normalizedTabId = Number(targetTab);
   // A managed-pool tab always retains managed ownership, even if stale local
@@ -217,6 +242,7 @@ async function resolveTargetTab(targetTab, windowId, agentId, operation) {
   if (targetTab && claudezillaWindow?.tabs.some((entry) => entry.tabId === normalizedTabId)) {
     await getSession(windowId);
     if (agentId) verifyTabOwnership(normalizedTabId, agentId, operation);
+    await bringToFrontInDedicatedWindow(normalizedTabId);
     return normalizedTabId;
   }
   if (targetTab && isAttachedTab(normalizedTabId)) {
@@ -232,6 +258,9 @@ async function resolveTargetTab(targetTab, windowId, agentId, operation) {
   const session = await getSession(windowId);
   const tabId = normalizedTabId || session.tabId;
   if (targetTab && agentId) verifyTabOwnership(tabId, agentId, operation);
+  if (claudezillaWindow?.tabs.some((entry) => entry.tabId === tabId)) {
+    await bringToFrontInDedicatedWindow(tabId);
+  }
   return tabId;
 }
 

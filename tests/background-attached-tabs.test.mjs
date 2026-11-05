@@ -47,9 +47,12 @@ function createHarness({
   storage: initialStorage = {},
   windowGetGate = Promise.resolve(),
   allowTabCreate = false,
+  allowWindowCreate = false,
   tabs: seededTabs = null,
   windows: seededWindows = null,
   timers = { setTimeout, clearTimeout },
+  incognitoAccess = true,
+  contentResults = {},
 } = {}) {
   const storage = structuredClone(initialStorage);
   const windows = new Map((seededWindows ?? [{ id: 7, incognito: false }]).map((win) => [win.id, { ...win }]));
@@ -64,7 +67,7 @@ function createHarness({
       incognito: false,
     },
   ]).map((tab) => [tab.id, { ...tab }]));
-  const calls = { tabsCreated: 0, windowsCreated: 0, windowsRemoved: [], contentActions: [], tabCreateOptions: [], captures: { tab: [], visible: [] } };
+  const calls = { tabsCreated: 0, windowsCreated: 0, windowsRemoved: [], contentActions: [], contentTargets: [], tabCreateOptions: [], tabUpdates: [], captures: { tab: [], visible: [] }, captureOpts: [] };
   let resolveWindowGetStarted;
   const windowGetStarted = new Promise((resolve) => { resolveWindowGetStarted = resolve; });
   const nativeMessages = event();
@@ -114,7 +117,7 @@ function createHarness({
     },
     extension: {
       async isAllowedIncognitoAccess() {
-        return true;
+        return incognitoAccess;
       },
     },
     webRequest: {
@@ -127,11 +130,11 @@ function createHarness({
       async get(windowId, options = {}) {
         resolveWindowGetStarted();
         await windowGetGate;
-        if (windowId !== 7) throw new Error('window not found');
+        const win = windows.get(windowId);
+        if (!win) throw new Error('window not found');
         return {
-          id: 7,
-          incognito: false,
-          tabs: options.populate ? [...tabs.values()] : undefined,
+          ...win,
+          tabs: options.populate ? [...tabs.values()].filter((tab) => tab.windowId === windowId) : undefined,
         };
       },
       async getLastFocused() {
@@ -143,9 +146,22 @@ function createHarness({
           tabs: options.populate ? [...tabs.values()].filter((tab) => tab.windowId === win.id) : undefined,
         }));
       },
-      async create() {
+      async create(options = {}) {
         calls.windowsCreated += 1;
-        throw new Error('test forbids creating windows');
+        if (!allowWindowCreate) throw new Error('test forbids creating windows');
+        const id = 7 + calls.windowsCreated;
+        const tab = {
+          id: id * 10,
+          windowId: id,
+          url: options.url ?? 'about:blank',
+          title: '',
+          active: true,
+          pinned: false,
+          incognito: !!options.incognito,
+        };
+        tabs.set(tab.id, tab);
+        windows.set(id, { id, incognito: !!options.incognito });
+        return { ...windows.get(id), tabs: [{ ...tab }] };
       },
       async update() {
         return { id: 7, width: 1280, height: 800 };
@@ -199,6 +215,12 @@ function createHarness({
       async update(tabId, changes) {
         const tab = tabs.get(Number(tabId));
         if (!tab) throw new Error('tab not found');
+        calls.tabUpdates.push({ tabId: tab.id, changes: structuredClone(changes) });
+        if (changes.active) {
+          for (const other of tabs.values()) {
+            if (other.windowId === tab.windowId) other.active = false;
+          }
+        }
         Object.assign(tab, changes);
         return { ...tab };
       },
@@ -206,17 +228,21 @@ function createHarness({
         tabs.delete(Number(tabId));
       },
       async sendMessage(tabId, message) {
-        if (!tabs.has(Number(tabId))) throw new Error('tab not found');
+        const tab = tabs.get(Number(tabId));
+        if (!tab) throw new Error('tab not found');
         calls.contentActions.push(message.action);
-        return { success: true, result: { action: message.action, dataUrl: 'data:image/png;base64,resized' } };
+        calls.contentTargets.push({ tabId: tab.id, action: message.action, active: tab.active });
+        return { success: true, result: { action: message.action, ...(contentResults[message.action] ?? { dataUrl: 'data:image/png;base64,resized' }) } };
       },
-      async captureTab(tabId) {
+      async captureTab(tabId, captureOptions) {
         if (!tabs.has(Number(tabId))) throw new Error('tab not found');
         calls.captures.tab.push(Number(tabId));
+        calls.captureOpts.push(structuredClone(captureOptions ?? null));
         return 'data:image/png;base64,captured';
       },
-      async captureVisibleTab(windowId) {
+      async captureVisibleTab(windowId, captureOptions) {
         calls.captures.visible.push(windowId === undefined ? null : windowId);
+        calls.captureOpts.push(structuredClone(captureOptions ?? null));
         return 'data:image/png;base64,visible';
       },
     },
@@ -616,5 +642,131 @@ describe('quitBrowser', () => {
     assert.equal(response.success, false);
     assert.match(response.error, /No windows to close/);
     assert.deepEqual(timers.delays, []);
+  });
+});
+
+describe('dedicated window keeps the driven tab selected', () => {
+  // A dedicated window: non-private with "Reuse current window" switched off,
+  // so the extension creates its own window. Two createWindow calls give two
+  // pool tabs; the second is created active, so the first is not selected.
+  async function createDedicatedWindow() {
+    const harness = createHarness({
+      allowTabCreate: true,
+      allowWindowCreate: true,
+      storage: { adoptCurrentWindow: false, claudezilla: { privateMode: false } },
+    });
+    const first = await harness.command('createWindow', { url: 'https://example.test/first', agentId: 'agent-a' });
+    const second = await harness.command('createWindow', { url: 'https://example.test/second', agentId: 'agent-a' });
+    assert.equal(first.success, true, first.error);
+    assert.equal(second.success, true, second.error);
+    assert.equal(first.result.isNewWindow, true);
+    assert.equal(harness.calls.windowsCreated, 1);
+    assert.equal((await harness.browser.tabs.get(first.result.tabId)).active, false);
+    assert.equal((await harness.browser.tabs.get(second.result.tabId)).active, true);
+    return { harness, windowId: first.result.windowId, backgroundTabId: first.result.tabId, selectedTabId: second.result.tabId };
+  }
+
+  it('selects a non-selected pool tab before the content action runs', async () => {
+    const { harness, backgroundTabId, selectedTabId } = await createDedicatedWindow();
+
+    const response = await harness.command('getContent', { tabId: backgroundTabId, agentId: 'agent-a' });
+
+    assert.equal(response.success, true, response.error);
+    assert.equal(response.result.tabId, backgroundTabId);
+    assert.deepEqual(harness.calls.tabUpdates, [{ tabId: backgroundTabId, changes: { active: true } }]);
+    assert.deepEqual(
+      harness.calls.contentTargets.filter((entry) => entry.action === 'getContent'),
+      [{ tabId: backgroundTabId, action: 'getContent', active: true }],
+    );
+    assert.equal((await harness.browser.tabs.get(selectedTabId)).active, false);
+  });
+
+  it('in an adopted window, never changes the user\'s selected tab', async () => {
+    const harness = createHarness({ allowTabCreate: true });
+    const created = await harness.command('createWindow', { url: 'https://example.test/agent', agentId: 'agent-a', private: false });
+    assert.equal(created.success, true, created.error);
+    assert.equal(created.result.isNewWindow, false);
+    assert.equal(harness.calls.windowsCreated, 0);
+    const agentTabId = created.result.tabId;
+
+    const explicit = await harness.command('getContent', { tabId: agentTabId, agentId: 'agent-a' });
+    const implicit = await harness.command('getContent', { agentId: 'agent-a' });
+
+    assert.equal(explicit.success, true, explicit.error);
+    assert.equal(implicit.success, true, implicit.error);
+    assert.equal(explicit.result.tabId, agentTabId);
+    assert.equal(implicit.result.tabId, agentTabId);
+    assert.deepEqual(harness.calls.tabUpdates, []);
+    assert.equal((await harness.browser.tabs.get(42)).active, true);
+    assert.deepEqual(
+      harness.calls.contentTargets.filter((entry) => entry.action === 'getContent'),
+      [
+        { tabId: agentTabId, action: 'getContent', active: false },
+        { tabId: agentTabId, action: 'getContent', active: false },
+      ],
+    );
+  });
+
+  it('records no tab update when the driven tab is already selected', async () => {
+    const { harness, selectedTabId } = await createDedicatedWindow();
+
+    const explicit = await harness.command('getContent', { tabId: selectedTabId, agentId: 'agent-a' });
+    const implicit = await harness.command('getContent', { agentId: 'agent-a' });
+
+    assert.equal(explicit.success, true, explicit.error);
+    assert.equal(implicit.success, true, implicit.error);
+    assert.equal(explicit.result.tabId, selectedTabId);
+    assert.equal(implicit.result.tabId, selectedTabId);
+    assert.deepEqual(harness.calls.tabUpdates, []);
+    assert.equal((await harness.browser.tabs.get(selectedTabId)).active, true);
+  });
+
+  it('after a background restart, a command without tabId selects the pool\'s current tab', async () => {
+    const harness = createHarness({
+      tabs: [
+        { id: 100, windowId: 7, url: 'https://example.test/first', title: 'First', active: true, pinned: false, incognito: false },
+        { id: 101, windowId: 7, url: 'https://example.test/second', title: 'Second', active: false, pinned: false, incognito: false },
+      ],
+      storage: {
+        claudezillaWindowState: {
+          windowId: 7,
+          tabs: [{ tabId: 100, ownerId: 'agent-a' }, { tabId: 101, ownerId: 'agent-a' }],
+          createdAt: 1,
+          groupId: null,
+          isPrivate: false,
+          adopted: false,
+        },
+      },
+    });
+
+    const response = await harness.command('getContent', { agentId: 'agent-a' });
+
+    assert.equal(response.success, true, response.error);
+    assert.equal(response.result.tabId, 101);
+    assert.deepEqual(harness.calls.tabUpdates, [{ tabId: 101, changes: { active: true } }]);
+    assert.deepEqual(
+      harness.calls.contentTargets.filter((entry) => entry.action === 'getContent'),
+      [{ tabId: 101, action: 'getContent', active: true }],
+    );
+    assert.equal((await harness.browser.tabs.get(100)).active, false);
+  });
+
+  it('firefox_screenshot of a non-selected pool tab selects it and captures the visible tab', async () => {
+    const { harness, windowId, backgroundTabId } = await createDedicatedWindow();
+
+    const screenshot = await harness.command('screenshot', {
+      tabId: backgroundTabId,
+      agentId: 'agent-a',
+      skipReadiness: true,
+      format: 'png',
+      scale: 1,
+    });
+
+    assert.equal(screenshot.success, true, screenshot.error);
+    assert.equal(screenshot.result.tabId, backgroundTabId);
+    assert.equal(screenshot.result.dataUrl, 'data:image/png;base64,visible');
+    assert.deepEqual(harness.calls.tabUpdates, [{ tabId: backgroundTabId, changes: { active: true } }]);
+    assert.deepEqual(harness.calls.captures.visible, [windowId]);
+    assert.deepEqual(harness.calls.captures.tab, []);
   });
 });
