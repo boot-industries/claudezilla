@@ -360,7 +360,7 @@ cd claudezilla
 
             <!-- Windows -->
             <div class="platform-content" data-platform="windows">
-              <pre><code># Run PowerShell as Administrator
+              <pre><code># In PowerShell (user-level registry and AppData only; no administrator rights needed)
 git clone https://github.com/boot-industries/claudezilla.git
 cd claudezilla
 .\install\install-windows.ps1</code></pre>
@@ -397,6 +397,12 @@ cd claudezilla
                 </div>
               </div>
             </div>
+            <p>
+              Other agent harnesses (macOS and Linux): add <code>--target omp</code>, <code>pi</code>, <code>hermes</code>,
+              <code>mercury</code> or <code>all</code> (default <code>claude</code>). The <code>omp</code> target writes
+              <code>~/.omp/agent/mcp.json</code>; the others print the config to add. The installer also links the
+              <code>claudezilla-browser</code> Agent Skill. The Windows installer configures Claude Code only.
+            </p>
           </div>
         </div>
 
@@ -414,7 +420,7 @@ cd claudezilla
 
       <!-- Manual Config Collapsible -->
       <div class="collapsible">
-        <button class="collapsible-trigger" onclick="toggleCollapsible(this)">
+        <button class="collapsible-trigger">
           <span class="icon">▶</span>
           <h4>Manual Configuration (if auto-config fails)</h4>
         </button>
@@ -496,7 +502,10 @@ cd claudezilla
         <strong>⚡ Why Private Windows?</strong>
         <p>
           Private windows provide isolation for browser automation. Your automation runs separately
-          from your normal browsing. You can skip this, but some features will be limited.
+          from your normal browsing. If you skip this, new Claudezilla windows fall back to regular
+          (non-private) windows and <code>firefox_create_window</code> reports <code>privateFallback</code>.
+          To use regular windows on purpose (for sites that need your logins), call
+          <code>firefox_set_private_mode</code> with <code>enabled: false</code>.
         </p>
       </div>
     </section>
@@ -508,9 +517,11 @@ cd claudezilla
       <div class="note" style="margin-top: 0;">
         <strong>🔧 Connection Issues?</strong>
         <p>
-          Check the debug log at <code>~/.claudezilla/claudezilla-debug.log</code> (macOS/Linux) or
-          <code>%LOCALAPPDATA%\claudezilla\claudezilla-debug.log</code> (Windows). Make sure Firefox is running
-          before starting Claude Code. Click the Claudezilla icon in Firefox to test the connection.
+          Check the debug log <code>claudezilla-debug.log</code> in <code>$CLAUDEZILLA_IPC_DIR</code>, else
+          <code>$XDG_RUNTIME_DIR</code>, else <code>~/.claudezilla/</code> (macOS/Linux), or
+          <code>%LOCALAPPDATA%\claudezilla\debug.log</code> (Windows). Make sure Firefox is running with the
+          extension loaded, then ask Claude to run <code>firefox_diagnose</code>. Click the Claudezilla icon in
+          Firefox to test the connection.
         </p>
       </div>
 
@@ -567,75 +578,6 @@ cd claudezilla
     </div>
   </footer>
 
-  <script>
-    // Platform tab switching
-    document.querySelectorAll('.platform-tab').forEach(tab => {
-      tab.addEventListener('click', () => {
-        const platform = tab.dataset.platform;
-
-        // Update tabs
-        document.querySelectorAll('.platform-tab').forEach(t => t.classList.remove('active'));
-        tab.classList.add('active');
-
-        // Update content
-        document.querySelectorAll('.platform-content').forEach(c => c.classList.remove('active'));
-        document.querySelector(`.platform-content[data-platform="${platform}"]`).classList.add('active');
-      });
-    });
-
-    // Collapsible toggle
-    function toggleCollapsible(trigger) {
-      trigger.classList.toggle('open');
-      const content = trigger.nextElementSibling;
-      content.classList.toggle('open');
-    }
-
-    // Check for Stripe checkout success redirect
-    (function() {
-      const urlParams = new URLSearchParams(window.location.search);
-      const sessionId = urlParams.get('session_id');
-
-      if (sessionId) {
-        showThankYouModal();
-        const newUrl = window.location.pathname;
-        window.history.replaceState({}, document.title, newUrl);
-      }
-
-      function showThankYouModal() {
-        const overlay = document.createElement('div');
-        overlay.className = 'thank-you-overlay';
-
-        const modal = document.createElement('div');
-        modal.className = 'thank-you-modal';
-
-        const checkmark = document.createElement('div');
-        checkmark.className = 'checkmark';
-        checkmark.textContent = '✓';
-
-        const heading = document.createElement('h2');
-        heading.textContent = 'Thank You!';
-
-        const message = document.createElement('p');
-        message.textContent = 'Your support keeps Claudezilla free and open source.';
-
-        const receiptNote = document.createElement('p');
-        receiptNote.className = 'receipt-note';
-        receiptNote.textContent = "You'll receive a receipt via email shortly.";
-
-        modal.appendChild(checkmark);
-        modal.appendChild(heading);
-        modal.appendChild(message);
-        modal.appendChild(receiptNote);
-        overlay.appendChild(modal);
-
-        document.body.appendChild(overlay);
-
-        setTimeout(() => {
-          overlay.style.opacity = '0';
-          setTimeout(() => overlay.remove(), 300);
-        }, 4000);
-      }
-    })();
-  </script>
+  <script src="/scripts/setup.js"></script>
 </body>
 </html>
