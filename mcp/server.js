@@ -1205,7 +1205,8 @@ const TOOLS = [
 
 // Add optional 'timeout' parameter to all tool schemas (except diagnose which runs locally)
 for (const tool of TOOLS) {
-  if (tool.name !== 'firefox_diagnose') {
+  // Tools that already define their own `timeout` (firefox_wait_for) keep it.
+  if (tool.name !== 'firefox_diagnose' && !tool.inputSchema.properties.timeout) {
     tool.inputSchema.properties.timeout = {
       type: 'number',
       description: 'Request timeout in milliseconds (default: 150000, range: 5000-300000)',
@@ -1538,8 +1539,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     // All tab-targeting commands now require ownership verification
     const commandParams = { ...(args || {}) };
 
-    // Per-operation timeout: map 'timeout' from tool args to '_timeout' internal param
-    if (commandParams.timeout && typeof commandParams.timeout === 'number') {
+    // Per-operation timeout: map 'timeout' from tool args to '_timeout' internal param.
+    // firefox_wait_for owns a `timeout` (how long the page waits): forward it to
+    // the content script and give the socket 5 s of headroom on top of it.
+    if (name === 'firefox_wait_for') {
+      const waitMs = typeof commandParams.timeout === 'number' ? commandParams.timeout : 10000;
+      commandParams._timeout = Math.max(5000, Math.min(300000, waitMs + 5000));
+    } else if (commandParams.timeout && typeof commandParams.timeout === 'number') {
       commandParams._timeout = Math.max(5000, Math.min(300000, commandParams.timeout));
       delete commandParams.timeout; // Don't forward the schema param to extension
     }
