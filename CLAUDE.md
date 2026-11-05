@@ -1,13 +1,13 @@
 # Claudezilla — Claude Code Firefox Extension
 
-**Version:** 0.7.2
+**Version:** 0.7.7
 **Documentation PREFIX:** CLZ
 
 ## Overview
 
 Firefox extension providing browser automation for Claude Code CLI. A Google-free alternative to the official Chrome extension.
 
-**Key Features:** Consent automation (4-pass CMP detection), lazy tool loading (~6,400 token savings), Linux/Windows/macOS support, annotated screenshots, focus loops, multi-agent tab coordination, orphaned tab cleanup, auto-retry system, supply chain hardened.
+**Key Features:** Consent automation (4-pass CMP detection), full tool catalog by default (opt-in lazy loading with `--tools lazy`), stable element refs (`ref_N`) with text snapshots and `firefox_find`, vision-sized screenshots, Linux/Windows/macOS support, annotated screenshots, focus loops, multi-agent tab coordination, orphaned tab cleanup, auto-retry system, supply chain hardened.
 
 ## Architecture
 
@@ -71,19 +71,20 @@ claudezilla@boot.industries
 ### Page Interaction
 | Command | Description |
 |---------|-------------|
-| getContent | Page text (HTML opt-in, 50K limit) |
-| click | Click element by selector |
-| type | Type text (React/Angular compatible) |
+| getContent | Visible page text (`ref`/selector scope, 20K chars per call, `offset` paging, HTML opt-in) |
+| click | Click element by `ref` or selector |
+| type | Type text by `ref` or selector (React/Angular compatible) |
 | pressKey | Send keyboard events |
-| scroll | Scroll to element/position |
+| scroll | Scroll to element/position (instant by default) |
 | waitFor | Wait for element |
-| screenshot | Capture with dynamic readiness detection |
+| screenshot | Vision-sized capture (`maxEdge` 1568, `region` zoom) with dynamic readiness detection |
 
 ### Page Analysis
 | Command | Description |
 |---------|-------------|
 | getPageState | Structured JSON (headings, links, buttons) |
-| getAccessibilitySnapshot | Semantic tree (200 node limit) |
+| getAccessibilitySnapshot | Compact text tree with `[ref_N]` handles (200 node default, `filter: interactive`, `format: json`) |
+| find | Elements by visible text or accessible name, with refs and landmark context |
 | getElementInfo | Element attributes, styles |
 | evaluate | Run JS in page context |
 
