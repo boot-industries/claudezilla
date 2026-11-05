@@ -952,6 +952,8 @@ async function handleCliCommand(message) {
         // window (getSession throws when none is tracked); windows are created
         // only by createWindow, which enforces the private-mode setting.
         const { tab: currentTab } = await getSession(windowId);
+        // The session tab may belong to another agent: same rule as an explicit tabId.
+        if (agentId) verifyTabOwnership(currentTab.id, agentId, 'navigate');
         await browser.tabs.update(currentTab.id, { url });
         const navigatedTab = await browser.tabs.get(currentTab.id);
         result = { tabId: currentTab.id, url: navigatedTab.url, title: navigatedTab.title, navigated: true };

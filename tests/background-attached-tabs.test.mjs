@@ -793,6 +793,25 @@ describe('navigate without tabId', () => {
     });
   }
 
+  it("refuses to drive another agent's pool tab", async () => {
+    const harness = createHarness({
+      allowTabCreate: true,
+      storage: { claudezilla: { privateMode: false } },
+    });
+    const created = await harness.command('createWindow', { url: 'https://example.test/agent', agentId: 'agent-a' });
+    assert.equal(created.success, true, created.error);
+
+    const navigated = await harness.command('navigate', { url: 'https://example.test/next', agentId: 'agent-b' });
+
+    assert.equal(navigated.success, false);
+    assert.match(navigated.error, /OWNERSHIP/);
+    assert.deepEqual(harness.calls.tabUpdates, []);
+
+    const owner = await harness.command('navigate', { url: 'https://example.test/next', agentId: 'agent-a' });
+    assert.equal(owner.success, true, owner.error);
+    assert.equal(harness.calls.tabUpdates.length, 1);
+  });
+
   it('never creates a window or tab when no session exists', async () => {
     const harness = createHarness({ allowTabCreate: true, allowWindowCreate: true });
 
