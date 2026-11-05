@@ -14,8 +14,9 @@ import {
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import { randomBytes } from 'crypto';
-import { readFileSync, existsSync, statSync, writeFileSync } from 'fs';
-import { resolve as resolvePath, extname } from 'path';
+import { readFileSync, existsSync, statSync, realpathSync, openSync, writeSync, closeSync, constants } from 'fs';
+import { tmpdir } from 'os';
+import { resolve as resolvePath, extname, dirname, basename, join, sep } from 'path';
 import { getSocketPath, getAuthTokenPath } from '../host/ipc.js';
 import { requestOverSocket } from './socket-request.js';
 import { createAgentReaper, resolveAgentTimeout } from './agent-reaper.js';
@@ -372,23 +373,72 @@ const RETRY_CONFIG = {
 };
 
 /**
- * Sleep for specified milliseconds
+ * Directories a screenshot may be written to: the OS temp dir, /tmp (POSIX)
+ * and the working directory, as real paths so symlinks cannot widen them.
  */
-function saveScreenshotToDisk(base64Data, savePath) {
+function allowedSaveRoots() {
+  const candidates = [tmpdir(), process.cwd()];
+  if (process.platform !== 'win32') candidates.push('/tmp');
+  const roots = new Set();
+  for (const dir of candidates) {
+    try {
+      roots.add(realpathSync(dir));
+    } catch {
+      // Directory missing on this platform: not a root.
+    }
+  }
+  return [...roots];
+}
+
+/**
+ * Write a screenshot to disk.
+ * SECURITY: savePath is chosen by the agent, so it is confined to
+ * allowedSaveRoots(), must carry an extension matching the image format, and
+ * is opened with O_NOFOLLOW and mode 0600 so it cannot clobber a symlink
+ * target or leak the image to other local users.
+ *
+ * @param {string} base64Data - Image bytes, base64-encoded
+ * @param {string} savePath - Requested destination
+ * @param {'jpeg'|'png'} format - Image format of base64Data
+ * @returns {string} Absolute path written
+ */
+function saveScreenshotToDisk(base64Data, savePath, format) {
   if (!savePath || typeof savePath !== 'string') throw new Error('savePath must be a non-empty string');
   if (savePath.includes('\0')) throw new Error('savePath contains null byte');
   if (savePath.includes('..')) throw new Error('savePath contains path traversal');
 
   const absPath = resolvePath(savePath);
   const ext = extname(absPath).toLowerCase();
-  if (ext && ext !== '.jpg' && ext !== '.jpeg' && ext !== '.png') {
-    throw new Error(`Unsupported extension "${ext}" — use .jpg or .png`);
+  const validExts = format === 'jpeg' ? ['.jpg', '.jpeg'] : ['.png'];
+  if (!validExts.includes(ext)) {
+    throw new Error('savePath must end in .jpg/.jpeg for JPEG or .png for PNG');
   }
 
-  writeFileSync(absPath, Buffer.from(base64Data, 'base64'));
+  const roots = allowedSaveRoots();
+  let parent;
+  try {
+    parent = realpathSync(dirname(absPath));
+  } catch {
+    throw new Error(`savePath directory does not exist: ${dirname(absPath)}`);
+  }
+  const inside = roots.some((root) => parent === root || parent.startsWith(root.endsWith(sep) ? root : root + sep));
+  if (!inside) throw new Error(`savePath must be inside one of: ${roots.join(', ')}`);
+
+  const flags = constants.O_WRONLY | constants.O_CREAT | constants.O_TRUNC | (constants.O_NOFOLLOW ?? 0);
+  const fd = openSync(join(parent, basename(absPath)), flags, 0o600);
+  try {
+    const bytes = Buffer.from(base64Data, 'base64');
+    let offset = 0;
+    while (offset < bytes.length) offset += writeSync(fd, bytes, offset, bytes.length - offset);
+  } finally {
+    closeSync(fd);
+  }
   return absPath;
 }
 
+/**
+ * Sleep for specified milliseconds
+ */
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -1639,7 +1689,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
         // If savePath requested, write file to disk
         if (savePathArg) {
-          const savedPath = saveScreenshotToDisk(base64Data, savePathArg);
+          const savedPath = saveScreenshotToDisk(base64Data, savePathArg, isJpeg ? 'jpeg' : 'png');
           content.push({ type: 'text', text: JSON.stringify({ savedPath }) });
         }
         return { content };
