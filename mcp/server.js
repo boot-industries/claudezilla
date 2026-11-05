@@ -697,7 +697,7 @@ const TOOLS = [
         },
         ref: {
           type: 'string',
-          description: 'Element ref from a snapshot or firefox_find, e.g. "ref_12" (preferred over selector)',
+          description: 'Element ref from a snapshot or firefox_find, e.g. "ref_a1b2_12" (preferred over selector)',
         },
         selector: {
           type: 'string',
@@ -730,7 +730,7 @@ const TOOLS = [
         },
         ref: {
           type: 'string',
-          description: 'Element ref from a snapshot or firefox_find, e.g. "ref_12" (preferred over selector)',
+          description: 'Element ref from a snapshot or firefox_find, e.g. "ref_a1b2_12" (preferred over selector)',
         },
         selector: {
           type: 'string',
@@ -751,7 +751,7 @@ const TOOLS = [
         },
         ref: {
           type: 'string',
-          description: 'Element ref from a snapshot or firefox_find, e.g. "ref_12" (preferred over selector)',
+          description: 'Element ref from a snapshot or firefox_find, e.g. "ref_a1b2_12" (preferred over selector)',
         },
         selector: {
           type: 'string',
@@ -785,7 +785,7 @@ const TOOLS = [
         },
         ref: {
           type: 'string',
-          description: 'Element ref from a snapshot or firefox_find, e.g. "ref_12" (preferred over selector)',
+          description: 'Element ref from a snapshot or firefox_find, e.g. "ref_a1b2_12" (preferred over selector)',
         },
         selector: {
           type: 'string',
@@ -1134,7 +1134,7 @@ const TOOLS = [
         },
         ref: {
           type: 'string',
-          description: 'Element ref from a snapshot or firefox_find, e.g. "ref_12" (preferred over selector)',
+          description: 'Element ref from a snapshot or firefox_find, e.g. "ref_a1b2_12" (preferred over selector)',
         },
         selector: {
           type: 'string',
@@ -1168,7 +1168,7 @@ const TOOLS = [
         },
         ref: {
           type: 'string',
-          description: 'Element ref from a snapshot or firefox_find, e.g. "ref_12" (preferred over selector)',
+          description: 'Element ref from a snapshot or firefox_find, e.g. "ref_a1b2_12" (preferred over selector)',
         },
         selector: {
           type: 'string',
@@ -1241,7 +1241,7 @@ const TOOLS = [
         },
         ref: {
           type: 'string',
-          description: 'Element ref from a snapshot or firefox_find, e.g. "ref_12" (preferred over selector)',
+          description: 'Element ref from a snapshot or firefox_find, e.g. "ref_a1b2_12" (preferred over selector)',
         },
         selector: {
           type: 'string',
@@ -1481,10 +1481,11 @@ const CATEGORY_GROUPS = {
 
 // Tool discovery policy: the full catalog ('all') by default; 'lazy' is opt-in and
 // exposes only the firefox_activate gateway until a category is activated.
-// Precedence: CLI argument (--tools lazy) > Env var (CLAUDEZILLA_TOOL_MODE=lazy) > default 'all'
+// Precedence: CLI argument (--tools lazy|all) > Env var (CLAUDEZILLA_TOOL_MODE=lazy) > default 'all'
 const TOOL_MODE = (() => {
   const toolsArgIdx = process.argv.indexOf('--tools');
-  if (toolsArgIdx !== -1 && process.argv[toolsArgIdx + 1] === 'lazy') return 'lazy';
+  const toolsArg = toolsArgIdx !== -1 ? process.argv[toolsArgIdx + 1] : undefined;
+  if (toolsArg === 'lazy' || toolsArg === 'all') return toolsArg;
   if (process.env.CLAUDEZILLA_TOOL_MODE?.toLowerCase() === 'lazy') return 'lazy';
   return 'all';
 })();
@@ -1525,11 +1526,12 @@ Etiquette: tabs you create are yours; never close or navigate other agents' tabs
 On connection errors run firefox_diagnose.`;
 
 // Tool annotations (MCP spec): hints that let clients auto-approve reads and
-// prompt before destructive or open-world actions.
+// prompt before destructive or open-world actions. firefox_screenshot is not
+// read-only: savePath and CLAUDEZILLA_SCREENSHOT_FILES write files to disk.
 const READ_ONLY_TOOLS = new Set([
   'firefox_get_tabs', 'firefox_list_all_tabs', 'firefox_get_content', 'firefox_get_element',
   'firefox_wait_for', 'firefox_get_page_state', 'firefox_get_accessibility_snapshot', 'firefox_find',
-  'firefox_screenshot', 'firefox_diff_page_state', 'firefox_get_slot_requests', 'firefox_loop_status',
+  'firefox_diff_page_state', 'firefox_get_slot_requests', 'firefox_loop_status',
   'firefox_diagnose',
 ]);
 const DESTRUCTIVE_TOOLS = new Set([

@@ -104,6 +104,8 @@ describe('mcp server tool discovery policy', () => {
       assert.ok(!('category' in tool), `${tool.name} leaks the internal category field`);
       assert.equal(typeof tool.annotations.readOnlyHint, 'boolean', `${tool.name} needs readOnlyHint`);
     }
+    // Screenshots can write files (savePath), so clients must not auto-approve them as reads.
+    assert.equal(tools.find(t => t.name === 'firefox_screenshot').annotations.readOnlyHint, false);
     const alwaysLoaded = tools.filter(t => t._meta?.['anthropic/alwaysLoad'] === true).map(t => t.name).sort();
     assert.deepEqual(alwaysLoaded, [
       'firefox_click',
@@ -137,6 +139,13 @@ describe('mcp server tool discovery policy', () => {
     const toolNames = listResp.result.tools.map(t => t.name);
     assert.ok(toolNames.includes('firefox_screenshot'));
     assert.ok(toolNames.length > 20);
+  });
+
+  it('--tools all wins over CLAUDEZILLA_TOOL_MODE=lazy', async () => {
+    const { stdout } = await runServerRpc(['--tools', 'all'], { CLAUDEZILLA_TOOL_MODE: 'lazy' });
+    const toolNames = parseResponses(stdout).find(l => l.id === 2).result.tools.map(t => t.name);
+    assert.ok(!toolNames.includes('firefox_activate'));
+    assert.ok(toolNames.includes('firefox_navigate'));
   });
 });
 
