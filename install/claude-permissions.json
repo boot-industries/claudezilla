@@ -10,6 +10,7 @@
     "mcp__claudezilla__firefox_detach_tab",
     "mcp__claudezilla__firefox_diagnose",
     "mcp__claudezilla__firefox_diff_page_state",
+    "mcp__claudezilla__firefox_find",
     "mcp__claudezilla__firefox_get_accessibility_snapshot",
     "mcp__claudezilla__firefox_get_console",
     "mcp__claudezilla__firefox_get_content",

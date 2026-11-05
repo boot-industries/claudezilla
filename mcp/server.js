@@ -616,7 +616,7 @@ const TOOLS = [
   },
   {
     name: 'firefox_navigate',
-    description: 'Navigate to a URL. If tabId provided, navigates that tab (requires ownership). Without tabId, navigates active tab (may be restricted in private window mode).',
+    description: 'Navigate an existing tab to a URL. tabId defaults to your current tab; ownership is enforced. Never creates a window: call firefox_create_window first.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -626,7 +626,7 @@ const TOOLS = [
         },
         tabId: {
           type: 'number',
-          description: 'Target tab ID. If provided, navigates this tab (ownership enforced). Without tabId, navigates active tab.',
+          description: 'Tab ID (default: your current tab)',
         },
       },
       required: ['url'],
@@ -640,7 +640,7 @@ const TOOLS = [
       properties: {
         tabId: {
           type: 'number',
-          description: 'Target tab ID. Default: active tab. Works on background tabs.',
+          description: 'Tab ID (default: your current tab)',
         },
         selector: {
           type: 'string',
@@ -665,7 +665,7 @@ const TOOLS = [
       properties: {
         tabId: {
           type: 'number',
-          description: 'Target tab ID. Default: active tab. Works on background tabs.',
+          description: 'Tab ID (default: your current tab)',
         },
         selector: {
           type: 'string',
@@ -683,7 +683,7 @@ const TOOLS = [
       properties: {
         tabId: {
           type: 'number',
-          description: 'Target tab ID. Default: active tab. Works on background tabs.',
+          description: 'Tab ID (default: your current tab)',
         },
         selector: {
           type: 'string',
@@ -709,7 +709,7 @@ const TOOLS = [
       properties: {
         tabId: {
           type: 'number',
-          description: 'Target tab ID. Default: active tab. Works on background tabs.',
+          description: 'Tab ID (default: your current tab)',
         },
         key: {
           type: 'string',
@@ -945,7 +945,7 @@ const TOOLS = [
       properties: {
         tabId: {
           type: 'number',
-          description: 'Target tab ID. Default: active tab. Works on background tabs.',
+          description: 'Tab ID (default: your current tab)',
         },
         level: {
           type: 'string',
@@ -971,7 +971,7 @@ const TOOLS = [
       properties: {
         tabId: {
           type: 'number',
-          description: 'Target tab ID. Default: active tab. Works on background tabs.',
+          description: 'Tab ID (default: your current tab)',
         },
         type: {
           type: 'string',
@@ -1005,7 +1005,7 @@ const TOOLS = [
       properties: {
         tabId: {
           type: 'number',
-          description: 'Target tab ID. Default: active tab. Works on background tabs.',
+          description: 'Tab ID (default: your current tab)',
         },
         expression: {
           type: 'string',
@@ -1023,7 +1023,7 @@ const TOOLS = [
       properties: {
         tabId: {
           type: 'number',
-          description: 'Target tab ID. Default: active tab. Works on background tabs.',
+          description: 'Tab ID (default: your current tab)',
         },
         selector: {
           type: 'string',
@@ -1052,7 +1052,7 @@ const TOOLS = [
       properties: {
         tabId: {
           type: 'number',
-          description: 'Target tab ID. Default: active tab. Works on background tabs.',
+          description: 'Tab ID (default: your current tab)',
         },
         selector: {
           type: 'string',
@@ -1082,7 +1082,7 @@ const TOOLS = [
       properties: {
         tabId: {
           type: 'number',
-          description: 'Target tab ID. Default: active tab. Works on background tabs.',
+          description: 'Tab ID (default: your current tab)',
         },
         selector: {
           type: 'string',
@@ -1095,13 +1095,13 @@ const TOOLS = [
   // ===== PAGE ANALYSIS (FAST ALTERNATIVES TO SCREENSHOTS) =====
   {
     name: 'firefox_get_page_state',
-    description: 'Get structured page state as JSON. Much faster than screenshots for understanding page content. Returns: URL, title, viewport, errors, headings, links, buttons, inputs, images, landmarks with counts. Individual string values are length-capped (headings: 100, links: 50/100, buttons: 50, inputs: 50, images: 100) with explicit `truncated: true` and `rawLength` metadata when shortened. Password fields are always masked ("***"). Works on background tabs.',
+    description: 'Get structured page state as JSON: URL, title, viewport, errors, headings, links, buttons, inputs, images, landmarks with counts. Default item caps: headings 30, links 50, buttons 30, inputs 30, images 20 (raise with the max* params). Long strings are shortened with `truncated: true` and `rawLength` metadata. Password fields are masked ("***"). Cheaper than screenshots.',
     inputSchema: {
       type: 'object',
       properties: {
         tabId: {
           type: 'number',
-          description: 'Target tab ID. Default: active tab. Works on background tabs.',
+          description: 'Tab ID (default: your current tab)',
         },
         maxHeadings: {
           type: 'number',
@@ -1134,7 +1134,7 @@ const TOOLS = [
       properties: {
         tabId: {
           type: 'number',
-          description: 'Target tab ID. Default: active tab. Works on background tabs.',
+          description: 'Tab ID (default: your current tab)',
         },
         maxDepth: {
           type: 'number',
@@ -1201,7 +1201,7 @@ const TOOLS = [
       properties: {
         timeout: {
           type: 'number',
-          description: 'Request timeout in milliseconds (default: 150000, range: 5000-300000)',
+          description: 'Request timeout in ms (5000-300000, default 150000)',
         },
         scanTimeout: {
           type: 'number',
@@ -1284,7 +1284,7 @@ for (const tool of TOOLS) {
   if (tool.name !== 'firefox_diagnose' && !tool.inputSchema.properties.timeout) {
     tool.inputSchema.properties.timeout = {
       type: 'number',
-      description: 'Request timeout in milliseconds (default: 150000, range: 5000-300000)',
+      description: 'Request timeout in ms (5000-300000, default 150000)',
     };
   }
 }
@@ -1353,16 +1353,14 @@ const CATEGORY_GROUPS = {
   all: ['core', 'inspection', 'devtools', 'multiagent', 'loop', 'config', 'diagnose'],
 };
 
-// Tool discovery policy: 'lazy' (default for Claude Code) vs 'all' (eager for OMP, Hermes, Pi, Claude Desktop)
-// Precedence: CLI argument (--tools all | --all-tools) > Env var (CLAUDEZILLA_TOOL_MODE=all) > default 'lazy'
+// Tool discovery policy: the full catalog ('all') by default; 'lazy' is opt-in and
+// exposes only the firefox_activate gateway until a category is activated.
+// Precedence: CLI argument (--tools lazy) > Env var (CLAUDEZILLA_TOOL_MODE=lazy) > default 'all'
 const TOOL_MODE = (() => {
-  if (process.argv.includes('--all-tools')) return 'all';
   const toolsArgIdx = process.argv.indexOf('--tools');
-  if (toolsArgIdx !== -1 && process.argv[toolsArgIdx + 1] === 'all') return 'all';
   if (toolsArgIdx !== -1 && process.argv[toolsArgIdx + 1] === 'lazy') return 'lazy';
-  const envMode = process.env.CLAUDEZILLA_TOOL_MODE?.toLowerCase();
-  if (envMode === 'all') return 'all';
-  return 'lazy';
+  if (process.env.CLAUDEZILLA_TOOL_MODE?.toLowerCase() === 'lazy') return 'lazy';
+  return 'all';
 })();
 
 let activatedCategories = new Set();
@@ -1392,6 +1390,72 @@ const GATEWAY_TOOLS = [
     },
   },
 ];
+
+// Server-level guidance sent once in the initialize response. Keep it under
+// 1,500 characters: it is read by every agent on every session.
+const SERVER_INSTRUCTIONS = `Claudezilla drives the user's real Firefox: open tabs, navigate, read pages, click, type and take screenshots (firefox_* tools).
+Workflow: firefox_create_window opens your tab; later calls without tabId target your most recent tab. Read before you look: firefox_get_accessibility_snapshot returns a compact text tree with [ref_N] handles, and firefox_find locates elements by text. Act with firefox_click / firefox_type / firefox_scroll / firefox_press_key by passing ref (preferred) or a CSS selector. Refs stay valid until the page navigates; after a stale-ref error, read the page again. Use firefox_get_content for long text (paginate with offset) and firefox_screenshot only when layout or visuals matter (default long edge 1568 px; region zooms; maxEdge 2576 for small text). Screenshot coordinates: CSS px = image px / cssScale.
+Etiquette: tabs you create are yours; never close or navigate other agents' tabs. The pool holds 12 tabs; close tabs you no longer need. Attach to the user's own tabs only when asked (firefox_list_all_tabs, firefox_attach_tab). firefox_evaluate stays disabled unless the user enables it in the add-on popup.
+On connection errors run firefox_diagnose.`;
+
+// Tool annotations (MCP spec): hints that let clients auto-approve reads and
+// prompt before destructive or open-world actions.
+const READ_ONLY_TOOLS = new Set([
+  'firefox_get_tabs', 'firefox_list_all_tabs', 'firefox_get_content', 'firefox_get_element',
+  'firefox_wait_for', 'firefox_get_page_state', 'firefox_get_accessibility_snapshot', 'firefox_find',
+  'firefox_screenshot', 'firefox_diff_page_state', 'firefox_get_slot_requests', 'firefox_loop_status',
+  'firefox_diagnose',
+]);
+const DESTRUCTIVE_TOOLS = new Set([
+  'firefox_close_tab', 'firefox_close_window', 'firefox_grant_tab_space', 'firefox_evaluate',
+]);
+const OPEN_WORLD_TOOLS = new Set(['firefox_create_window', 'firefox_navigate']);
+
+// Tools Claude Code should load up front rather than defer behind tool search.
+const ALWAYS_LOAD = new Set([
+  'firefox_create_window', 'firefox_navigate', 'firefox_get_accessibility_snapshot',
+  'firefox_find', 'firefox_click', 'firefox_type', 'firefox_screenshot',
+]);
+
+/**
+ * Shape a tool definition for tools/list: spec fields only (no internal
+ * `category`), a human title and annotations.
+ */
+function toWireTool(tool) {
+  const title = tool.name
+    .replace(/^firefox_/, '')
+    .split('_')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+  const wire = {
+    name: tool.name,
+    title,
+    description: tool.description,
+    inputSchema: tool.inputSchema,
+    annotations: {
+      title,
+      readOnlyHint: READ_ONLY_TOOLS.has(tool.name),
+      destructiveHint: DESTRUCTIVE_TOOLS.has(tool.name),
+      openWorldHint: OPEN_WORLD_TOOLS.has(tool.name),
+    },
+  };
+  if (ALWAYS_LOAD.has(tool.name)) wire._meta = { 'anthropic/alwaysLoad': true };
+  return wire;
+}
+
+// Tools whose result has a `text` body: sent as a one-line JSON header followed
+// by the text itself, so newlines and quotes are not re-escaped into JSON.
+const TEXT_BODY_TOOLS = new Set(['firefox_get_content', 'firefox_get_accessibility_snapshot', 'firefox_find']);
+
+/**
+ * Serialize a command result for the tool response.
+ */
+function formatResult(name, result) {
+  if (typeof result?.text === 'string' && TEXT_BODY_TOOLS.has(name)) {
+    return JSON.stringify({ ...result, text: undefined }) + '\n\n' + result.text;
+  }
+  return JSON.stringify(result);
+}
 
 // Map MCP tool names to Claudezilla commands
 const TOOL_TO_COMMAND = {
@@ -1450,24 +1514,22 @@ const server = new Server(
     capabilities: {
       tools: { listChanged: true },
     },
+    instructions: TOOL_MODE === 'lazy'
+      ? `Call firefox_activate first to load the tools. ${SERVER_INSTRUCTIONS}`
+      : SERVER_INSTRUCTIONS,
   }
 );
 
 // Handle list tools request
 server.setRequestHandler(ListToolsRequestSchema, async () => {
-  // Before activation: expose only the gateway tool
+  // Lazy mode before activation: expose only the gateway tool
   if (!isActivated) {
-    return { tools: GATEWAY_TOOLS };
+    return { tools: GATEWAY_TOOLS.map(toWireTool) };
   }
 
-  // After activation: filter by activated categories
-  let availableTools = TOOLS.filter(tool => activatedCategories.has(tool.category));
-  if (TOOL_MODE === 'all') {
-    // In eager mode, retain firefox_activate in tool list as a compatible no-op
-    availableTools = [...GATEWAY_TOOLS, ...availableTools];
-  }
-
-  return { tools: availableTools };
+  // Filter by activated categories (everything in the default 'all' mode)
+  const availableTools = TOOLS.filter(tool => activatedCategories.has(tool.category));
+  return { tools: availableTools.map(toWireTool) };
 });
 
 // Handle tool calls
@@ -1587,7 +1649,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       if (!before || !after) throw new Error('Both "before" and "after" snapshots are required');
       const diff = diffPageState(before, after);
       return {
-        content: [{ type: 'text', text: JSON.stringify(diff, null, 2) }],
+        content: [{ type: 'text', text: JSON.stringify(diff) }],
       };
     } catch (error) {
       return { content: [{ type: 'text', text: `Diff error: ${error.message}` }], isError: true };
@@ -1601,7 +1663,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       return {
         content: [{
           type: 'text',
-          text: JSON.stringify(diagnostics, null, 2),
+          text: JSON.stringify(diagnostics),
         }],
       };
     } catch (error) {
@@ -1750,7 +1812,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       // Handle undefined/null results - ensure text is always a string
       const resultText = response.result !== undefined
-        ? JSON.stringify(response.result, null, 2)
+        ? formatResult(name, response.result)
         : '{ "success": true }';
 
       return {

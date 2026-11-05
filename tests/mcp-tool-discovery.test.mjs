@@ -73,7 +73,7 @@ function runServerRpc(args = [], env = {}, { requests = [], waitMs = 400 } = {})
 }
 
 describe('mcp server tool discovery policy', () => {
-  it('exposes only firefox_activate in default lazy mode', async () => {
+  it('exposes only firefox_activate in lazy mode', async () => {
     const { stdout } = await runServerRpc([], { CLAUDEZILLA_TOOL_MODE: 'lazy' });
     const lines = stdout.split('\n').filter(Boolean).map(l => {
       try { return JSON.parse(l); } catch { return null; }
@@ -85,20 +85,43 @@ describe('mcp server tool discovery policy', () => {
     assert.deepEqual(toolNames, ['firefox_activate']);
   });
 
-  it('exposes all tools when --all-tools flag is passed', async () => {
-    const { stdout } = await runServerRpc(['--all-tools']);
-    const lines = stdout.split('\n').filter(Boolean).map(l => {
-      try { return JSON.parse(l); } catch { return null; }
-    }).filter(Boolean);
+  it('exposes the full catalog by default, as spec-shaped annotated tools', async () => {
+    // CLAUDEZILLA_TOOL_MODE is blanked so an inherited value cannot leak in.
+    const first = parseResponses((await runServerRpc([], { CLAUDEZILLA_TOOL_MODE: '' })).stdout);
+    const second = parseResponses((await runServerRpc([], { CLAUDEZILLA_TOOL_MODE: '' })).stdout);
 
-    const listResp = lines.find(l => l.id === 2);
-    assert.ok(listResp, 'Did not receive response for tools/list');
-    const toolNames = listResp.result.tools.map(t => t.name);
-    assert.ok(toolNames.includes('firefox_activate'));
-    assert.ok(toolNames.includes('firefox_create_window'));
+    const tools = first.find(l => l.id === 2)?.result.tools;
+    assert.ok(tools, 'Did not receive response for tools/list');
+    const toolNames = tools.map(t => t.name);
+    assert.ok(!toolNames.includes('firefox_activate'), 'the lazy gateway is opt-in');
+    assert.ok(toolNames.includes('firefox_navigate'));
     assert.ok(toolNames.includes('firefox_screenshot'));
-    assert.ok(toolNames.includes('firefox_get_page_state'));
     assert.ok(toolNames.length > 20, `Expected >20 tools but got ${toolNames.length}`);
+    assert.deepEqual(toolNames, second.find(l => l.id === 2).result.tools.map(t => t.name), 'tool order must be stable');
+
+    for (const tool of tools) {
+      assert.ok(!('category' in tool), `${tool.name} leaks the internal category field`);
+      assert.equal(typeof tool.annotations.readOnlyHint, 'boolean', `${tool.name} needs readOnlyHint`);
+    }
+    const alwaysLoaded = tools.filter(t => t._meta?.['anthropic/alwaysLoad'] === true).map(t => t.name).sort();
+    assert.deepEqual(alwaysLoaded, [
+      'firefox_click',
+      'firefox_create_window',
+      'firefox_get_accessibility_snapshot',
+      'firefox_navigate',
+      'firefox_screenshot',
+      'firefox_type',
+    ]);
+
+    const instructions = first.find(l => l.id === 1).result.instructions;
+    assert.equal(typeof instructions, 'string');
+    assert.ok(instructions.length <= 1500, `instructions are ${instructions.length} chars`);
+  });
+
+  it('lazy mode tells the agent to activate first', async () => {
+    const { stdout } = await runServerRpc([], { CLAUDEZILLA_TOOL_MODE: 'lazy' });
+    const instructions = parseResponses(stdout).find(l => l.id === 1).result.instructions;
+    assert.match(instructions, /^Call firefox_activate first to load the tools\. /);
   });
 
   it('exposes all tools when CLAUDEZILLA_TOOL_MODE=all is set in environment', async () => {
