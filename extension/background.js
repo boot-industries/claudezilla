@@ -907,7 +907,7 @@ async function handleCliCommand(message) {
         result = {
           extension: browser.runtime.getManifest().version,
           browser: navigator.userAgent,
-          features: ['devtools', 'network', 'console', 'evaluate', 'focusglow', 'tabgroups', 'security-hardened', 'orphan-cleanup', 'focus-loop', 'auto-retry', 'task-detection', 'expression-validation', 'windows-support', 'autonomous-install', 'attached-tabs'],
+          features: ['devtools', 'network', 'console', 'evaluate', 'focusglow', 'tabgroups', 'security-hardened', 'orphan-cleanup', 'focus-loop', 'auto-retry', 'task-detection', 'expression-validation', 'windows-support', 'autonomous-install', 'attached-tabs', 'quit-browser'],
         };
         break;
 
