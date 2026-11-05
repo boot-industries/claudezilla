@@ -634,7 +634,7 @@ const TOOLS = [
   },
   {
     name: 'firefox_get_content',
-    description: 'Get the text content of a page or element. Works on background tabs. Returns url, title, text. HTML excluded by default (use includeHtml=true if needed). Text truncated at 50K chars by default.',
+    description: 'Read the visible text of the page or of one element (ref or selector), returned as plain text after a one-line JSON header. Default 20,000 chars; when truncated, the header carries nextOffset for the next page. HTML only with includeHtml=true.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -654,9 +654,13 @@ const TOOLS = [
           type: 'boolean',
           description: 'Include raw HTML in response (default: false). Warning: can be very large.',
         },
+        offset: {
+          type: 'number',
+          description: 'Character offset to start from (use nextOffset from a truncated result)',
+        },
         maxLength: {
           type: 'number',
-          description: 'Max text length before truncation (default: 50000). Use selector for focused extraction.',
+          description: 'Max characters to return (default: 20000)',
         },
       },
     },

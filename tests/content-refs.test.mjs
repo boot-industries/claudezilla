@@ -199,3 +199,29 @@ describe('element refs, text snapshot and find', () => {
     assert.ok(snap.text.endsWith('[truncated at 2 nodes: pass ref to read a subtree or raise maxNodes]'), snap.text);
   });
 });
+
+describe('get_content paging', () => {
+  it('pages innerText by offset and reports nextOffset only while truncated', () => {
+    const { context, page } = createHarness();
+    page.body.innerText = 'a'.repeat(30) + 'b'.repeat(20);
+
+    const first = context.getContent({ maxLength: 30 });
+    assert.equal(first.textLength, 50);
+    assert.equal(first.truncated, true);
+    assert.equal(first.nextOffset, 30);
+    assert.equal(first.text, 'a'.repeat(30));
+
+    const second = context.getContent({ maxLength: 30, offset: first.nextOffset });
+    assert.equal(second.offset, 30);
+    assert.equal(second.truncated, false);
+    assert.equal('nextOffset' in second, false);
+    assert.equal(second.text, 'b'.repeat(20));
+  });
+
+  it('reads one element by ref', () => {
+    const { context, page } = createHarness();
+    page.signIn.innerText = 'Sign in';
+    const ref = refOn(context.getAccessibilitySnapshot().text, 'button "Sign in"');
+    assert.equal(context.getContent({ ref }).text, 'Sign in');
+  });
+});

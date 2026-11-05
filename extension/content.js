@@ -1374,61 +1374,46 @@ function getElementInfo(params) {
 }
 
 /**
- * Get page content
+ * Get the visible text of the page or of one element, one page at a time
  * @param {object} params - Parameters
- * @param {string} params.selector - Optional CSS selector to get specific element
+ * @param {string} params.ref - Optional element ref to read
+ * @param {string} params.selector - Optional CSS selector to read
  * @param {boolean} params.includeHtml - Include HTML in response (default: false)
- * @param {number} params.maxLength - Max text length before truncation (default: 50000)
- * @returns {object} Page content
+ * @param {number} params.offset - Character offset to start from (default: 0)
+ * @param {number} params.maxLength - Max characters returned (default: 20000)
+ * @returns {object} { url, title, offset, textLength, truncated, nextOffset?, text, html? }
  */
 function getContent(params = {}) {
-  const { selector, includeHtml = false, maxLength = 50000 } = params;
+  const { selector, includeHtml = false } = params;
+  const offset = Math.max(0, Math.floor(Number(params.offset) || 0));
+  const maxLength = Math.max(1, Math.floor(Number(params.maxLength) || 20000));
 
-  // Helper to truncate text
-  function truncateText(text, limit) {
-    if (!text || text.length <= limit) return { text, truncated: false };
-    return {
-      text: text.slice(0, limit) + '\n\n[... truncated, use selector for specific content]',
-      truncated: true
-    };
-  }
-
+  let scope = document.body;
   if (hasRef(params) || selector) {
-    const element = resolveElement(params);
-    if (!element) {
+    scope = resolveElement(params);
+    if (!scope) {
       throw new Error(`Element not found: ${selector}`);
     }
     // Show focusglow on read element
-    moveFocusTo(element);
-
-    const rawText = element.textContent?.trim() || '';
-    const { text, truncated } = truncateText(rawText, maxLength);
-
-    const result = {
-      ...targetOf(params),
-      text,
-      tagName: element.tagName.toLowerCase(),
-      textLength: rawText.length,
-      truncated,
-    };
-    if (includeHtml) {
-      result.html = element.innerHTML;
-    }
-    return result;
+    moveFocusTo(scope);
   }
 
-  const rawText = document.body?.textContent?.trim() || '';
-  const { text, truncated } = truncateText(rawText, maxLength);
+  // innerText is the rendered text: no script/style contents, hidden text excluded
+  const fullText = scope?.innerText ?? '';
+  const end = offset + maxLength;
+  const truncated = end < fullText.length;
 
   const result = {
     url: window.location.href,
     title: document.title,
-    text,
-    textLength: rawText.length,
+    offset,
+    textLength: fullText.length,
     truncated,
+    ...(truncated ? { nextOffset: end } : {}),
+    text: fullText.slice(offset, end),
   };
   if (includeHtml) {
-    result.html = document.documentElement.outerHTML;
+    result.html = scope === document.body ? document.documentElement.outerHTML : scope.innerHTML;
   }
   return result;
 }
