@@ -13,7 +13,7 @@
  */
 
 import { readMessage, sendMessage } from './protocol.js';
-import { appendFileSync, unlinkSync, existsSync, writeFileSync, readFileSync } from 'fs';
+import { unlinkSync, existsSync, writeFileSync, readFileSync } from 'fs';
 import { createServer } from 'net';
 import { randomUUID, randomBytes, timingSafeEqual } from 'crypto';
 import {
@@ -28,6 +28,7 @@ import {
   commandTimeoutMs,
   socketTimeoutMs
 } from './ipc.js';
+import { appendDebugLog } from './debug-log.js';
 
 // Single source of truth for the host version. Reading from package.json at
 // module load keeps the `version` response in sync with the npm-tracked
@@ -167,11 +168,7 @@ function log(...args) {
   const msg = `[${new Date().toISOString()}] [claudezilla-host] ${args.join(' ')}\n`;
   console.error('[claudezilla-host]', ...args);
   try {
-    // Create log file with restricted permissions if it doesn't exist
-    if (!existsSync(DEBUG_LOG)) {
-      writeFileSync(DEBUG_LOG, '', { mode: 0o600 });
-    }
-    appendFileSync(DEBUG_LOG, msg);
+    appendDebugLog(DEBUG_LOG, msg);
   } catch (e) {
     // ignore
   }
