@@ -50,7 +50,7 @@ Claudezilla drives the user's real Firefox: open tabs, navigate, read pages, cli
 
 - A ref (for example `ref_a1b2_12`) names one element in the current document. It stays valid until the page navigates or the element is removed.
 - Refs are per document: each page load gets a new random prefix, so a ref from a previous page is reported as stale rather than matching another element. Always pass refs exactly as returned.
-- A stale ref fails with `ref_N is stale or not found on the current page. Re-read the page to get fresh references.` Recover by calling `firefox_get_accessibility_snapshot` or `firefox_find` again and using the new ref. Do not guess a ref number.
+- A stale ref fails with `<ref> is stale or not found on the current page. Re-read the page to get fresh references.` (for example `ref_a1b2_12 is stale or not found …`). Recover by calling `firefox_get_accessibility_snapshot` or `firefox_find` again and using the new ref. Do not guess a ref number.
 - `firefox_get_element` and `firefox_get_content` also accept `ref`. `firefox_get_page_state` items carry `ref` too.
 
 ## Screenshots
@@ -68,14 +68,14 @@ Claudezilla drives the user's real Firefox: open tabs, navigate, read pages, cli
 ## Multi-agent etiquette
 
 - Tabs you create are yours. Never close or navigate other agents' tabs.
-- The pool holds 12 tabs shared by all agents. Close tabs you no longer need. If the pool is full, ask with `firefox_request_tab_space` rather than forcing anything.
+- The pool holds 12 tabs shared by all agents. Close tabs you no longer need. When the pool is full, opening a tab closes your own oldest tab; if you own none you get `POOL_FULL`, and then you ask with `firefox_request_tab_space` rather than forcing anything.
 - Attach to the user's own tabs only when asked: `firefox_list_all_tabs`, then `firefox_attach_tab`; detach with `firefox_detach_tab` when done.
 - `firefox_evaluate` stays disabled unless the user enables it in the add-on popup. Do not ask the user to enable it unless no other tool can do the job.
 
 ## Harness notes
 
 - **Claude Code:** screenshots arrive as inline images.
-- **omp and Mercury Agent:** MCP images are not shown inline. Run the server with `CLAUDEZILLA_SCREENSHOT_FILES=1` (the installer sets this); every screenshot is then written to `$TMPDIR/claudezilla-screenshots/` and the text block reports `savedPath`. Open `savedPath` with the harness's file reader to see the image.
+- **omp and Mercury Agent:** MCP images are not shown inline. Run the server with `CLAUDEZILLA_SCREENSHOT_FILES=1` (the omp installer target writes it into `~/.omp/agent/mcp.json`; the Mercury target prints it in the config to add); every screenshot is then written to `claudezilla-screenshots/` in the OS temp directory (`os.tmpdir()`, newest 50 kept) and the text block reports `savedPath`. Open `savedPath` with the harness's file reader to see the image.
 - **Pi:** the default codemode exposure works; no extra settings are needed. `CLAUDEZILLA_SCREENSHOT_FILES=1` is set by the printed config so `savedPath` is always available.
 - **Hermes Agent:** set `CLAUDEZILLA_SCREENSHOT_FILES: "1"` in the server `env` and add `~/.agents/skills` to `skills.external_dirs` so this skill is found.
 - All tools are listed by default. Lazy loading (a single `firefox_activate` gateway) is opt-in via `--tools lazy` or `CLAUDEZILLA_TOOL_MODE=lazy`; in that mode call `firefox_activate` first.
