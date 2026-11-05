@@ -1447,7 +1447,7 @@ const TOOL_CATEGORIES = {
   firefox_get_console: 'devtools',
   firefox_get_network: 'devtools',
   firefox_evaluate: 'devtools',
-  firefox_get_accessibility_snapshot: 'devtools',
+  firefox_get_accessibility_snapshot: 'core',
   firefox_find: 'core',
   firefox_request_tab_space: 'multiagent',
   firefox_grant_tab_space: 'multiagent',
