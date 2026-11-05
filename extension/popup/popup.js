@@ -67,7 +67,10 @@ async function saveSettings() {
       compressImages: compressImagesCheckbox.checked,
       allowEvaluate: allowEvaluateCheckbox.checked,
     };
-    await browser.storage.local.set({ claudezilla: settings });
+    // Merge into the stored object: other keys (e.g. privateMode, set via
+    // firefox_set_private_mode) are not controlled by the popup.
+    const stored = await browser.storage.local.get('claudezilla');
+    await browser.storage.local.set({ claudezilla: { ...(stored.claudezilla || {}), ...settings } });
   } catch (e) {
     console.log('[claudezilla] Could not save settings:', e.message);
   }
