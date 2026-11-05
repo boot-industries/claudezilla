@@ -48,12 +48,13 @@ TOKEN=$(tr -d '[:space:]' < "$TOKEN_FILE")
 # malformed, so it is always safe to pass.
 SESSION_ID="${CLAUDE_CODE_SESSION_ID:-}"
 if [[ -n "$SESSION_ID" ]]; then
-  PARAMS=$(jq -n --arg s "$SESSION_ID" '{sessionId: $s}')
+  PARAMS=$(jq -nc --arg s "$SESSION_ID" '{sessionId: $s}')
 else
   PARAMS='{}'
 fi
 
-GET_REQ=$(jq -n --argjson p "$PARAMS" --arg t "$TOKEN" '{command: "getLoopState", params: $p, authToken: $t}')
+# The host reads one JSON request per line, so the request must be compact (jq -c).
+GET_REQ=$(jq -nc --argjson p "$PARAMS" --arg t "$TOKEN" '{command: "getLoopState", params: $p, authToken: $t}')
 
 # Query loop state from Claudezilla host. -w bounds the connection wait so
 # the hook can never block Claude Code's exit path beyond NC_TIMEOUT seconds.
@@ -90,7 +91,7 @@ fi
 # Check max iterations (0 = unlimited)
 if [[ "$MAX" -gt 0 ]] && [[ "$ITERATION" -ge "$MAX" ]]; then
   # Max iterations reached - stop loop and allow exit
-  STOP_REQ=$(jq -n --argjson p "$PARAMS" --arg t "$TOKEN" '{command: "stopLoop", params: $p, authToken: $t}')
+  STOP_REQ=$(jq -nc --argjson p "$PARAMS" --arg t "$TOKEN" '{command: "stopLoop", params: $p, authToken: $t}')
   printf '%s\n' "$STOP_REQ" | nc -U -w "$NC_TIMEOUT" "$SOCKET_PATH" >/dev/null 2>&1 || true
   exit 0
 fi
@@ -99,7 +100,7 @@ fi
 # Will read Claude's last output and search for <promise>TEXT</promise>.
 
 # Increment iteration counter
-INC_REQ=$(jq -n --argjson p "$PARAMS" --arg t "$TOKEN" '{command: "incrementLoopIteration", params: $p, authToken: $t}')
+INC_REQ=$(jq -nc --argjson p "$PARAMS" --arg t "$TOKEN" '{command: "incrementLoopIteration", params: $p, authToken: $t}')
 printf '%s\n' "$INC_REQ" | nc -U -w "$NC_TIMEOUT" "$SOCKET_PATH" >/dev/null 2>&1 || true
 
 # Calculate next iteration number
