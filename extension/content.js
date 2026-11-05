@@ -708,6 +708,39 @@ function safeQuerySelector(selector) {
   return document.querySelector(selector);
 }
 
+/**
+ * Wait until the page is visible and has painted a frame, capped at timeoutMs.
+ * Used after the extension selects a pool tab: a background tab fires
+ * visibilitychange when it becomes active, and we proceed as soon as it does
+ * instead of sleeping a fixed interval.
+ * @param {object} options
+ * @param {number} [options.timeoutMs=300]
+ * @returns {Promise<{visible: boolean, waitedMs: number}>}
+ */
+async function awaitVisible({ timeoutMs = 300 } = {}) {
+  const start = performance.now();
+  if (document.visibilityState !== 'visible') {
+    await new Promise(resolve => {
+      let timer;
+      const onChange = () => {
+        if (document.visibilityState === 'visible') finish();
+      };
+      const finish = () => {
+        clearTimeout(timer);
+        document.removeEventListener('visibilitychange', onChange);
+        resolve();
+      };
+      timer = setTimeout(finish, timeoutMs);
+      document.addEventListener('visibilitychange', onChange);
+    });
+  }
+  await nextFrame();
+  return {
+    visible: document.visibilityState === 'visible',
+    waitedMs: Math.round(performance.now() - start),
+  };
+}
+
 // ===== AUTO-RETRY SYSTEM (v0.5.0) =====
 
 /**
@@ -2216,6 +2249,10 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
         case 'getElementInfo':
           result = getElementInfo(params);
+          break;
+
+        case 'awaitVisible':
+          result = await awaitVisible(params);
           break;
 
         case 'getPageState':

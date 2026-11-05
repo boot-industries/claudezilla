@@ -228,8 +228,8 @@ async function bringToFrontInDedicatedWindow(tabId) {
     const tab = await browser.tabs.get(tabId);
     if (tab.active || tab.windowId !== claudezillaWindow.windowId) return;
     await browser.tabs.update(tabId, { active: true });
-    // Give the page a moment to receive visibilitychange and repaint
-    await new Promise(resolve => setTimeout(resolve, 150));
+    // Wait (bounded) for the page to report visible and paint, instead of a fixed sleep
+    await executeInTab(tabId, 'awaitVisible', { timeoutMs: 300 }).catch(() => {});
   } catch (e) {
     console.log(`[claudezilla] Could not bring tab ${tabId} to front:`, e.message);
   }
