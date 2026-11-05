@@ -309,21 +309,21 @@
   <div class="container">
     <div class="content-card">
       <h1>Privacy Policy</h1>
-      <p class="last-updated">Last updated: January 6, 2025</p>
+      <p class="last-updated">Last updated: November 5, 2026</p>
 
       <h2>Overview</h2>
       <p>Claudezilla is a Firefox extension that enables browser automation for Claude Code CLI. We are committed to protecting your privacy. This policy explains what data the extension accesses and how it is handled.</p>
 
       <h2>Data Collection</h2>
-      <p><strong>Claudezilla does not collect, store, or transmit any personal data.</strong></p>
-      <p>The extension operates entirely locally on your machine. All communication occurs through a Unix socket between the extension and the native messaging host - no data is sent to external servers.</p>
+      <p><strong>Claudezilla does not collect or transmit any personal data.</strong> The extension manifest declares no data collection (<code>data_collection_permissions: none</code>).</p>
+      <p>The extension operates entirely locally on your machine. It talks to the native messaging host through Firefox native messaging, and the host talks to the Claudezilla MCP server through a local Unix socket (a named pipe on Windows) - no data is sent to external servers. The host keeps a local debug log (size-capped at 10 MB, readable only by your user) that records command names, not their parameters, apart from the first 50 characters of a focus-loop prompt.</p>
 
       <h2>What the Extension Accesses</h2>
       <p>When you use Claudezilla with Claude Code, the extension may access:</p>
       <ul>
         <li><strong>Page content:</strong> Text, DOM elements, and page structure - only when explicitly requested by Claude</li>
-        <li><strong>Screenshots:</strong> Captured and held in memory temporarily, never persisted to disk or transmitted externally</li>
-        <li><strong>Network requests:</strong> Monitored for page readiness detection only; request bodies are never captured</li>
+        <li><strong>Screenshots:</strong> Returned to Claude Code over the local connection and never transmitted externally. They are written to disk only when requested: an explicit <code>savePath</code> (restricted to the temp and working directories), or <code>CLAUDEZILLA_SCREENSHOT_FILES=1</code>, which keeps the newest 50 in a private temp directory</li>
+        <li><strong>Network requests:</strong> Monitored for page readiness detection and returned to Claude only when it asks (<code>firefox_get_network</code>); request bodies are never captured and sensitive URL query parameters are redacted</li>
         <li><strong>Console logs:</strong> Available on-demand for debugging; opt-in and never transmitted</li>
       </ul>
       <p>All accessed data remains on your local machine and is used solely to fulfill automation commands from Claude Code.</p>
@@ -334,15 +334,15 @@
         <li><strong>tabs:</strong> Create and manage browser tabs for automation</li>
         <li><strong>activeTab:</strong> Access the current tab when automation is requested</li>
         <li><strong>&lt;all_urls&gt;:</strong> Enable automation on any URL you navigate to</li>
-        <li><strong>webRequest:</strong> Detect when pages finish loading</li>
-        <li><strong>storage:</strong> Save your preferences (like compression settings)</li>
+        <li><strong>webRequest:</strong> Detect when pages finish loading, and list requests for <code>firefox_get_network</code></li>
+        <li><strong>storage:</strong> Save your preferences (like compression and private-mode settings) and Claudezilla's window and attached-tab state</li>
       </ul>
 
       <h2>Third-Party Services</h2>
       <p>The extension itself uses no third-party services. However:</p>
       <ul>
         <li><strong>Stripe:</strong> If you choose to make a donation via our <a href="/support.html">support page</a>, payment processing is handled by Stripe. See <a href="https://stripe.com/privacy" target="_blank" rel="noopener">Stripe's Privacy Policy</a>.</li>
-        <li><strong>Helio:</strong> Cryptocurrency donations are processed by Helio. See <a href="https://docs.hel.io/privacy" target="_blank" rel="noopener">Helio's Privacy Policy</a>.</li>
+        <li><strong>Helio:</strong> Cryptocurrency donations are processed by Helio (MoonPay Commerce). See <a href="https://docs.hel.io/docs/privacy-policy" target="_blank" rel="noopener">Helio's Privacy Policy</a>.</li>
       </ul>
 
       <h2>Analytics</h2>
