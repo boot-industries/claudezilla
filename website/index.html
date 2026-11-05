@@ -161,19 +161,19 @@
     <section class="features-section">
       <h2 class="section-title">Why Firefox?</h2>
       <p class="section-subtitle">
-        Chrome requires a Google account, phones home to Google servers, and ships with telemetry you cannot fully disable. Claudezilla gives Claude Code browser capabilities without any of that.
+        Chrome ties into Google accounts, phones home to Google servers, and ships with telemetry you cannot fully disable. Claudezilla gives Claude Code browser capabilities without any of that.
       </p>
 
       <div class="features-grid">
         <div class="feature-card">
           <div class="feature-icon">🔒</div>
           <h3>Zero Telemetry</h3>
-          <p>No usage data leaves your machine. No Google account. No Chrome sync. Communication runs through a local Unix socket (a named pipe on Windows) — the browser never contacts an external server on Claudezilla's behalf.</p>
+          <p>No telemetry, no Google account, no Chrome sync. Claudezilla's automation sends no page data or commands to any server: it runs through a local Unix socket (a named pipe on Windows). Apart from a donation you start, the only outside requests are Google Fonts on the extension's welcome and support pages (<a href="/privacy.html">details</a>).</p>
         </div>
         <div class="feature-card">
           <div class="feature-icon">🤝</div>
           <h3>Multi-Agent Safe</h3>
-          <p>12-tab shared pool with 128-bit agent IDs and ownership tracking. Screenshot mutex prevents collisions. Multiple Claude Code sessions coexist on the same Firefox instance without interference.</p>
+          <p>12-tab shared pool with 128-bit agent IDs. Each pool tab has an owner; other agents cannot close or navigate it, and concurrent screenshots are serialized (a second agent gets a retryable error).</p>
         </div>
         <div class="feature-card">
           <div class="feature-icon">🎮</div>
@@ -204,7 +204,7 @@
         <div class="feature-card">
           <div class="feature-icon">🛡️</div>
           <h3>Privacy by Architecture</h3>
-          <p>All communication runs through a local Unix socket (a named pipe on Windows). No network exposure, no cloud dependency, no data exfiltration surface. The entire stack is auditable — MIT-licensed.</p>
+          <p>All communication runs through a local Unix socket (a named pipe on Windows). No listening network port (the only listener is the 0600 Unix socket), no cloud dependency. The entire stack is auditable — MIT-licensed.</p>
         </div>
       </div>
     </section>
@@ -336,6 +336,7 @@ cd claudezilla && ./install/install-macos.sh</code></pre>
         <a href="https://github.com/boot-industries/claudezilla/blob/main/SECURITY.md" target="_blank" rel="noopener">Security</a>
         <a href="/support.html">Support</a>
       <a href="/changelog.html">Changelog</a>
+      <a href="/privacy.html">Privacy</a>
       </div>
       <div class="footer-credit">
         MIT License · <a href="https://boot.industries" target="_blank" rel="noopener">boot.industries</a>

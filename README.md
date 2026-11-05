@@ -13,7 +13,7 @@ A Firefox-native MCP server for Claude Code and other MCP agent harnesses. Navig
 Anthropic's official browser tool requires Chrome. If you're on a system where Chrome is not available — or not acceptable — Claudezilla gives Claude Code browser automation through Firefox.
 
 - **Linux-native** — Works with the Firefox that ships on Debian, Fedora, RHEL, Ubuntu, and every major distro. No Google repository required.
-- **Zero telemetry** — All communication runs through a local Unix socket (a named pipe on Windows). No data leaves your machine. No Google account, no Chrome sync, no phone-home.
+- **Zero telemetry** — The automation runs through a local Unix socket (a named pipe on Windows) and sends no page data or commands to any server. No Google account, no Chrome sync, no phone-home. (The extension's first-run welcome and support pages load fonts from Google Fonts; see the [privacy policy](https://claudezilla.com/privacy.html).)
 - **Hardened environments** — Built for Tails, Whonix, Qubes OS, air-gapped networks, and enterprise Linux where package policy prohibits Chrome.
 - **Multi-agent safe** — 12-tab shared pool with 128-bit agent IDs, ownership tracking, and screenshot mutex. Multiple Claude sessions coexist safely.
 - **Full browser control** — Read pages as compact accessibility snapshots with element refs; click, type, scroll, screenshot, evaluate JS (opt-in), inspect network requests and uncaught page errors.
