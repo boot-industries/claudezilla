@@ -432,22 +432,29 @@ function buildErrorMessage(errCode, socketPath, authTokenFile) {
 /**
  * Send command to Claudezilla via Unix socket (single attempt)
  * SECURITY: Includes auth token read from host-created file
+ *
+ * @param {object} [options]
+ * @param {boolean} [options.autostart=true] - false skips the on-demand
+ *   browser start: a probe that must not start the browser (the tool-list
+ *   canNavigate check) still reaches a running host but never launches one.
  */
-async function sendCommandOnce(command, params = {}) {
+async function sendCommandOnce(command, params = {}, options = {}) {
   // Optional on-demand browser start. When the host is not reachable and
   // CLAUDEZILLA_AUTOSTART_CMD is set, the browser is started and this call
   // waits for its socket. A failed start is reported alongside the original
   // connection error.
   let startError = null;
-  try {
-    const start = await autostart.ensureStarted();
-    if (start.reason === 'launch-failed') {
-      startError = start.error ?? new Error('Autostart failed');
-    } else if (start.reason === 'cooldown') {
-      startError = new Error('Autostart skipped: the previous start failed and the retry cooldown has not elapsed.');
+  if (options.autostart !== false) {
+    try {
+      const start = await autostart.ensureStarted();
+      if (start.reason === 'launch-failed') {
+        startError = start.error ?? new Error('Autostart failed');
+      } else if (start.reason === 'cooldown') {
+        startError = new Error('Autostart skipped: the previous start failed and the retry cooldown has not elapsed.');
+      }
+    } catch (e) {
+      startError = e;
     }
-  } catch (e) {
-    startError = e;
   }
 
   // SECURITY: Load auth token on each command (handles host restarts)
@@ -480,13 +487,13 @@ async function sendCommandOnce(command, params = {}) {
  * Send command to Claudezilla with automatic retry for transient failures
  * Retries with exponential backoff for ENOENT, ECONNREFUSED, ECONNRESET
  */
-async function sendCommand(command, params = {}) {
+async function sendCommand(command, params = {}, options = {}) {
   let lastError;
   let delay = RETRY_CONFIG.initialDelayMs;
 
   for (let attempt = 0; attempt <= RETRY_CONFIG.maxRetries; attempt++) {
     try {
-      return await sendCommandOnce(command, params);
+      return await sendCommandOnce(command, params, options);
     } catch (err) {
       lastError = err;
 
@@ -515,7 +522,9 @@ async function sendCommand(command, params = {}) {
  */
 async function canNavigate() {
   try {
-    const response = await sendCommand('canNavigate');
+    // Listing the tools must never start the browser (CLAUDEZILLA_AUTOSTART_CMD):
+    // probe the host as it is, and let the first tool call start it.
+    const response = await sendCommand('canNavigate', {}, { autostart: false });
     return response.result?.canNavigate ?? true;
   } catch (error) {
     // If we can't check, assume navigate is available (fail open)
