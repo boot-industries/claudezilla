@@ -12,7 +12,7 @@ This plugin provides Ralph Wiggum-style focus loops for Claudezilla. It uses Cla
 2. Claude works on the task and eventually tries to exit
 3. This plugin's Stop hook intercepts the exit
 4. Hook queries Claudezilla for loop state over the host socket, sending the host's auth token. It looks for `claudezilla.sock` and `claudezilla-auth.token` in `CLAUDEZILLA_IPC_DIR`, else `XDG_RUNTIME_DIR`, else `~/.claudezilla/`, else `${TMPDIR:-/tmp}` (the host's order); with no socket or no readable token it lets the session exit
-5. If loop is active and not complete, hook blocks exit and re-injects the prompt
+5. While the loop is active and below `maxIterations`, the hook blocks exit and re-injects the prompt
 6. Claude continues working, seeing its previous changes in files
 7. Loop ends when max iterations reached (or manually stopped)
 
@@ -38,7 +38,7 @@ reads when registering the plugin.
 firefox_start_loop({
   prompt: "Build a REST API for todos",
   maxIterations: 20,
-  completionPromise: "DONE"  // Optional: end loop when Claude outputs <promise>DONE</promise>
+  completionPromise: "DONE"  // Optional: stored with the loop state; the stop hook does not detect it yet
 })
 
 // Check loop status
