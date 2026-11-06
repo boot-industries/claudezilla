@@ -65,11 +65,11 @@ claudezilla@boot.industries
 | navigate | Navigate an owned pool tab or an attached tab to URL; never creates a window |
 | getActiveTab | Selected tab of the current window |
 | closeTab | Close tab by ID |
-| closeWindow | Close the Claudezilla window (refused while other agents have tabs) |
+| closeWindow | Close the Claudezilla window (refused only when tabs of two or more different agents are open; an adopted user window keeps the window and closes only the tracked tabs) |
 | getTabs | List tabs with ownership |
 | listAllTabs | List every open tab across windows |
 | attachTab / detachTab | Drive (or release) a user tab in place |
-| getWindows | List windows with their tabs |
+| getWindows | List windows as `{windowId, private, focused, tabCount}` |
 | resizeWindow | Resize/reposition a window |
 | setViewport | Apply a device viewport preset |
 | setPrivateMode | Private (default) or regular windows for new Claudezilla windows |
@@ -92,7 +92,7 @@ claudezilla@boot.industries
 ### Page Analysis
 | Command | Description |
 |---------|-------------|
-| getPageState | Structured JSON (headings, links, buttons, inputs, images, landmarks; items carry `ref`) |
+| getPageState | Structured JSON (headings, links, buttons, inputs, images, landmarks; headings, links, buttons and inputs carry `ref`) |
 | getAccessibilitySnapshot | Compact text tree with `[ref_N]` handles (200 node default, `filter: interactive`, `format: json`) |
 | find | Elements by visible text or accessible name, with refs and landmark context |
 | getElementInfo | Element attributes, styles |
@@ -120,16 +120,16 @@ claudezilla@boot.industries
 
 ## Multi-Agent Safety
 
-- **Tab ownership:** Only creator can close/navigate their tabs
+- **Tab ownership:** Pool tabs record their creator; close and navigate are owner-checked; content commands are checked only when a `tabId` is passed (the MCP server injects the agent's current tab once it has one; before that the window's active tab is used unchecked). Attached tabs are owner-checked only on close, and another agent can re-attach an attached tab. Owner `unknown` bypasses the check.
 - **Tab pool:** 12 tabs shared; agents can only evict their own tabs
 - **Mercy system:** `firefox_request_tab_space` / `firefox_grant_tab_space` with 30-second slot reservations
-- **Screenshot mutex:** Serialized via promise chain; returns `MUTEX_BUSY` if another agent has held it >2.5s
+- **Screenshot mutex:** Serialized via promise chain; if another agent has held it >2.5s the caller gets `Screenshot mutex held by another agent` (internal code `MUTEX_BUSY`)
 - **Agent IDs:** `agent_<128-bit-hex>_<pid>` (truncated to 12 chars in logs)
 - **Session cleanup:** bounded `goodbye` (2 s, never autostarts the browser) on SIGINT/SIGTERM/SIGHUP, stdin end and beforeExit; each MCP server closes its own agent's pool tabs after 10 min without a tool call (`CLAUDEZILLA_AGENT_TIMEOUT_MS`, `0` disables)
 
 ## Security
 
-- Socket permissions 0600, buffer limit 10MB
+- Socket chmod'ed to 0600 right after `listen()`, buffer limit 10MB
 - URL schemes whitelisted: `http:`, `https:`, `about:`, `file:`
 - CSS selectors validated (1000 char limit)
 - Expression validation blocks dangerous patterns in `evaluate`
@@ -144,12 +144,12 @@ claudezilla@boot.industries
 ### Supply Chain Hardening (v0.6.4)
 
 - `ignore-scripts=true` in `.npmrc` (root, `mcp/`, `worker/`) — blocks postinstall hook attacks
-- All dependency versions pinned to exact (no `^`/`~` ranges)
-- pnpm with strict dependency isolation (root, `mcp/`, `worker/`)
+- All direct dependency versions pinned to exact (no `^`/`~` ranges)
+- pnpm with strict dependency isolation for development and CI (root, `mcp/`, `worker/`); the installers run `npm install` in `mcp/`, which ignores `pnpm-lock.yaml`
 - GitHub Actions SHA-pinned (no mutable tags)
 - All CI workflows have explicit `permissions:` blocks
 - Bot-detection in `dep-audit.yml` flags Dependabot/Renovate PRs
-- Install scripts use `--ignore-scripts` flag
+- macOS/Linux install scripts use the `--ignore-scripts` flag; the Windows installer relies on `mcp/.npmrc` (`ignore-scripts=true`)
 - Lockfiles committed for all workspaces including zero-dep `host/`
 
 See [SECURITY.md](./SECURITY.md) for full security model.
