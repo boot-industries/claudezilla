@@ -15,10 +15,14 @@ import { randomUUID } from 'node:crypto';
 import { requestOverSocket } from '../mcp/socket-request.js';
 import { isWindows } from '../host/ipc.js';
 
+// Unix socket paths are capped at 104 bytes on macOS (108 on Linux), and macOS's
+// per-user tmpdir (/var/folders/xx/.../T/) already takes ~49 of them, so keep
+// the file name short: a full UUID pushes the path to 107 and listen() fails
+// with EINVAL.
 function ipcPath() {
   return isWindows()
     ? `\\\\.\\pipe\\claudezilla-test-${randomUUID()}`
-    : join(tmpdir(), `claudezilla-test-${randomUUID()}.sock`);
+    : join(tmpdir(), `cz-req-${randomUUID().slice(0, 8)}.sock`);
 }
 
 /**
