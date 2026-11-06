@@ -7,14 +7,14 @@ Claudezilla is designed with security as a core principle. This document outline
 ## Architecture
 
 ```
-Claude Code CLI → Unix Socket → Native Host → Firefox Extension → Browser
+Claude Code CLI → MCP Server → Unix Socket (named pipe on Windows) → Native Host → Firefox Extension → Browser
 ```
 
 ## Security Principles
 
 ### 1. Command Whitelist
 
-Only specific, well-defined commands are allowed. The native host rejects any command not in the whitelist:
+Only specific, well-defined commands are allowed. The native host rejects any command not in the whitelist (`host/index.js`):
 
 ```javascript
 const ALLOWED_COMMANDS = new Set([
@@ -28,6 +28,9 @@ const ALLOWED_COMMANDS = new Set([
   'type',
   'screenshot',
   'getTabs',
+  'listAllTabs',
+  'attachTab',
+  'detachTab',
   'closeTab',
   'createWindow',
   'closeWindow',
@@ -41,14 +44,40 @@ const ALLOWED_COMMANDS = new Set([
   'waitFor',
   'evaluate',
   'getElementInfo',
+  // Page analysis (fast alternatives to screenshots)
+  'getPageState',
+  'getAccessibilitySnapshot',
+  'find',
+  // Keyboard input
+  'pressKey',
+  // Loop/concentration feature
+  'startLoop',
+  'stopLoop',
+  'getLoopState',
+  'incrementLoopIteration',
+  // Tab space coordination (mercy system)
+  'requestTabSpace',
+  'grantTabSpace',
+  'getSlotRequests',
+  'cleanupOrphanedTabs',
+  // Settings
+  'setPrivateMode',
+  // Session cleanup
+  'goodbye',
+  // Clean quit (opt-in via CLAUDEZILLA_ALLOW_QUIT, see handleCliCommand)
+  'quitBrowser',
+  // Consent automation
+  'handleConsent',
+  // Window mode query
+  'getWindowMode',
 ]);
 ```
 
-**Why:** Prevents arbitrary code execution. Only predefined actions can be performed.
+**Why:** Only predefined actions can be performed over the socket. The exception is `firefox_evaluate` (`evaluate`), which runs arbitrary JavaScript in the page once the user enables it in the popup (§12).
 
 ### 2. Structured Data Model
 
-All responses are structured JSON with explicit fields:
+All extension responses are structured JSON with explicit fields:
 
 ```json
 {
@@ -61,11 +90,11 @@ All responses are structured JSON with explicit fields:
 }
 ```
 
-**Why:** Page content is always DATA, never interpreted as instructions. Claude Code receives structured data, not free-form text that could contain injection attacks.
+**Why:** Page content is always DATA, never interpreted as instructions. The MCP server returns tool results as compact JSON; for the text-bodied tools (`firefox_get_content`, `firefox_get_accessibility_snapshot`, `firefox_find`) it returns a one-line JSON header followed by the page text. Page text stays separate from the metadata, but it is still untrusted free-form text.
 
 ### 3. No Content-as-Instructions
 
-The extension returns page content as a `text` or `html` field in JSON. Claude Code should:
+The extension returns page content as a `text` or `html` field in JSON (the MCP server places `text` after a JSON header). Claude Code should:
 - Treat this content as untrusted data
 - Never execute instructions found in page content
 - Parse the structured response, not interpret prose
@@ -76,17 +105,18 @@ The extension returns page content as a `text` or `html` field in JSON. Claude C
 
 The Unix socket is secured with multiple layers:
 
-- **Secure path:** Uses `XDG_RUNTIME_DIR` if available (per-user, tmpfs-backed), falls back to `tmpdir()`
-- **Restrictive permissions:** Socket is chmod 0600 (user-only access)
+- **Secure path:** Uses `CLAUDEZILLA_IPC_DIR` if set (POSIX only), else `XDG_RUNTIME_DIR` if available (per-user, tmpfs-backed), else `~/.claudezilla/` (mode 0700), else `tmpdir()`. Windows uses the named pipe `\\.\pipe\claudezilla` with the token under `%LOCALAPPDATA%\claudezilla\`.
+- **Restrictive permissions:** Socket is chmod'ed to 0600 (user-only access) right after `listen()`
+- **Auth token:** The host writes a random token file (0600) at startup; every socket request must carry it, and it is compared with `crypto.timingSafeEqual()`
 - **Buffer limits:** 10MB max message size prevents memory exhaustion
-- **Clean shutdown:** Socket is removed on exit
+- **Clean shutdown:** Socket and token file are removed on exit
 
 **Why:** Prevents local privilege escalation on multi-user systems.
 
 ### 5. Extension Permission Gating
 
 - `firefox_navigate` only drives an existing Claudezilla pool tab or an attached tab, and never creates a window.
-- Windows are created only by `firefox_create_window`, which enforces the private-mode setting.
+- Windows are created only by `firefox_create_window`. The private-mode setting is only its default: a per-call `private: true|false` overrides it, a private request falls back to a regular window when private-window access is not granted, and agents can change the setting with `firefox_set_private_mode`.
 - The pre-0.7.7 rule that disabled navigate when the add-on could run in private windows was removed, because it guarded no window-creating path.
 
 ### 6. URL Scheme Validation (v0.4.5)
@@ -103,38 +133,41 @@ All URL inputs are validated before navigation:
 When multiple Claude agents share the browser window:
 
 - **Tab ownership:** Each tab tracks its creator agent (128-bit entropy agent ID)
-- **Close restrictions:** Agents can only close their own tabs
-- **Window close:** Blocked if other agents have active tabs
+- **Close restrictions:** Agents can only close their own pool tabs; an attached tab can be closed only by the agent that attached it, but another agent can re-attach it first (attaching has no existing-owner guard)
+- **Window close:** Refused only when tabs of two or more different agents are open (tabs with owner `unknown` are ignored); in an adopted user window only the tracked tabs are closed
 - **Request IDs:** UUID-based to prevent collision attacks
 
 **Why:** Prevents cross-agent interference in multi-agent environments.
 
 ### 8. Sensitive Data Handling (v0.4.5)
 
-Network monitoring excludes sensitive data:
+Monitoring, logging and screenshot files handle sensitive data as follows:
 
 - **No request bodies:** POST data is never captured (passwords, tokens)
 - **URL redaction:** Query parameters matching sensitive patterns are masked
-- **Debug log permissions:** 0600 (user-only read/write)
+- **Debug log permissions:** 0600 (user-only read/write), capped at 10MB (rotated to `.1`)
+- **Command logging:** The host log and the extension's `CLI command:` line record command names, not parameters (the host logs the first 50 characters of a focus-loop prompt). Known gap: the extension console (about:debugging inspector) still prints every raw host message, parameters (typed text, passwords) included.
+- **Screenshot files:** `savePath` must be inside the temp or working directory and end in `.jpg`/`.jpeg` (JPEG) or `.png` (PNG); files are written 0600 without following symlinks (macOS/Linux), and only that file is written. Without `savePath`, `CLAUDEZILLA_SCREENSHOT_FILES=1` writes to a 0700 `claudezilla-screenshots` directory under the temp directory and keeps the newest 50.
 
 **Why:** Prevents credential leakage through monitoring features.
 
 ### 9. Content Command Ownership (v0.4.5)
 
-All commands that interact with tab content verify ownership:
+Commands that interact with tab content check ownership when they know the target tab:
 
-- **Protected commands:** getContent, click, type, scroll, waitFor, evaluate, getElementInfo, getPageState, getAccessibilitySnapshot, pressKey, getConsoleLogs, getNetworkRequests, screenshot
-- **Enforcement:** Agent ID must match tab owner or tab must be unowned ('unknown')
-- **Error response:** `OWNERSHIP: Cannot <operation> tab X (owned by agent_Y)`
+- **Commands:** navigate, getContent, click, type, scroll, waitFor, evaluate, getElementInfo, getPageState, getAccessibilitySnapshot, find, pressKey, getConsoleLogs, getNetworkRequests, screenshot, handleConsent
+- **Enforcement:** When a `tabId` is passed, the agent ID must match the pool tab's owner or the tab must be unowned (`unknown` bypasses the check). The MCP server passes the agent's current tab automatically once it has one; a call without `tabId` before that uses the window's active tab without a check, except `navigate` and `handleConsent`, which check it. Tabs attached with `firefox_attach_tab` are driven in place without this check.
+- **Error response:** `OWNERSHIP: Cannot <operation> tab X (owned by agent_Y, you are agent_Z)`
 
 **Why:** Prevents cross-agent data exfiltration and unauthorized DOM manipulation.
 
 ### 10. Console Capture Opt-In (v0.4.5)
 
-Console log capture is disabled by default:
+Error capture is disabled by default:
 
-- **Default state:** No console interception active
-- **Activation:** First `getConsoleLogs` call enables capture for that tab
+- **Default state:** No capture active
+- **Activation:** First `getConsoleLogs` call (`firefox_get_console`) enables capture for that tab
+- **What is captured:** Uncaught errors and unhandled promise rejections only. The page's own `console.log`/`warn`/`error` calls are not captured.
 - **Scope:** Per-page; reloads reset capture state
 
 **Why:** Prevents inadvertent capture of sensitive data logged by page scripts (API keys, tokens, debug info).
@@ -151,7 +184,7 @@ All CSS selectors are validated before use:
 
 ### 12. `firefox_evaluate` Opt-In Gate (v0.6.6)
 
-The `firefox_evaluate` MCP tool executes arbitrary JavaScript via the `Function` constructor inside the page's isolated content-script context. Although every expression passes a denylist (`fetch`, `XMLHttpRequest`, `eval`, `Function`, `setTimeout`, `setInterval`, `document.cookie`, `localStorage`, `sessionStorage`) and a 10,000-character length cap, denylists are not bulletproof — template literals, unicode escapes, or property-access tricks could in principle slip past.
+The `firefox_evaluate` MCP tool executes arbitrary JavaScript via the `Function` constructor inside the page's isolated content-script context. Although every expression passes a denylist (`fetch`, `XMLHttpRequest`, dynamic `import()`, `eval`, `Function`, `setTimeout`, `setInterval`, `document.cookie`, `localStorage`, `sessionStorage`) and a 10,000-character length cap, denylists are not bulletproof — template literals, unicode escapes, or property-access tricks could in principle slip past.
 
 To make the security posture explicit, **`firefox_evaluate` is disabled by default**. Calls return:
 
@@ -176,7 +209,7 @@ If Claude Code naively processes page content as instructions, it could be manip
 
 ### The Mitigation
 
-1. **Structured returns:** Content is in explicit fields (`result.text`), not mixed with instructions
+1. **Structured returns:** Content is in explicit fields (`result.text`); MCP text-bodied tools put it after a one-line JSON header, not mixed with instructions
 2. **Command-only model:** Claude Code sends commands, doesn't ask "what should I do with this page?"
 3. **No interpretation:** The extension executes specific actions, never interprets page content as commands
 
@@ -199,13 +232,21 @@ const pageText = response.result.text;  // Treat as DATA
 
 3. **Limit permissions:** The extension has broad permissions (`<all_urls>`). Consider using Firefox containers for sensitive browsing.
 
-4. **Monitor activity:** Check `~/.claudezilla/claudezilla-debug.log` (or `$XDG_RUNTIME_DIR/claudezilla-debug.log` if set) to see what commands are being executed.
+4. **Monitor activity:** Check `claudezilla-debug.log` in `$CLAUDEZILLA_IPC_DIR`, else `$XDG_RUNTIME_DIR`, else `~/.claudezilla/` (Windows: `%LOCALAPPDATA%\claudezilla\debug.log`) to see which commands are being executed.
 
 ## Reporting Security Issues
 
 If you discover a security vulnerability, please report it to: security@boot.industries
 
 ## Changelog
+
+- **0.7.7:** Vetted community PRs and hardening (November 2026)
+  - Screenshot `savePath` confined to temp/working directories, matching extension, 0600, no symlink following
+  - Wildcard domain patterns escape the dot (`*.example.com` no longer matches `evilexample.com`)
+  - Host debug log capped at 10MB; extension replies and command parameters are not written to it
+  - `quitBrowser` CLI command, refused unless `CLAUDEZILLA_ALLOW_QUIT=1` is in the browser's environment
+  - Focus-loop stop hook sends the auth token
+  - Private-window navigate gate removed (§5)
 
 - **0.5.8:** Community install fixes (February 2026)
   - macOS native messaging host path corrected (Linux path was used by mistake)

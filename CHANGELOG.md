@@ -37,7 +37,8 @@
 - **`firefox_find`** — find elements by visible text or accessible name, with landmark context.
 - **Vision-sized screenshots** — long edge capped at `maxEdge` (default 1568, up to 2576), `region`
   zoom, and `width`/`height`/`cssScale` reported before the image. `CLAUDEZILLA_SCREENSHOT_FILES=1`
-  also writes each screenshot to a private temp directory for harnesses without inline images.
+  also writes each screenshot without an explicit `savePath` to a private temp directory for
+  harnesses without inline images.
 - **Full catalog by default** — tools are annotated (`readOnlyHint`, `destructiveHint`,
   `openWorldHint`), titled, and the server sends `instructions`. Lazy loading is opt-in
   (`--tools lazy` / `CLAUDEZILLA_TOOL_MODE=lazy`). Results are compact JSON; text bodies follow a
@@ -51,11 +52,14 @@
 - `firefox_wait_for` forwards its `timeout` to the page instead of overwriting it.
 - `*.example.com` no longer matches `evilexample.com`.
 - `savePath` is confined to the temp and working directories, needs a matching extension, and is
-  written 0600 without following symlinks.
+  written 0600 without following symlinks (macOS/Linux).
 - Calls without `tabId` target the agent's own current tab, not the extension's global active tab.
 - `firefox_scroll` defaults to `instant` and reports the position after a smooth scroll settles.
 - The focus-loop stop hook authenticates and honours `CLAUDEZILLA_IPC_DIR`.
-- Command parameters (typed text, passwords) are no longer logged by the extension.
+- The extension's `CLI command:` log line no longer prints command parameters (typed text,
+  passwords), and the host log records command names only (plus the first 50 characters of a
+  focus-loop prompt). Known gap: the extension console (about:debugging inspector) still shows raw
+  host messages, parameters included.
 - A ref carries a random per-page prefix (`ref_a1b2_12`), so a ref from a previous page is reported
   as stale instead of matching an unrelated element. `firefox_find` matches full accessible names,
   and snapshots and find see through `display: contents` wrappers.
@@ -103,7 +107,7 @@
 
 ### Fixes & Improvements
 
-- **The Screenshot Path Captures the Agent's Tab (#27, reported by @AdamWiley46)** — in an
+- **The Screenshot Path Captures the Agent's Tab (PR #27, @andrei-rizoiu; found in the v0.7.2 review)** — in an
   adopted (user) window the capture returned the user's visible page: the path compared
   the target against Claudezilla's own `activeTabId` instead of the browser's selected
   tab, then captured the window. It now captures the requested tab directly.

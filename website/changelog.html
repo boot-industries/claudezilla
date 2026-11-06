@@ -256,14 +256,213 @@
     <!-- Releases -->
     <div class="releases">
 
-      <!-- v0.7.2 -->
+      <!-- v0.7.7 -->
       <div class="release latest">
+        <div class="release-header">
+          <span class="release-version">v0.7.7</span>
+          <span class="release-date">2026-11-05</span>
+          <span class="release-badge">Latest</span>
+        </div>
+        <p class="release-tagline">Vetted community PRs #40–#49, element refs and <code>firefox_find</code>, vision-sized screenshots, full tool catalog by default (PR #50; fixes #47)</p>
+
+        <div class="change-section">
+          <h3>Community Contributions</h3>
+          <ul class="change-list">
+            <li class="change-item">
+              <span class="change-tag tag-chore">chore</span>
+              <div class="change-text">
+                <strong><code>npm test</code> Finds the Suite on Node 22+ (PR #41)</strong>
+                <span class="detail">Thanks @andrei-rizoiu. Bare <code>node --test</code>.</span>
+              </div>
+            </li>
+            <li class="change-item">
+              <span class="change-tag tag-fix">fix</span>
+              <div class="change-text">
+                <strong><code>CLAUDEZILLA_AUTOSTART_CMD</code> Is Not Triggered by Listing Tools (PR #43)</strong>
+                <span class="detail">Thanks @andrei-rizoiu. A <code>tools/list</code> probe no longer starts the browser. The <code>autostart: false</code> option it added is reused by the shutdown goodbye.</span>
+              </div>
+            </li>
+            <li class="change-item">
+              <span class="change-tag tag-fix">fix</span>
+              <div class="change-text">
+                <strong>Driven Tab Stays Selected in a Dedicated Window (PR #44)</strong>
+                <span class="detail">Thanks @andrei-rizoiu. The fixed 150 ms wait after selecting a pool tab is now a capped wait for the page to report visible.</span>
+              </div>
+            </li>
+            <li class="change-item">
+              <span class="change-tag tag-feat">feat</span>
+              <div class="change-text">
+                <strong><code>quitBrowser</code> (PR #45)</strong>
+                <span class="detail">Thanks @andrei-rizoiu. Clean shutdown of an agent-only browser; off by default, CLI only, advertised as the <code>quit-browser</code> feature.</span>
+              </div>
+            </li>
+            <li class="change-item">
+              <span class="change-tag tag-chore">chore</span>
+              <div class="change-text">
+                <strong>Dependency Audit on Fork PRs (PR #46)</strong>
+                <span class="detail">Thanks @andrei-rizoiu. No <code>pull_request_target</code>.</span>
+              </div>
+            </li>
+            <li class="change-item">
+              <span class="change-tag tag-fix">fix</span>
+              <div class="change-text">
+                <strong>Goodbye Loop on Client Exit (PR #48, fixes #47)</strong>
+                <span class="detail">Thanks @braklo. The server exits once the client goes away. Goodbye now never starts Firefox, is bounded to 2 s, and a 3 s backstop forces exit.</span>
+              </div>
+            </li>
+            <li class="change-item">
+              <span class="change-tag tag-fix">fix</span>
+              <div class="change-text">
+                <strong>Debug Log Cap (PR #49)</strong>
+                <span class="detail">Thanks @braklo. The host debug log is size-capped; extension replies are logged without stringifying the payload.</span>
+              </div>
+            </li>
+            <li class="change-item">
+              <span class="change-tag tag-chore">security</span>
+              <div class="change-text">
+                <strong>proxy-addr CVE-2026-90711 (PR #40 — superseded)</strong>
+                <span class="detail">Thanks @anupamme. The code path is unreachable (the stdio server never uses express), but the <code>mcp/</code> lockfile was stale (SDK 1.29.0 against a pinned 1.32.1). It is refreshed and resolves proxy-addr 2.0.8 without a permanent override.</span>
+              </div>
+            </li>
+            <li class="change-item">
+              <span class="change-tag tag-fix">fix</span>
+              <div class="change-text">
+                <strong>Navigate Gate (PR #42 — superseded)</strong>
+                <span class="detail">Thanks @andrei-rizoiu. The root cause is fixed instead: <code>firefox_navigate</code> never creates a window, so the "disabled in private windows" gate and the <code>canNavigate</code> probe are gone (see SECURITY.md §5).</span>
+              </div>
+            </li>
+          </ul>
+        </div>
+
+        <div class="change-section">
+          <h3>Features</h3>
+          <ul class="change-list">
+            <li class="change-item">
+              <span class="change-tag tag-feat">feat</span>
+              <div class="change-text">
+                <strong>Element refs</strong>
+                <span class="detail"><code>firefox_get_accessibility_snapshot</code> returns a compact text tree with <code>[ref_N]</code> handles; <code>firefox_click</code>, <code>firefox_type</code>, <code>firefox_scroll</code>, <code>firefox_press_key</code>, <code>firefox_get_element</code>, <code>firefox_get_content</code> accept <code>ref</code>. A stale ref fails with a re-read hint.</span>
+              </div>
+            </li>
+            <li class="change-item">
+              <span class="change-tag tag-feat">feat</span>
+              <div class="change-text">
+                <strong><code>firefox_find</code></strong>
+                <span class="detail">Find elements by visible text or accessible name, with landmark context.</span>
+              </div>
+            </li>
+            <li class="change-item">
+              <span class="change-tag tag-feat">feat</span>
+              <div class="change-text">
+                <strong>Vision-sized screenshots</strong>
+                <span class="detail">Long edge capped at <code>maxEdge</code> (default 1568, up to 2576), <code>region</code> zoom, and <code>width</code>/<code>height</code>/<code>cssScale</code> reported before the image. <code>CLAUDEZILLA_SCREENSHOT_FILES=1</code> also writes each screenshot without an explicit <code>savePath</code> to a private temp directory for harnesses without inline images.</span>
+              </div>
+            </li>
+            <li class="change-item">
+              <span class="change-tag tag-feat">feat</span>
+              <div class="change-text">
+                <strong>Full catalog by default</strong>
+                <span class="detail">Tools are annotated (<code>readOnlyHint</code>, <code>destructiveHint</code>, <code>openWorldHint</code>), titled, and the server sends <code>instructions</code>. Lazy loading is opt-in (<code>--tools lazy</code> / <code>CLAUDEZILLA_TOOL_MODE=lazy</code>). Results are compact JSON; text bodies follow a one-line header.</span>
+              </div>
+            </li>
+            <li class="change-item">
+              <span class="change-tag tag-feat">feat</span>
+              <div class="change-text">
+                <strong>Portable <code>claudezilla-browser</code> Agent Skill</strong>
+                <span class="detail">Installer updates for omp, Pi, Hermes Agent and Mercury.</span>
+              </div>
+            </li>
+          </ul>
+        </div>
+
+        <div class="change-section">
+          <h3>Fixes &amp; Security</h3>
+          <ul class="change-list">
+            <li class="change-item">
+              <span class="change-tag tag-fix">fix</span>
+              <div class="change-text">The popup no longer erases <code>privateMode</code> when saving settings.</div>
+            </li>
+            <li class="change-item">
+              <span class="change-tag tag-fix">fix</span>
+              <div class="change-text"><code>firefox_wait_for</code> forwards its <code>timeout</code> to the page instead of overwriting it.</div>
+            </li>
+            <li class="change-item">
+              <span class="change-tag tag-chore">security</span>
+              <div class="change-text"><code>*.example.com</code> no longer matches <code>evilexample.com</code>.</div>
+            </li>
+            <li class="change-item">
+              <span class="change-tag tag-chore">security</span>
+              <div class="change-text"><code>savePath</code> is confined to the temp and working directories, needs a matching extension, and is written 0600 without following symlinks (macOS/Linux).</div>
+            </li>
+            <li class="change-item">
+              <span class="change-tag tag-fix">fix</span>
+              <div class="change-text">Calls without <code>tabId</code> target the agent's own current tab, not the extension's global active tab.</div>
+            </li>
+            <li class="change-item">
+              <span class="change-tag tag-fix">fix</span>
+              <div class="change-text"><code>firefox_scroll</code> defaults to <code>instant</code> and reports the position after a smooth scroll settles.</div>
+            </li>
+            <li class="change-item">
+              <span class="change-tag tag-fix">fix</span>
+              <div class="change-text">The focus-loop stop hook authenticates and honours <code>CLAUDEZILLA_IPC_DIR</code>.</div>
+            </li>
+            <li class="change-item">
+              <span class="change-tag tag-chore">security</span>
+              <div class="change-text">The extension's <code>CLI command:</code> log line no longer prints command parameters (typed text, passwords), and the host log records command names only (plus the first 50 characters of a focus-loop prompt). Known gap: the extension console (about:debugging inspector) still shows raw host messages, parameters included.</div>
+            </li>
+            <li class="change-item">
+              <span class="change-tag tag-fix">fix</span>
+              <div class="change-text">A ref carries a random per-page prefix (<code>ref_a1b2_12</code>), so a ref from a previous page is reported as stale instead of matching an unrelated element. <code>firefox_find</code> matches full accessible names, and snapshots and find see through <code>display: contents</code> wrappers.</div>
+            </li>
+            <li class="change-item">
+              <span class="change-tag tag-fix">fix</span>
+              <div class="change-text"><code>firefox_navigate</code> without <code>tabId</code> verifies ownership of the session tab, like an explicit <code>tabId</code>.</div>
+            </li>
+            <li class="change-item">
+              <span class="change-tag tag-fix">fix</span>
+              <div class="change-text"><code>firefox_screenshot</code> is no longer annotated <code>readOnlyHint</code> (it can write files); <code>--tools all</code> wins over <code>CLAUDEZILLA_TOOL_MODE=lazy</code>. The installers no longer nest the skill link inside a copied skill directory.</div>
+            </li>
+          </ul>
+        </div>
+
+        <div class="change-section">
+          <h3>Breaking Changes</h3>
+          <ul class="change-list">
+            <li class="change-item">
+              <span class="change-tag tag-chore">breaking</span>
+              <div class="change-text"><code>firefox_screenshot</code> <code>purpose</code> and <code>scale</code> are removed (use <code>maxEdge</code> / <code>region</code>).</div>
+            </li>
+            <li class="change-item">
+              <span class="change-tag tag-chore">breaking</span>
+              <div class="change-text">Every tool is listed by default; <code>firefox_activate</code> exists only in lazy mode. <code>--all-tools</code> is ignored.</div>
+            </li>
+            <li class="change-item">
+              <span class="change-tag tag-chore">breaking</span>
+              <div class="change-text">Annotated screenshot labels are <code>{ref, role, text}</code> (no <code>selector</code>).</div>
+            </li>
+            <li class="change-item">
+              <span class="change-tag tag-chore">breaking</span>
+              <div class="change-text"><code>firefox_get_content</code> returns visible text (<code>innerText</code>), 20,000 characters per call.</div>
+            </li>
+            <li class="change-item">
+              <span class="change-tag tag-chore">breaking</span>
+              <div class="change-text"><code>firefox_scroll</code> defaults to <code>behavior: instant</code>.</div>
+            </li>
+            <li class="change-item">
+              <span class="change-tag tag-chore">breaking</span>
+              <div class="change-text"><code>savePath</code> is restricted as above.</div>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- v0.7.2 -->
+      <div class="release">
         <div class="release-header">
           <span class="release-version">v0.7.2</span>
           <span class="release-date">2026-10-19</span>
-          <span class="release-badge">Latest</span>
         </div>
-        <p class="release-tagline">Bounded frame waits, adopted-window politeness, correct MCP registration — community PRs #26, #27, #28, #30</p>
+        <p class="release-tagline">Bounded frame waits, adopted-window politeness, correct MCP registration — community PRs #26, #27, #28, #29, #30, plus issues #24 and #31</p>
 
         <div class="change-section">
           <h3>Fixes & Improvements</h3>
@@ -300,7 +499,21 @@
               <span class="change-tag tag-fix">fix</span>
               <div class="change-text">
                 <strong>MCP Registration via <code>claude mcp add</code> (PR #30, fixes #24)</strong>
-                <span class="detail">Thanks @flo-dhalluin (Florent D'halluin). The installers register the server where Claude Code reads it, and the Windows installer writes its JSON without a BOM. <code>firefox_evaluate</code> is no longer auto-allowed — it stays behind the extension's opt-in.</span>
+                <span class="detail">Thanks @flo-dhalluin (Florent D'halluin, commits as @flo-netheos). The installers register the server where Claude Code reads it (<code>~/.claude.json</code>), and the Windows installer writes its JSON without a BOM.</span>
+              </div>
+            </li>
+            <li class="change-item">
+              <span class="change-tag tag-fix">fix</span>
+              <div class="change-text">
+                <strong>The Screenshot Path Captures the Agent's Tab (PR #27)</strong>
+                <span class="detail">Thanks @andrei-rizoiu; found in the v0.7.2 review. In an adopted (user) window the capture returned the user's visible page. It now captures the requested tab directly.</span>
+              </div>
+            </li>
+            <li class="change-item">
+              <span class="change-tag tag-chore">security</span>
+              <div class="change-text">
+                <strong><code>firefox_evaluate</code> Is No Longer Auto-Allowed (#24)</strong>
+                <span class="detail">Reported by @AdamWiley46. The blanket <code>mcp__claudezilla__*</code> permission is replaced by an explicit tool list, so <code>firefox_evaluate</code> stays behind the extension's own opt-in.</span>
               </div>
             </li>
             <li class="change-item">
@@ -308,6 +521,13 @@
               <div class="change-text">
                 <strong>Configurable Idle-Agent Cleanup (#31)</strong>
                 <span class="detail">Reported by @AdamWiley46. <code>CLAUDEZILLA_AGENT_TIMEOUT_MS=0</code> now disables the idle-agent reaper entirely, instead of falling back to the 10-minute default.</span>
+              </div>
+            </li>
+            <li class="change-item">
+              <span class="change-tag tag-chore">security</span>
+              <div class="change-text">
+                <strong>Dependency Advisory in the Shipped MCP SDK</strong>
+                <span class="detail"><code>@modelcontextprotocol/sdk</code> pinned at 1.32.1, past GHSA-6qxp-vccf-f47h; the dependency-audit gate now blocks on runtime-dependency findings and reports dev-only findings as advisories.</span>
               </div>
             </li>
           </ul>
