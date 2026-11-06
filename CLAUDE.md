@@ -61,9 +61,10 @@ claudezilla@boot.industries
 |---------|-------------|
 | ping | Test connection |
 | version | Get host version |
-| createWindow | Open URL in shared 12-tab pool (auto-fallback on private mode failure) |
-| navigate | Navigate an owned pool tab or an attached tab to URL; never creates a window |
+| createWindow | Open URL in shared 12-tab pool (auto-fallback on private mode failure); `container` opens the tab in a Firefox container and forces non-private mode |
+| navigate | Navigate an owned pool tab or an attached tab to URL; never creates a window; `container` asserts the tab's container (`CONTAINER_IMMUTABLE` on mismatch) |
 | getActiveTab | Selected tab of the current window |
+| listContainers | List Firefox containers (name, cookieStoreId, color, icon) |
 | closeTab | Close tab by ID |
 | closeWindow | Close the Claudezilla window (refused only when tabs of two or more different agents are open; an adopted user window keeps the window and closes only the tracked tabs) |
 | getTabs | List tabs with ownership |
