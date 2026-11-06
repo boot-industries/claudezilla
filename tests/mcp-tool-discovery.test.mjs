@@ -13,8 +13,10 @@ function parseResponses(stdout) {
 }
 
 // Sends initialize + tools/list, then `requests`. Resolves as soon as the last
-// request is answered, or after `waitMs` at the latest.
-function runServerRpc(args = [], env = {}, { requests = [], waitMs = 400 } = {}) {
+// request is answered, or after `waitMs` at the latest. The cap only bounds a
+// failure: a cold `node mcp/server.js` start can take over 400 ms on a loaded
+// CI runner (macOS), so a tight cap kills the server before it answers.
+function runServerRpc(args = [], env = {}, { requests = [], waitMs = 5000 } = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn('node', ['mcp/server.js', ...args], {
       cwd: new URL('../', import.meta.url).pathname,
