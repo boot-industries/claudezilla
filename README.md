@@ -13,9 +13,9 @@ A Firefox-native MCP server for Claude Code and other MCP agent harnesses. Navig
 Anthropic's official browser tool requires Chrome. If you're on a system where Chrome is not available — or not acceptable — Claudezilla gives Claude Code browser automation through Firefox.
 
 - **Linux-native** — Works with the Firefox that ships on Debian, Fedora, RHEL, Ubuntu, and every major distro. No Google repository required.
-- **Zero telemetry** — The automation runs through a local Unix socket (a named pipe on Windows) and sends no page data or commands to any server. No Google account, no Chrome sync, no phone-home. (The extension's first-run welcome and support pages load fonts from Google Fonts; see the [privacy policy](https://claudezilla.com/privacy.html).)
+- **Zero telemetry** — The automation runs through a local Unix socket (a named pipe on Windows) and sends no page data or commands to any server. No Google account, no Chrome sync, no phone-home. Exceptions, both on extension pages: the welcome and support pages load fonts from Google Fonts, and the support page contacts `api.claudezilla.com` only if you start a donation (see the [privacy policy](https://claudezilla.com/privacy.html)).
 - **Hardened environments** — Built for Tails, Whonix, Qubes OS, air-gapped networks, and enterprise Linux where package policy prohibits Chrome.
-- **Multi-agent safe** — 12-tab shared pool with 128-bit agent IDs, ownership tracking, and screenshot mutex. Multiple Claude sessions coexist safely.
+- **Multi-agent safe** — 12-tab shared pool with 128-bit agent IDs, per-tab owners, and a screenshot mutex. Multiple Claude sessions can share one Firefox (see [SECURITY.md](./SECURITY.md) for exactly what is owner-checked).
 - **Full browser control** — Read pages as compact accessibility snapshots with element refs; click, type, scroll, screenshot, evaluate JS (opt-in), inspect network requests and uncaught page errors.
 
 ## Quick Start
@@ -65,7 +65,7 @@ On Linux, when Firefox is found, the installer also sideloads the extension into
 | `CLAUDEZILLA_AUTOSTART_RETRY_COOLDOWN_MS` | all platforms | How long to wait before retrying a failed start (default `60000`). |
 | `CLAUDEZILLA_AUTOSTART_LAUNCH_TIMEOUT_MS` | all platforms | How long the start command itself may run (default `20000`). |
 | `CLAUDEZILLA_TOOL_MODE` | MCP server | `lazy` lists only the `firefox_activate` gateway until a category is activated (same as `--tools lazy`). The default lists every tool; `--tools all` overrides the variable. |
-| `CLAUDEZILLA_SCREENSHOT_FILES` | MCP server | `1` also writes every screenshot to `claudezilla-screenshots/` in the OS temp directory (newest 50 kept) and returns its `savedPath`, for harnesses that cannot show inline images. |
+| `CLAUDEZILLA_SCREENSHOT_FILES` | MCP server | `1` also writes each screenshot taken without an explicit `savePath` to `claudezilla-screenshots/` in the OS temp directory (newest 50 kept) and returns its `savedPath`, for harnesses that cannot show inline images. With `savePath`, only that file is written. |
 | `CLAUDEZILLA_AGENT_TIMEOUT_MS` | MCP server | Close this agent's pool tabs after this long without a tool call (default `600000`, 10 minutes; `0` disables). |
 | `CLAUDEZILLA_ALLOW_QUIT` | all platforms | Allows the `quitBrowser` command, which closes every window of the browser the host runs in. Set it only in the environment of a browser that exists for agents (for example the profile started by `CLAUDEZILLA_AUTOSTART_CMD` or a systemd unit), never for your own browser. |
 
@@ -115,7 +115,7 @@ ExecStart=/usr/bin/firefox --no-remote --profile %h/profiles/headless
 ExecStop=/usr/bin/node /path/to/claudezilla/host/cli.js quitBrowser
 ```
 
-systemd runs `ExecStop` with the unit's environment, waits for Firefox to exit, and only falls back to `SIGTERM` after `TimeoutStopSec`.
+systemd runs `ExecStop` with the unit's environment. `quitBrowser` replies `{quitting: true}` at once and closes the windows after a 200 ms grace (with a 1.5 s pause before the Claudezilla window when other windows are open), so `cli.js` returns before Firefox has exited; once `ExecStop` returns, systemd sends `SIGTERM` to whatever is still running.
 
 ## What Can Claude Do?
 
@@ -127,13 +127,13 @@ systemd runs `ExecStop` with the unit's environment, waits for Firefox to exit, 
 | **Screenshot** | Capture the viewport or a region, sized for vision models (JPEG or PNG) |
 | **Consent** | Auto-dismiss cookie/GDPR consent dialogs |
 | **Wait** | Handle SPAs and dynamic content |
-| **Focus Loops** | Persistent iterative tasks until completion |
+| **Focus Loops** | Re-run a prompt across Claude Code turns until max iterations or a manual stop |
 
 ## Support Development
 
 Claudezilla is free and open source. You can support its development with a one-time donation or monthly sponsorship:
 
-- Click the **☕ Buy Me a Coffee** button on the welcome page (shown the first time you open the popup while private-window access is off)
+- Click the **☕ Buy Me a Coffee** button on the welcome page (opened each time you open the popup while private-window access is off)
 - Or use the **☕ Support this project** link in the extension popup
 - Donations are processed securely through Stripe
 
@@ -160,11 +160,11 @@ All 35 tools are listed by default.
 - `firefox_click` — Click an element by `ref` (from a snapshot or `firefox_find`) or CSS selector
 - `firefox_type` — Type into an input field by `ref` or selector
 - `firefox_press_key` — Keyboard events (Enter, Tab, shortcuts)
-- `firefox_screenshot` — Capture the viewport or a `region`, sized for vision models (`maxEdge`, default 1568 px); supports annotated mode. Set `CLAUDEZILLA_SCREENSHOT_FILES=1` for harnesses that cannot show inline images: each screenshot is also saved under the temp directory and its `savedPath` is returned.
+- `firefox_screenshot` — Capture the viewport or a `region`, sized for vision models (`maxEdge`, default 1568 px); supports annotated mode. Set `CLAUDEZILLA_SCREENSHOT_FILES=1` for harnesses that cannot show inline images: each screenshot without an explicit `savePath` is also saved under the temp directory and its `savedPath` is returned.
 - `firefox_get_tabs` / `firefox_close_tab` — Manage tabs
 - `firefox_list_all_tabs` — List all open tabs, including ones not yet under Claudezilla's control
 - `firefox_attach_tab` / `firefox_detach_tab` — Attach to (or release) a tab the user already has open, driving it in place instead of opening a new one
-- `firefox_close_window` — Close the Claudezilla window (refused while other agents have tabs open)
+- `firefox_close_window` — Close the Claudezilla window (refused only when tabs of two or more different agents are open; an adopted user window keeps the window and closes only Claudezilla's tabs)
 - `firefox_resize_window` / `firefox_set_viewport` — Resize a window, or apply a device viewport preset
 
 ### Multi-Agent
@@ -172,7 +172,7 @@ All 35 tools are listed by default.
 
 ### Configuration
 - `firefox_activate` — Only with opt-in lazy loading (`--tools lazy` or `CLAUDEZILLA_TOOL_MODE=lazy`): load tool categories on demand. By default every tool is listed.
-- `firefox_set_config` — Per-agent domain allow-list (`allowedDomains`) and automatic consent handling (`handleConsent`)
+- `firefox_set_config` — Per-agent domain allow-list (`allowedDomains`, checked only against the `url` of `firefox_navigate` and `firefox_create_window`; the agent can clear it, so it is not a sandbox) and automatic consent handling (`handleConsent`)
 - `firefox_set_private_mode` — Toggle private/regular browsing
 - `firefox_handle_consent` — Dismiss cookie/GDPR consent dialogs
 
@@ -182,7 +182,7 @@ All 35 tools are listed by default.
 - `firefox_loop_status` — Check iteration count and state
 
 ### Page Analysis
-- `firefox_get_page_state` — Structured data (headings, links, buttons, inputs, images, landmarks); items carry `ref`
+- `firefox_get_page_state` — Structured data (headings, links, buttons, inputs, images, landmarks); headings, links, buttons and inputs carry `ref`
 - `firefox_diff_page_state` — Diff two page-state snapshots
 - `firefox_get_accessibility_snapshot` — Primary way to read a page: compact text tree with `[ref_N]` handles for click/type/scroll/press_key (cheaper than screenshots)
 - `firefox_find` — Find elements by visible text or accessible name; returns refs with landmark context
@@ -207,13 +207,13 @@ All 35 tools are listed by default.
 
 Claudezilla is designed with security in mind:
 
-- **Command whitelist** — Only predefined actions allowed
+- **Command whitelist** — Only predefined actions allowed; `firefox_evaluate` runs arbitrary page JavaScript once you enable it in the popup
 - **Local only** — Communication via Unix socket, or a named pipe on Windows (no network exposure)
-- **Tab isolation** — Each Claude session owns its tabs
+- **Tab ownership** — Pool tabs record the agent that created them; close and navigate are owner-checked, and content commands are checked when a `tabId` is passed (the MCP server passes the agent's current tab automatically once it has one). Attached user tabs are not owner-checked except for close.
 - **URL validation** — Blocks dangerous schemes (`javascript:`, `data:`)
-- **Supply chain hardened** — `ignore-scripts=true`, pinned dependencies, pnpm strict isolation, SHA-pinned CI actions, timing-safe auth
+- **Supply chain hardened** — `ignore-scripts=true`, pinned direct dependencies, SHA-pinned CI actions, timing-safe auth. The installers run `npm install` in `mcp/` (npm ignores `pnpm-lock.yaml`); pnpm with its lockfile is used for development and CI.
 
-Works in both regular and private Firefox windows. Tab navigation respects ownership — Claude can only navigate tabs it created or tabs attached with `firefox_attach_tab`.
+Works in both regular and private Firefox windows. `firefox_navigate` drives pool tabs it created (owner-checked) or tabs attached with `firefox_attach_tab` (not owner-checked).
 
 See [SECURITY.md](./SECURITY.md) for the full security model.
 
