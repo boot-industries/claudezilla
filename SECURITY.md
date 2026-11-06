@@ -73,7 +73,7 @@ const ALLOWED_COMMANDS = new Set([
 ]);
 ```
 
-**Why:** Prevents arbitrary code execution. Only predefined actions can be performed.
+**Why:** Only predefined actions can be performed over the socket. The exception is `firefox_evaluate` (`evaluate`), which runs arbitrary JavaScript in the page once the user enables it in the popup (§12).
 
 ### 2. Structured Data Model
 
@@ -106,7 +106,7 @@ The extension returns page content as a `text` or `html` field in JSON (the MCP 
 The Unix socket is secured with multiple layers:
 
 - **Secure path:** Uses `CLAUDEZILLA_IPC_DIR` if set (POSIX only), else `XDG_RUNTIME_DIR` if available (per-user, tmpfs-backed), else `~/.claudezilla/` (mode 0700), else `tmpdir()`. Windows uses the named pipe `\\.\pipe\claudezilla` with the token under `%LOCALAPPDATA%\claudezilla\`.
-- **Restrictive permissions:** Socket is chmod 0600 (user-only access)
+- **Restrictive permissions:** Socket is chmod'ed to 0600 (user-only access) right after `listen()`
 - **Auth token:** The host writes a random token file (0600) at startup; every socket request must carry it, and it is compared with `crypto.timingSafeEqual()`
 - **Buffer limits:** 10MB max message size prevents memory exhaustion
 - **Clean shutdown:** Socket and token file are removed on exit
@@ -116,7 +116,7 @@ The Unix socket is secured with multiple layers:
 ### 5. Extension Permission Gating
 
 - `firefox_navigate` only drives an existing Claudezilla pool tab or an attached tab, and never creates a window.
-- Windows are created only by `firefox_create_window`, which enforces the private-mode setting.
+- Windows are created only by `firefox_create_window`. The private-mode setting is only its default: a per-call `private: true|false` overrides it, a private request falls back to a regular window when private-window access is not granted, and agents can change the setting with `firefox_set_private_mode`.
 - The pre-0.7.7 rule that disabled navigate when the add-on could run in private windows was removed, because it guarded no window-creating path.
 
 ### 6. URL Scheme Validation (v0.4.5)
@@ -133,8 +133,8 @@ All URL inputs are validated before navigation:
 When multiple Claude agents share the browser window:
 
 - **Tab ownership:** Each tab tracks its creator agent (128-bit entropy agent ID)
-- **Close restrictions:** Agents can only close their own tabs
-- **Window close:** Blocked if other agents have active tabs
+- **Close restrictions:** Agents can only close their own pool tabs; an attached tab can be closed only by the agent that attached it, but another agent can re-attach it first (attaching has no existing-owner guard)
+- **Window close:** Refused only when tabs of two or more different agents are open (tabs with owner `unknown` are ignored); in an adopted user window only the tracked tabs are closed
 - **Request IDs:** UUID-based to prevent collision attacks
 
 **Why:** Prevents cross-agent interference in multi-agent environments.
@@ -147,16 +147,16 @@ Monitoring, logging and screenshot files handle sensitive data as follows:
 - **URL redaction:** Query parameters matching sensitive patterns are masked
 - **Debug log permissions:** 0600 (user-only read/write), capped at 10MB (rotated to `.1`)
 - **Command logging:** The host log and the extension's `CLI command:` line record command names, not parameters (the host logs the first 50 characters of a focus-loop prompt). Known gap: the extension console (about:debugging inspector) still prints every raw host message, parameters (typed text, passwords) included.
-- **Screenshot files:** `savePath` must be inside the temp or working directory and end in `.jpg`/`.jpeg` (JPEG) or `.png` (PNG); files are written 0600 without following symlinks. `CLAUDEZILLA_SCREENSHOT_FILES=1` writes to a 0700 `claudezilla-screenshots` directory under the temp directory and keeps the newest 50.
+- **Screenshot files:** `savePath` must be inside the temp or working directory and end in `.jpg`/`.jpeg` (JPEG) or `.png` (PNG); files are written 0600 without following symlinks (macOS/Linux), and only that file is written. Without `savePath`, `CLAUDEZILLA_SCREENSHOT_FILES=1` writes to a 0700 `claudezilla-screenshots` directory under the temp directory and keeps the newest 50.
 
 **Why:** Prevents credential leakage through monitoring features.
 
 ### 9. Content Command Ownership (v0.4.5)
 
-All commands that interact with tab content verify ownership:
+Commands that interact with tab content check ownership when they know the target tab:
 
-- **Protected commands:** navigate, getContent, click, type, scroll, waitFor, evaluate, getElementInfo, getPageState, getAccessibilitySnapshot, find, pressKey, getConsoleLogs, getNetworkRequests, screenshot, handleConsent
-- **Enforcement:** Agent ID must match the pool tab's owner or the tab must be unowned ('unknown'). Tabs attached with `firefox_attach_tab` are driven in place without this check; only the attaching agent can close them.
+- **Commands:** navigate, getContent, click, type, scroll, waitFor, evaluate, getElementInfo, getPageState, getAccessibilitySnapshot, find, pressKey, getConsoleLogs, getNetworkRequests, screenshot, handleConsent
+- **Enforcement:** When a `tabId` is passed, the agent ID must match the pool tab's owner or the tab must be unowned (`unknown` bypasses the check). The MCP server passes the agent's current tab automatically once it has one; a call without `tabId` before that uses the window's active tab without a check, except `navigate` and `handleConsent`, which check it. Tabs attached with `firefox_attach_tab` are driven in place without this check.
 - **Error response:** `OWNERSHIP: Cannot <operation> tab X (owned by agent_Y, you are agent_Z)`
 
 **Why:** Prevents cross-agent data exfiltration and unauthorized DOM manipulation.
