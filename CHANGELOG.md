@@ -37,7 +37,8 @@
 - **`firefox_find`** — find elements by visible text or accessible name, with landmark context.
 - **Vision-sized screenshots** — long edge capped at `maxEdge` (default 1568, up to 2576), `region`
   zoom, and `width`/`height`/`cssScale` reported before the image. `CLAUDEZILLA_SCREENSHOT_FILES=1`
-  also writes each screenshot to a private temp directory for harnesses without inline images.
+  also writes each screenshot without an explicit `savePath` to a private temp directory for
+  harnesses without inline images.
 - **Full catalog by default** — tools are annotated (`readOnlyHint`, `destructiveHint`,
   `openWorldHint`), titled, and the server sends `instructions`. Lazy loading is opt-in
   (`--tools lazy` / `CLAUDEZILLA_TOOL_MODE=lazy`). Results are compact JSON; text bodies follow a
@@ -106,7 +107,7 @@
 
 ### Fixes & Improvements
 
-- **The Screenshot Path Captures the Agent's Tab (#27, reported by @AdamWiley46)** — in an
+- **The Screenshot Path Captures the Agent's Tab (PR #27, @andrei-rizoiu; found in the v0.7.2 review)** — in an
   adopted (user) window the capture returned the user's visible page: the path compared
   the target against Claudezilla's own `activeTabId` instead of the browser's selected
   tab, then captured the window. It now captures the requested tab directly.

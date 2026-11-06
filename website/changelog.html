@@ -355,7 +355,7 @@
               <span class="change-tag tag-feat">feat</span>
               <div class="change-text">
                 <strong>Vision-sized screenshots</strong>
-                <span class="detail">Long edge capped at <code>maxEdge</code> (default 1568, up to 2576), <code>region</code> zoom, and <code>width</code>/<code>height</code>/<code>cssScale</code> reported before the image. <code>CLAUDEZILLA_SCREENSHOT_FILES=1</code> also writes each screenshot to a private temp directory for harnesses without inline images.</span>
+                <span class="detail">Long edge capped at <code>maxEdge</code> (default 1568, up to 2576), <code>region</code> zoom, and <code>width</code>/<code>height</code>/<code>cssScale</code> reported before the image. <code>CLAUDEZILLA_SCREENSHOT_FILES=1</code> also writes each screenshot without an explicit <code>savePath</code> to a private temp directory for harnesses without inline images.</span>
               </div>
             </li>
             <li class="change-item">
@@ -505,8 +505,8 @@
             <li class="change-item">
               <span class="change-tag tag-fix">fix</span>
               <div class="change-text">
-                <strong>The Screenshot Path Captures the Agent's Tab (#27)</strong>
-                <span class="detail">Reported by @AdamWiley46. In an adopted (user) window the capture returned the user's visible page. It now captures the requested tab directly.</span>
+                <strong>The Screenshot Path Captures the Agent's Tab (PR #27)</strong>
+                <span class="detail">Thanks @andrei-rizoiu; found in the v0.7.2 review. In an adopted (user) window the capture returned the user's visible page. It now captures the requested tab directly.</span>
               </div>
             </li>
             <li class="change-item">
